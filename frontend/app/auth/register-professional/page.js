@@ -3,17 +3,18 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Scale, AlertCircle, UploadCloud } from 'lucide-react';
+import { AlertCircle, UploadCloud } from 'lucide-react';
+import BrandLogo from '@/components/common/BrandLogo';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 import Select from '@/components/common/Select';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/components/LanguageProvider';
 import { validateForm, professionalRegisterRules } from '@/utils/validators';
 import {
   CITIES,
   PROFESSION_TYPES,
   SPECIALIZATIONS,
-  SITE,
 } from '@/utils/constants';
 
 const cityOptions = CITIES.map((c) => ({ value: c, label: c }));
@@ -37,6 +38,7 @@ function SectionHeading({ children }) {
 export default function RegisterProfessionalPage() {
   const router = useRouter();
   const { registerProfessional } = useAuth();
+  const { t } = useLanguage();
   const [values, setValues] = useState({
     name: '',
     email: '',
@@ -84,10 +86,7 @@ export default function RegisterProfessionalPage() {
       });
       router.push('/dashboard/professional');
     } catch (err) {
-      setBanner(
-        (err && err.message) ||
-          'We could not create your account right now. Please try again shortly.'
-      );
+      setBanner((err && err.message) || t('auth.genericError'));
     } finally {
       setSubmitting(false);
     }
@@ -97,14 +96,7 @@ export default function RegisterProfessionalPage() {
     <div className="flex min-h-screen flex-col bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center px-4 py-4">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white">
-              <Scale size={18} />
-            </span>
-            <span className="text-lg font-bold text-slate-900">
-              {SITE.name}
-            </span>
-          </Link>
+          <BrandLogo variant="light" />
         </div>
       </header>
 
@@ -112,10 +104,10 @@ export default function RegisterProfessionalPage() {
         <div className="w-full max-w-2xl">
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-bold text-slate-900">
-              Join as a professional
+              {t('regPro.title')}
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Create your profile and start accepting online consultations.
+              {t('regPro.subtitle')}
             </p>
           </div>
 
@@ -129,55 +121,55 @@ export default function RegisterProfessionalPage() {
 
             <form onSubmit={handleSubmit} className="space-y-6" noValidate>
               <div className="space-y-4">
-                <SectionHeading>Personal details</SectionHeading>
+                <SectionHeading>{t('regPro.personalDetails')}</SectionHeading>
                 <Input
-                  label="Full name"
+                  label={t('auth.fullName')}
                   name="name"
                   value={values.name}
                   onChange={handleChange}
-                  placeholder="Your full name"
+                  placeholder={t('auth.fullNamePlaceholder')}
                   error={errors.name}
                   required
                 />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Input
-                    label="Email address"
+                    label={t('auth.email')}
                     name="email"
                     type="email"
                     value={values.email}
                     onChange={handleChange}
-                    placeholder="you@example.com"
+                    placeholder={t('auth.emailPlaceholder')}
                     error={errors.email}
                     required
                   />
                   <Input
-                    label="Phone number"
+                    label={t('auth.phone')}
                     name="phone"
                     value={values.phone}
                     onChange={handleChange}
-                    placeholder="10-digit mobile"
+                    placeholder={t('auth.phonePlaceholder')}
                     error={errors.phone}
                     required
                   />
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Select
-                    label="City"
+                    label={t('auth.city')}
                     name="city"
                     value={values.city}
                     onChange={handleChange}
                     options={cityOptions}
-                    placeholder="Select your city"
+                    placeholder={t('auth.cityPlaceholder')}
                     error={errors.city}
                     required
                   />
                   <Input
-                    label="Password"
+                    label={t('auth.password')}
                     name="password"
                     type="password"
                     value={values.password}
                     onChange={handleChange}
-                    placeholder="Min. 8 characters"
+                    placeholder={t('auth.passwordPlaceholder')}
                     error={errors.password}
                     required
                   />
@@ -185,66 +177,68 @@ export default function RegisterProfessionalPage() {
               </div>
 
               <div className="space-y-4">
-                <SectionHeading>Professional profile</SectionHeading>
+                <SectionHeading>
+                  {t('regPro.professionalProfile')}
+                </SectionHeading>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Select
-                    label="Profession type"
+                    label={t('regPro.professionType')}
                     name="professionType"
                     value={values.professionType}
                     onChange={handleChange}
                     options={professionOptions}
-                    placeholder="Select profession"
+                    placeholder={t('regPro.professionTypePlaceholder')}
                     error={errors.professionType}
                     required
                   />
                   <Select
-                    label="Specialization"
+                    label={t('regPro.specialization')}
                     name="specialization"
                     value={values.specialization}
                     onChange={handleChange}
                     options={specializationOptions}
-                    placeholder="Select specialization"
+                    placeholder={t('regPro.specializationPlaceholder')}
                     error={errors.specialization}
                     required
                   />
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Input
-                    label="Years of experience"
+                    label={t('regPro.experience')}
                     name="experience"
                     type="number"
                     value={values.experience}
                     onChange={handleChange}
-                    placeholder="e.g. 8"
+                    placeholder={t('regPro.experiencePlaceholder')}
                     error={errors.experience}
                     min="0"
                   />
                   <Input
-                    label="Per-minute rate (₹)"
+                    label={t('regPro.perMinuteRate')}
                     name="perMinuteRate"
                     type="number"
                     value={values.perMinuteRate}
                     onChange={handleChange}
-                    placeholder="e.g. 50"
+                    placeholder={t('regPro.perMinuteRatePlaceholder')}
                     error={errors.perMinuteRate}
                     min="0"
                   />
                 </div>
                 <Input
-                  label="Languages"
+                  label={t('regPro.languages')}
                   name="languages"
                   value={values.languages}
                   onChange={handleChange}
-                  placeholder="English, Hindi, Marathi"
-                  hint="Enter languages separated by commas."
+                  placeholder={t('regPro.languagesPlaceholder')}
+                  hint={t('regPro.languagesHint')}
                   error={errors.languages}
                 />
                 <Input
-                  label="Registration / Bar Council number"
+                  label={t('regPro.registrationNumber')}
                   name="registrationNumber"
                   value={values.registrationNumber}
                   onChange={handleChange}
-                  placeholder="e.g. MAH/12345/2010"
+                  placeholder={t('regPro.registrationNumberPlaceholder')}
                   error={errors.registrationNumber}
                   required
                 />
@@ -253,7 +247,7 @@ export default function RegisterProfessionalPage() {
                     htmlFor="bio"
                     className="mb-1.5 block text-sm font-medium text-slate-700"
                   >
-                    Professional bio
+                    {t('regPro.bio')}
                   </label>
                   <textarea
                     id="bio"
@@ -261,24 +255,25 @@ export default function RegisterProfessionalPage() {
                     rows={4}
                     value={values.bio}
                     onChange={handleChange}
-                    placeholder="Briefly describe your practice, expertise and the kind of clients you help."
+                    placeholder={t('regPro.bioPlaceholder')}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
                   />
                 </div>
               </div>
 
               <div className="space-y-4">
-                <SectionHeading>Verification documents</SectionHeading>
+                <SectionHeading>
+                  {t('regPro.verificationDocuments')}
+                </SectionHeading>
                 <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center">
                   <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600">
                     <UploadCloud size={24} />
                   </div>
                   <p className="text-sm font-medium text-slate-700">
-                    Upload your ID & registration certificate
+                    {t('regPro.uploadTitle')}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Drag & drop files here, or browse. PDF, JPG or PNG up to
-                    10MB.
+                    {t('regPro.uploadHint')}
                   </p>
                   <Button
                     variant="outline"
@@ -286,24 +281,24 @@ export default function RegisterProfessionalPage() {
                     className="mt-4"
                     disabled
                   >
-                    Browse files
+                    {t('regPro.browseFiles')}
                   </Button>
                 </div>
               </div>
 
               <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting ? 'Creating account…' : 'Create professional account'}
+                {submitting ? t('auth.creating') : t('regPro.submit')}
               </Button>
             </form>
           </div>
 
           <p className="mt-6 text-center text-sm text-slate-600">
-            Already have an account?{' '}
+            {t('auth.alreadyHaveAccount')}{' '}
             <Link
               href="/auth/login"
               className="font-medium text-blue-600 hover:text-blue-700"
             >
-              Sign in
+              {t('auth.signIn')}
             </Link>
           </p>
         </div>

@@ -286,7 +286,7 @@ export const translations = {
 
   hi: {
     // --- Header / navigation ---
-    'nav.professionals': 'पेशेवर',
+    'nav.professionals': 'प्रोफेशनल',
     'nav.firms': 'फर्म',
     'nav.howItWorks': 'यह कैसे काम करता है',
     'nav.pricing': 'मूल्य निर्धारण',
@@ -305,15 +305,15 @@ export const translations = {
     'footer.subscribe': 'सदस्यता लें',
     'footer.colCompany': 'कंपनी',
     'footer.colExplore': 'खोजें',
-    'footer.colProfessionals': 'पेशेवरों के लिए',
+    'footer.colProfessionals': 'प्रोफेशनल्स के लिए',
     'footer.linkAbout': 'हमारे बारे में',
     'footer.linkHowItWorks': 'यह कैसे काम करता है',
     'footer.linkPricing': 'मूल्य निर्धारण',
     'footer.linkContact': 'संपर्क करें',
-    'footer.linkProfessionals': 'पेशेवर खोजें',
+    'footer.linkProfessionals': 'प्रोफेशनल खोजें',
     'footer.linkFirms': 'फर्म ब्राउज़ करें',
     'footer.linkSearch': 'उन्नत खोज',
-    'footer.linkJoinPro': 'पेशेवर के रूप में जुड़ें',
+    'footer.linkJoinPro': 'प्रोफेशनल के रूप में जुड़ें',
     'footer.linkRegisterFirm': 'अपनी फर्म पंजीकृत करें',
     'footer.linkLogin': 'साइन इन करें',
     'footer.linkTerms': 'नियम एवं शर्तें',
@@ -343,7 +343,7 @@ export const translations = {
     'hero.headingLead': 'अपना मामला एआई को बताइए और मिलान पाइए',
     'hero.headingHighlight': 'सही विशेषज्ञ से।',
     'hero.subtext':
-      'एआई-आधारित कानूनी और कर परामर्श, जो मिनटों में आपको सही पेशेवर से जोड़ता है। अपनी समस्या सरल भाषा में बताइए — हमारी एआई आपको सत्यापित वकील, अधिवक्ता या कर विशेषज्ञ तक पहुँचाती है।',
+      'एआई-आधारित कानूनी और कर परामर्श, जो मिनटों में आपको सही प्रोफेशनल से जोड़ता है। अपनी समस्या सरल भाषा में बताइए — हमारी एआई आपको सत्यापित वकील, अधिवक्ता या कर विशेषज्ञ तक पहुँचाती है।',
     'hero.inputPlaceholder': 'अपनी कानूनी या कर समस्या बताइए…',
     'hero.inputAria': 'अपनी कानूनी या कर समस्या बताइए',
     'hero.matchButton': 'एआई से मिलान कराएं',
@@ -358,14 +358,14 @@ export const translations = {
     'hero.chatBotLead': 'समझ गया — यह एक दीवानी संपत्ति मामला है। मुझे मिले',
     'hero.chatBotMatch': '3 सत्यापित संपत्ति वकील',
     'hero.chatBotTail': 'आपके पास।',
-    'hero.verifiedNote': 'सभी मिलान सत्यापित और जाँचे-परखे पेशेवर हैं।',
+    'hero.verifiedNote': 'सभी मिलान सत्यापित और जाँचे-परखे प्रोफेशनल हैं।',
 
     // --- Search section ---
-    'search.eyebrow': 'पेशेवर खोजें',
+    'search.eyebrow': 'प्रोफेशनल खोजें',
     'search.headingLead': 'सही चुनें',
     'search.headingHighlight': 'कानूनी या कर विशेषज्ञ',
     'search.subtext':
-      'कीवर्ड, पेशे और शहर के अनुसार सत्यापित पेशेवर खोजें — और मिनटों में परामर्श बुक करें।',
+      'कीवर्ड, पेशे और शहर के अनुसार सत्यापित प्रोफेशनल खोजें — और मिनटों में परामर्श बुक करें।',
     'search.keywordPlaceholder': 'कीवर्ड, नाम या विशेषज्ञता',
     'search.keywordAria': 'खोज कीवर्ड',
     'search.professionAria': 'पेशा',
@@ -401,7 +401,7 @@ export const translations = {
     'smartMatching.headingLead': 'स्मार्ट मिलान,',
     'smartMatching.headingHighlight': 'एआई द्वारा संचालित',
     'smartMatching.subtext':
-      'एक उलझी समस्या से सही पेशेवर तक — तीन चरणों में।',
+      'एक उलझी समस्या से सही प्रोफेशनल तक — तीन चरणों में।',
     'smartMatching.step1Title': 'अपना मामला बताइए',
     'smartMatching.step1Desc':
       'एआई को सरल भाषा में बताइए कि क्या हुआ — कोई कानूनी शब्दजाल नहीं, कोई फ़ॉर्म नहीं। बस अपनी स्थिति अपने शब्दों में।',
@@ -417,7 +417,7 @@ export const translations = {
     'aiAssistant.headingLead': 'मिलिए अपने एआई',
     'aiAssistant.headingHighlight': 'कानूनी व कर असिस्टेंट से',
     'aiAssistant.subtext':
-      'सिर्फ़ एक चैटबॉट से कहीं अधिक — एक मार्गदर्शक जो आपका मामला समझता है और आपको सही सत्यापित पेशेवर से जोड़ता है।',
+      'सिर्फ़ एक चैटबॉट से कहीं अधिक — एक मार्गदर्शक जो आपका मामला समझता है और आपको सही सत्यापित प्रोफेशनल से जोड़ता है।',
     'aiAssistant.assistantName': 'Pro Firmo असिस्टेंट',
     'aiAssistant.assistantStatus': 'आपके मामले का विश्लेषण कर रहा है',
     'aiAssistant.analyzing': 'एआई आपके मामले का विश्लेषण कर रही है…',
@@ -443,7 +443,7 @@ export const translations = {
       'प्रतिबद्ध होने से पहले संभावित रास्ते, समय-सीमा और लागत समझिए।',
     'aiAssistant.feature4Title': 'केवल सत्यापित विशेषज्ञों से मिलान करता है',
     'aiAssistant.feature4Desc':
-      'हर अनुशंसित पेशेवर पहचान-सत्यापित और प्रमाण-पत्र जाँचा हुआ है।',
+      'हर अनुशंसित प्रोफेशनल पहचान-सत्यापित और प्रमाण-पत्र जाँचा हुआ है।',
     'aiAssistant.cta': 'एआई असिस्टेंट से शुरू करें',
 
     // --- How it works section ---
@@ -485,7 +485,7 @@ export const translations = {
     'featuredFirms.heading': 'भरोसेमंद कानूनी व कर फर्म',
     'featuredFirms.subtext':
       'जाँची-परखी विशेषज्ञ टीमों वाली पूर्ण-सेवा फर्म, जटिल मामले संभालने के लिए तैयार।',
-    'featuredFirms.professionals': 'पेशेवर',
+    'featuredFirms.professionals': 'प्रोफेशनल',
     'featuredFirms.viewFirm': 'फर्म देखें',
 
     // --- Dashboard preview section ---
@@ -553,11 +553,11 @@ export const translations = {
     'cta.headingLead': 'तैयार हैं मिलान पाने के लिए',
     'cta.headingHighlight': 'सही विशेषज्ञ से?',
     'cta.subtext':
-      'अपना मामला एआई को बताइए और मिनटों में अपने लिए मिलान किया हुआ सत्यापित कानूनी या कर पेशेवर पाइए — तेज़, पारदर्शी और भरोसेमंद।',
+      'अपना मामला एआई को बताइए और मिनटों में अपने लिए मिलान किया हुआ सत्यापित कानूनी या कर प्रोफेशनल पाइए — तेज़, पारदर्शी और भरोसेमंद।',
     'cta.getStarted': 'मुफ़्त में शुरू करें',
-    'cta.joinPro': 'पेशेवर के रूप में जुड़ें',
-    'cta.note': 'क्रेडिट कार्ड की आवश्यकता नहीं · केवल सत्यापित पेशेवर',
-    'cta.bgAlt': 'आधुनिक कार्यालय में सहयोग करते कानूनी और कर पेशेवर',
+    'cta.joinPro': 'प्रोफेशनल के रूप में जुड़ें',
+    'cta.note': 'क्रेडिट कार्ड की आवश्यकता नहीं · केवल सत्यापित प्रोफेशनल',
+    'cta.bgAlt': 'आधुनिक कार्यालय में सहयोग करते कानूनी और कर प्रोफेशनल',
     'cta.consultantAlt': 'सत्यापित Pro Firmo सलाहकार',
     'cta.consultantsBadge': 'सत्यापित सलाहकार ऑनलाइन',
     'cta.consultantName': 'राहुल मेहता',

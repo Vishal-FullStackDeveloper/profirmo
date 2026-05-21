@@ -7,31 +7,34 @@ import Footer from '@/components/common/Footer';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Button from '@/components/common/Button';
-
-const CONTACT_DETAILS = [
-  {
-    icon: Mail,
-    label: 'Email us',
-    value: 'support@profirmo.in',
-    hint: 'We reply within one business day.',
-  },
-  {
-    icon: Phone,
-    label: 'Call us',
-    value: '+91 22 4000 1100',
-    hint: 'Mon to Sat, 9:00 AM to 7:00 PM.',
-  },
-  {
-    icon: MapPin,
-    label: 'Visit us',
-    value: '7th Floor, Nariman Point, Mumbai, Maharashtra 400021',
-    hint: 'By appointment only.',
-  },
-];
+import { useLanguage } from '@/components/LanguageProvider';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ContactPage() {
+  const { t } = useLanguage();
+
+  const CONTACT_DETAILS = [
+    {
+      icon: Mail,
+      label: t('contact.details.email.label'),
+      value: 'support@profirmo.in',
+      hint: t('contact.details.email.hint'),
+    },
+    {
+      icon: Phone,
+      label: t('contact.details.phone.label'),
+      value: '+91 22 4000 1100',
+      hint: t('contact.details.phone.hint'),
+    },
+    {
+      icon: MapPin,
+      label: t('contact.details.visit.label'),
+      value: t('contact.details.visit.value'),
+      hint: t('contact.details.visit.hint'),
+    },
+  ];
+
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -50,14 +53,14 @@ export default function ContactPage() {
 
   function validate() {
     const next = {};
-    if (!form.name.trim()) next.name = 'Please enter your name.';
+    if (!form.name.trim()) next.name = t('contact.error.name');
     if (!form.email.trim()) {
-      next.email = 'Please enter your email.';
+      next.email = t('contact.error.emailRequired');
     } else if (!EMAIL_REGEX.test(form.email.trim())) {
-      next.email = 'Please enter a valid email address.';
+      next.email = t('contact.error.emailInvalid');
     }
-    if (!form.subject.trim()) next.subject = 'Please enter a subject.';
-    if (!form.message.trim()) next.message = 'Please enter a message.';
+    if (!form.subject.trim()) next.subject = t('contact.error.subject');
+    if (!form.message.trim()) next.message = t('contact.error.message');
     return next;
   }
 
@@ -81,11 +84,10 @@ export default function ContactPage() {
         <section className="border-b border-slate-200 bg-slate-50">
           <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              Contact us
+              {t('contact.hero.title')}
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-600 sm:text-lg">
-              Have a question about Pro Firmo? We would love to hear from you —
-              send us a message and our team will get back to you.
+              {t('contact.hero.subtitle')}
             </p>
           </div>
         </section>
@@ -97,10 +99,10 @@ export default function ContactPage() {
               <div className="lg:col-span-3">
                 <Card padding={false} className="p-6 sm:p-8">
                   <h2 className="text-xl font-semibold text-slate-900">
-                    Send us a message
+                    {t('contact.form.title')}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Fill in the form below and we will respond shortly.
+                    {t('contact.form.subtitle')}
                   </p>
 
                   {submitted && (
@@ -111,11 +113,10 @@ export default function ContactPage() {
                       />
                       <div>
                         <p className="text-sm font-medium text-emerald-800">
-                          Thanks — we&apos;ll get back to you.
+                          {t('contact.form.successTitle')}
                         </p>
                         <p className="mt-0.5 text-sm text-emerald-700">
-                          Your message has been received. Our team will reply
-                          within one business day.
+                          {t('contact.form.successBody')}
                         </p>
                       </div>
                     </div>
@@ -124,31 +125,31 @@ export default function ContactPage() {
                   <form onSubmit={handleSubmit} className="mt-6 space-y-5" noValidate>
                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                       <Input
-                        label="Full name"
+                        label={t('contact.form.nameLabel')}
                         name="name"
                         value={form.name}
                         onChange={handleChange}
-                        placeholder="Your name"
+                        placeholder={t('contact.form.namePlaceholder')}
                         error={errors.name}
                         required
                       />
                       <Input
-                        label="Email address"
+                        label={t('contact.form.emailLabel')}
                         name="email"
                         type="email"
                         value={form.email}
                         onChange={handleChange}
-                        placeholder="you@example.com"
+                        placeholder={t('contact.form.emailPlaceholder')}
                         error={errors.email}
                         required
                       />
                     </div>
                     <Input
-                      label="Subject"
+                      label={t('contact.form.subjectLabel')}
                       name="subject"
                       value={form.subject}
                       onChange={handleChange}
-                      placeholder="How can we help?"
+                      placeholder={t('contact.form.subjectPlaceholder')}
                       error={errors.subject}
                       required
                     />
@@ -157,7 +158,7 @@ export default function ContactPage() {
                         htmlFor="message"
                         className="mb-1.5 block text-sm font-medium text-slate-700"
                       >
-                        Message
+                        {t('contact.form.messageLabel')}
                         <span className="ml-0.5 text-red-500">*</span>
                       </label>
                       <textarea
@@ -166,7 +167,7 @@ export default function ContactPage() {
                         value={form.message}
                         onChange={handleChange}
                         rows={5}
-                        placeholder="Tell us a bit more..."
+                        placeholder={t('contact.form.messagePlaceholder')}
                         aria-invalid={errors.message ? 'true' : 'false'}
                         className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 transition-colors focus:outline-none focus:ring-2 ${
                           errors.message
@@ -181,7 +182,7 @@ export default function ContactPage() {
                       )}
                     </div>
                     <Button type="submit" size="lg">
-                      Send message
+                      {t('contact.form.submit')}
                     </Button>
                   </form>
                 </Card>
@@ -219,13 +220,13 @@ export default function ContactPage() {
                     </span>
                     <div>
                       <p className="text-sm font-semibold text-slate-800">
-                        Support hours
+                        {t('contact.details.hours.label')}
                       </p>
                       <p className="mt-0.5 text-sm text-slate-700">
-                        Monday to Saturday
+                        {t('contact.details.hours.value')}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        9:00 AM to 7:00 PM IST. Closed on public holidays.
+                        {t('contact.details.hours.hint')}
                       </p>
                     </div>
                   </div>

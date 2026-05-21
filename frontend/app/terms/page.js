@@ -1,90 +1,26 @@
+'use client';
+
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
-
-export const metadata = {
-  title: 'Terms & Conditions — Pro Firmo',
-  description:
-    'The terms and conditions governing the use of the Pro Firmo platform.',
-};
+import { useLanguage } from '@/components/LanguageProvider';
 
 const SECTIONS = [
-  {
-    title: 'Acceptance of terms',
-    body: [
-      'By accessing or using Pro Firmo (the "Platform"), you agree to be bound by these Terms & Conditions and our Privacy Policy. If you do not agree with any part of these terms, you should not use the Platform.',
-      'These terms apply to all users of the Platform, including clients seeking consultations and professionals or firms offering them.',
-    ],
-  },
-  {
-    title: 'Accounts and registration',
-    body: [
-      'To access certain features you must create an account and provide accurate, complete and current information. You are responsible for maintaining the confidentiality of your login credentials and for all activity that occurs under your account.',
-      'Professionals and firms must complete our verification process before offering consultations. We reserve the right to suspend or terminate accounts that provide false information or breach these terms.',
-    ],
-  },
-  {
-    title: 'Consultations and payments',
-    body: [
-      'Pro Firmo enables clients to book online consultations with professionals on a pay-per-minute basis. The applicable rate is displayed on each professional profile before booking.',
-      'Clients are billed for the actual duration of each consultation. Estimated costs shown at booking are indicative and the final amount is calculated on the consultation length. All payments are processed through our supported payment partners.',
-    ],
-  },
-  {
-    title: 'Professional responsibilities',
-    body: [
-      'Professionals and firms are solely responsible for the advice and services they provide. They must hold and maintain all qualifications, registrations and licences required to practise.',
-      'Pro Firmo is a technology platform that facilitates connections between clients and professionals. It does not provide legal or tax advice and is not a party to the professional relationship formed between a client and a professional.',
-    ],
-  },
-  {
-    title: 'Client responsibilities',
-    body: [
-      'Clients agree to use the Platform lawfully and to provide accurate information relevant to their consultation. Clients are responsible for evaluating the suitability of any professional before engaging them.',
-      'Any documents or information shared during a consultation must be lawfully held by the client and shared in good faith.',
-    ],
-  },
-  {
-    title: 'Cancellations and refunds',
-    body: [
-      'Scheduled consultations may be cancelled or rescheduled in accordance with the cancellation window shown at the time of booking. Refunds, where applicable, are processed to the original payment method.',
-      'If a consultation cannot be completed due to a technical fault attributable to the Platform, we will work with you to reschedule or refund the affected amount.',
-    ],
-  },
-  {
-    title: 'Acceptable use',
-    body: [
-      'You agree not to misuse the Platform, including by attempting to gain unauthorised access, disrupting its operation, transmitting harmful code, or using it for any unlawful purpose.',
-      'You may not circumvent the Platform to arrange or take payment for consultations outside of Pro Firmo.',
-    ],
-  },
-  {
-    title: 'Limitation of liability',
-    body: [
-      'The Platform is provided on an "as is" and "as available" basis. To the maximum extent permitted by law, Pro Firmo disclaims all warranties and is not liable for any indirect, incidental or consequential damages arising from your use of the Platform.',
-      'Pro Firmo is not responsible for the accuracy, quality or outcome of any advice provided by professionals through the Platform.',
-    ],
-  },
-  {
-    title: 'Intellectual property',
-    body: [
-      'All content, trademarks, logos and software on the Platform are the property of Pro Firmo or its licensors and are protected by applicable intellectual property laws. You may not copy, reproduce or distribute them without prior written permission.',
-    ],
-  },
-  {
-    title: 'Changes to these terms',
-    body: [
-      'We may update these Terms & Conditions from time to time. Material changes will be communicated through the Platform. Your continued use of Pro Firmo after changes take effect constitutes acceptance of the revised terms.',
-    ],
-  },
-  {
-    title: 'Contact us',
-    body: [
-      'If you have any questions about these Terms & Conditions, please contact us at support@profirmo.in.',
-    ],
-  },
+  { titleKey: 'terms.s1.title', bodyKeys: ['terms.s1.p1', 'terms.s1.p2'] },
+  { titleKey: 'terms.s2.title', bodyKeys: ['terms.s2.p1', 'terms.s2.p2'] },
+  { titleKey: 'terms.s3.title', bodyKeys: ['terms.s3.p1', 'terms.s3.p2'] },
+  { titleKey: 'terms.s4.title', bodyKeys: ['terms.s4.p1', 'terms.s4.p2'] },
+  { titleKey: 'terms.s5.title', bodyKeys: ['terms.s5.p1', 'terms.s5.p2'] },
+  { titleKey: 'terms.s6.title', bodyKeys: ['terms.s6.p1', 'terms.s6.p2'] },
+  { titleKey: 'terms.s7.title', bodyKeys: ['terms.s7.p1', 'terms.s7.p2'] },
+  { titleKey: 'terms.s8.title', bodyKeys: ['terms.s8.p1', 'terms.s8.p2'] },
+  { titleKey: 'terms.s9.title', bodyKeys: ['terms.s9.p1'] },
+  { titleKey: 'terms.s10.title', bodyKeys: ['terms.s10.p1'] },
+  { titleKey: 'terms.s11.title', bodyKeys: ['terms.s11.p1'] },
 ];
 
 export default function TermsPage() {
+  const { t } = useLanguage();
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -93,36 +29,33 @@ export default function TermsPage() {
         <section className="border-b border-slate-200 bg-slate-50">
           <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              Terms &amp; Conditions
+              {t('terms.hero.title')}
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-600 sm:text-lg">
-              Please read these terms carefully before using the Pro Firmo
-              platform.
+              {t('terms.hero.subtitle')}
             </p>
             <p className="mt-4 text-sm text-slate-500">
-              Last updated: 21 May 2026
+              {t('terms.lastUpdated')}
             </p>
           </div>
         </section>
 
         <section className="bg-white py-16 lg:py-20">
           <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-            <p className="text-base text-slate-600">
-              These Terms &amp; Conditions govern your access to and use of
-              Pro Firmo. They form a legally binding agreement between you and
-              Pro Firmo. The text below is provided as a placeholder for
-              demonstration purposes.
-            </p>
+            <p className="text-base text-slate-600">{t('terms.intro')}</p>
             <div className="mt-10 space-y-10">
               {SECTIONS.map((section, index) => (
-                <div key={section.title}>
+                <div key={section.titleKey}>
                   <h2 className="text-xl font-semibold text-slate-900">
-                    {index + 1}. {section.title}
+                    {index + 1}. {t(section.titleKey)}
                   </h2>
                   <div className="mt-3 space-y-3">
-                    {section.body.map((paragraph, i) => (
-                      <p key={i} className="text-sm leading-relaxed text-slate-600">
-                        {paragraph}
+                    {section.bodyKeys.map((bodyKey) => (
+                      <p
+                        key={bodyKey}
+                        className="text-sm leading-relaxed text-slate-600"
+                      >
+                        {t(bodyKey)}
                       </p>
                     ))}
                   </div>

@@ -4,6 +4,7 @@ import { CreditCard, Lock, ShieldCheck } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
+import { useLanguage } from '@/components/LanguageProvider';
 import { formatCurrency } from '@/utils/formatters';
 
 /**
@@ -12,6 +13,7 @@ import { formatCurrency } from '@/utils/formatters';
  * Props: { amount, onPay, processing }
  */
 export default function PaymentPlaceholder({ amount, onPay, processing }) {
+  const { t } = useLanguage();
   return (
     <Card>
       <div className="flex items-center gap-2">
@@ -20,15 +22,17 @@ export default function PaymentPlaceholder({ amount, onPay, processing }) {
         </span>
         <div>
           <h3 className="text-sm font-semibold text-slate-800">
-            Payment details
+            {t('bookCmp.paymentDetails')}
           </h3>
-          <p className="text-xs text-slate-500">Secured checkout</p>
+          <p className="text-xs text-slate-500">
+            {t('bookCmp.securedCheckout')}
+          </p>
         </div>
       </div>
 
       <div className="mt-4 space-y-3">
         <Input
-          label="Card number"
+          label={t('bookCmp.cardNumber')}
           name="card-number"
           placeholder="4242 4242 4242 4242"
           value=""
@@ -38,7 +42,7 @@ export default function PaymentPlaceholder({ amount, onPay, processing }) {
         />
         <div className="grid grid-cols-2 gap-3">
           <Input
-            label="Expiry"
+            label={t('bookCmp.expiry')}
             name="card-expiry"
             placeholder="MM / YY"
             value=""
@@ -47,7 +51,7 @@ export default function PaymentPlaceholder({ amount, onPay, processing }) {
             readOnly
           />
           <Input
-            label="CVC"
+            label={t('bookCmp.cvc')}
             name="card-cvc"
             placeholder="123"
             value=""
@@ -59,7 +63,9 @@ export default function PaymentPlaceholder({ amount, onPay, processing }) {
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-        <span className="text-sm font-medium text-slate-600">Amount due</span>
+        <span className="text-sm font-medium text-slate-600">
+          {t('bookCmp.amountDue')}
+        </span>
         <span className="text-lg font-bold text-slate-900">
           {formatCurrency(amount)}
         </span>
@@ -73,12 +79,14 @@ export default function PaymentPlaceholder({ amount, onPay, processing }) {
         disabled={processing}
       >
         <Lock size={16} />
-        {processing ? 'Processing…' : `Pay ${formatCurrency(amount)}`}
+        {processing
+          ? t('bookCmp.processing')
+          : t('bookCmp.pay', { amount: formatCurrency(amount) })}
       </Button>
 
       <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-400">
         <ShieldCheck size={14} className="mt-0.5 shrink-0" />
-        Payment gateway integration placeholder — no real charge is made.
+        {t('bookCmp.paymentPlaceholder')}
       </p>
     </Card>
   );

@@ -3,48 +3,77 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Scale,
   LayoutDashboard,
   Search,
   Building2,
   Users,
   ArrowLeft,
 } from 'lucide-react';
-import { ROLES, SITE } from '@/utils/constants';
+import BrandLogo from '@/components/common/BrandLogo';
+import { useLanguage } from '@/components/LanguageProvider';
+import { ROLES } from '@/utils/constants';
 
 const NAV_BY_ROLE = {
   [ROLES.CLIENT]: [
-    { label: 'Overview', href: '/dashboard/client', icon: LayoutDashboard },
-    { label: 'Find professionals', href: '/professionals', icon: Search },
-    { label: 'Browse firms', href: '/firms', icon: Building2 },
+    {
+      labelKey: 'dash.nav.overview',
+      href: '/dashboard/client',
+      icon: LayoutDashboard,
+    },
+    {
+      labelKey: 'dash.nav.findProfessionals',
+      href: '/professionals',
+      icon: Search,
+    },
+    { labelKey: 'dash.nav.browseFirms', href: '/firms', icon: Building2 },
   ],
   [ROLES.PROFESSIONAL]: [
     {
-      label: 'Overview',
+      labelKey: 'dash.nav.overview',
       href: '/dashboard/professional',
       icon: LayoutDashboard,
     },
-    { label: 'Find professionals', href: '/professionals', icon: Search },
-    { label: 'Browse firms', href: '/firms', icon: Building2 },
+    {
+      labelKey: 'dash.nav.findProfessionals',
+      href: '/professionals',
+      icon: Search,
+    },
+    { labelKey: 'dash.nav.browseFirms', href: '/firms', icon: Building2 },
   ],
   [ROLES.FIRM_PROFESSIONAL]: [
     {
-      label: 'Overview',
+      labelKey: 'dash.nav.overview',
       href: '/dashboard/professional',
       icon: LayoutDashboard,
     },
-    { label: 'Find professionals', href: '/professionals', icon: Search },
-    { label: 'Browse firms', href: '/firms', icon: Building2 },
+    {
+      labelKey: 'dash.nav.findProfessionals',
+      href: '/professionals',
+      icon: Search,
+    },
+    { labelKey: 'dash.nav.browseFirms', href: '/firms', icon: Building2 },
   ],
   [ROLES.FIRM_ADMIN]: [
-    { label: 'Overview', href: '/dashboard/firm', icon: LayoutDashboard },
-    { label: 'Find professionals', href: '/professionals', icon: Search },
-    { label: 'Browse firms', href: '/firms', icon: Building2 },
+    {
+      labelKey: 'dash.nav.overview',
+      href: '/dashboard/firm',
+      icon: LayoutDashboard,
+    },
+    {
+      labelKey: 'dash.nav.findProfessionals',
+      href: '/professionals',
+      icon: Search,
+    },
+    { labelKey: 'dash.nav.browseFirms', href: '/firms', icon: Building2 },
   ],
   [ROLES.PLATFORM_ADMIN]: [
-    { label: 'Overview', href: '/dashboard/admin', icon: LayoutDashboard },
-    { label: 'Professionals', href: '/professionals', icon: Users },
-    { label: 'Firms', href: '/firms', icon: Building2 },
+    {
+      labelKey: 'dash.nav.overview',
+      href: '/dashboard/admin',
+      icon: LayoutDashboard,
+    },
+    { labelKey: 'dash.nav.professionals', href: '/professionals', icon: Users },
+    { labelKey: 'dash.nav.firms', href: '/firms', icon: Building2 },
   ],
 };
 
@@ -54,6 +83,7 @@ const NAV_BY_ROLE = {
  */
 export default function Sidebar({ role }) {
   const pathname = usePathname();
+  const { t } = useLanguage();
   const items = NAV_BY_ROLE[role] || NAV_BY_ROLE[ROLES.CLIENT];
 
   function isActive(href) {
@@ -63,15 +93,12 @@ export default function Sidebar({ role }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-4">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white">
-          <Scale size={18} />
-        </span>
-        <span className="text-lg font-bold text-slate-900">{SITE.name}</span>
+        <BrandLogo variant="light" />
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Menu
+          {t('dash.nav.menu')}
         </p>
         {items.map((item) => {
           const Icon = item.icon;
@@ -87,7 +114,7 @@ export default function Sidebar({ role }) {
               }`}
             >
               <Icon size={18} />
-              {item.label}
+              {t(item.labelKey)}
             </Link>
           );
         })}
@@ -99,7 +126,7 @@ export default function Sidebar({ role }) {
           className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
         >
           <ArrowLeft size={18} />
-          Back to site
+          {t('dash.nav.backToSite')}
         </Link>
       </div>
     </div>

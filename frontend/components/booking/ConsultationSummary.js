@@ -1,6 +1,9 @@
+'use client';
+
 import { CalendarDays, Clock, Tag, Wallet } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
+import { useLanguage } from '@/components/LanguageProvider';
 import { BOOKING_TYPES } from '@/utils/constants';
 import {
   formatCurrency,
@@ -23,40 +26,43 @@ export default function ConsultationSummary({
   time,
   duration,
 }) {
+  const { t } = useLanguage();
   const rate = professional ? Number(professional.perMinuteRate) || 0 : 0;
   const mins = Number(duration) || 0;
   const estimatedCost = mins * rate;
   const isInstant = type === BOOKING_TYPES.INSTANT;
 
   const whenLabel = isInstant
-    ? 'Now'
+    ? t('bookCmp.summaryNow')
     : date
     ? `${formatDate(date)}${time ? `, ${formatTime(time)}` : ''}`
-    : 'Date not selected';
+    : t('bookCmp.summaryDateNotSelected');
 
   const rows = [
     {
       icon: <Tag size={16} className="text-slate-400" />,
-      label: 'Type',
+      label: t('bookCmp.summaryType'),
       value: (
         <Badge variant={isInstant ? 'green' : 'blue'}>
-          {isInstant ? 'Instant' : 'Scheduled'}
+          {isInstant
+            ? t('bookCmp.summaryInstant')
+            : t('bookCmp.summaryScheduled')}
         </Badge>
       ),
     },
     {
       icon: <CalendarDays size={16} className="text-slate-400" />,
-      label: 'When',
+      label: t('bookCmp.summaryWhen'),
       value: <span className="text-slate-800">{whenLabel}</span>,
     },
     {
       icon: <Clock size={16} className="text-slate-400" />,
-      label: 'Duration',
+      label: t('bookCmp.summaryDuration'),
       value: <span className="text-slate-800">{formatDuration(mins)}</span>,
     },
     {
       icon: <Wallet size={16} className="text-slate-400" />,
-      label: 'Rate',
+      label: t('bookCmp.summaryRate'),
       value: <span className="text-slate-800">{formatRate(rate)}</span>,
     },
   ];
@@ -64,7 +70,7 @@ export default function ConsultationSummary({
   return (
     <Card>
       <h3 className="text-sm font-semibold text-slate-800">
-        Consultation summary
+        {t('bookCmp.summary')}
       </h3>
 
       <div className="mt-4 flex items-center gap-3 border-b border-slate-100 pb-4">
@@ -73,7 +79,9 @@ export default function ConsultationSummary({
         </span>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-800">
-            {professional ? professional.name : 'Professional'}
+            {professional
+              ? professional.name
+              : t('bookCmp.professionalFallback')}
           </p>
           <p className="truncate text-xs text-slate-500">
             {professional ? professional.professionType : '—'}
@@ -98,14 +106,14 @@ export default function ConsultationSummary({
 
       <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
         <span className="text-sm font-medium text-slate-600">
-          Estimated cost
+          {t('bookCmp.summaryEstimatedCost')}
         </span>
         <span className="text-lg font-bold text-slate-900">
           {formatCurrency(estimatedCost)}
         </span>
       </div>
       <p className="mt-1 text-xs text-slate-400">
-        Final cost is billed per minute for the actual call duration.
+        {t('bookCmp.summaryNote')}
       </p>
     </Card>
   );

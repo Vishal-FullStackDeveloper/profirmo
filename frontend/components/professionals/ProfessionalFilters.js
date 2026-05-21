@@ -4,6 +4,7 @@ import { SlidersHorizontal } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Select from '@/components/common/Select';
+import { useLanguage } from '@/components/LanguageProvider';
 import {
   CITIES,
   PROFESSION_TYPES,
@@ -13,13 +14,6 @@ import {
   RATE_RANGES,
 } from '@/utils/constants';
 
-const RATING_OPTIONS = [
-  { value: '', label: 'Any rating' },
-  { value: '3', label: '3.0 & up' },
-  { value: '4', label: '4.0 & up' },
-  { value: '4.5', label: '4.5 & up' },
-];
-
 const toOptions = (arr) => arr.map((v) => ({ value: v, label: v }));
 
 /**
@@ -28,7 +22,15 @@ const toOptions = (arr) => arr.map((v) => ({ value: v, label: v }));
  * Props: { params, setParams }
  */
 export default function ProfessionalFilters({ params = {}, setParams }) {
+  const { t } = useLanguage();
   const update = (patch) => setParams((prev) => ({ ...prev, ...patch }));
+
+  const RATING_OPTIONS = [
+    { value: '', label: t('profCmp.anyRating') },
+    { value: '3', label: t('profCmp.rating3') },
+    { value: '4', label: t('profCmp.rating4') },
+    { value: '4.5', label: t('profCmp.rating45') },
+  ];
 
   const handleExperience = (value) => {
     const range = EXPERIENCE_RANGES.find((r) => r.value === value);
@@ -63,62 +65,67 @@ export default function ProfessionalFilters({ params = {}, setParams }) {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <SlidersHorizontal size={18} className="text-slate-500" />
-          <h2 className="text-sm font-semibold text-slate-900">Filters</h2>
+          <h2 className="text-sm font-semibold text-slate-900">
+            {t('profCmp.filters')}
+          </h2>
         </div>
         <button
           type="button"
           onClick={clearAll}
           className="text-xs font-medium text-blue-600 hover:text-blue-700"
         >
-          Clear all
+          {t('profCmp.clearAll')}
         </button>
       </div>
 
       <div className="space-y-4">
         <Input
-          label="Search"
+          label={t('profCmp.search')}
           name="search"
           value={params.search || ''}
           onChange={(e) => update({ search: e.target.value })}
-          placeholder="Name or keyword"
+          placeholder={t('profCmp.searchPlaceholder')}
         />
 
         <Select
-          label="City"
+          label={t('profCmp.city')}
           name="city"
           value={params.city || ''}
           onChange={(e) => update({ city: e.target.value || undefined })}
-          options={[{ value: '', label: 'All cities' }, ...toOptions(CITIES)]}
+          options={[
+            { value: '', label: t('profCmp.allCities') },
+            ...toOptions(CITIES),
+          ]}
         />
 
         <Select
-          label="Profession"
+          label={t('profCmp.profession')}
           name="professionType"
           value={params.professionType || ''}
           onChange={(e) =>
             update({ professionType: e.target.value || undefined })
           }
           options={[
-            { value: '', label: 'All professions' },
+            { value: '', label: t('profCmp.allProfessions') },
             ...toOptions(PROFESSION_TYPES),
           ]}
         />
 
         <Select
-          label="Specialization"
+          label={t('profCmp.specialization')}
           name="specialization"
           value={params.specialization || ''}
           onChange={(e) =>
             update({ specialization: e.target.value || undefined })
           }
           options={[
-            { value: '', label: 'All specializations' },
+            { value: '', label: t('profCmp.allSpecializations') },
             ...toOptions(SPECIALIZATIONS),
           ]}
         />
 
         <Select
-          label="Experience"
+          label={t('profCmp.experience')}
           name="experience"
           value={params.experience || 'any'}
           onChange={(e) => handleExperience(e.target.value)}
@@ -129,7 +136,7 @@ export default function ProfessionalFilters({ params = {}, setParams }) {
         />
 
         <Select
-          label="Rate per minute"
+          label={t('profCmp.ratePerMinute')}
           name="rateRange"
           value={params.rateRange || 'any'}
           onChange={(e) => handleRate(e.target.value)}
@@ -137,7 +144,7 @@ export default function ProfessionalFilters({ params = {}, setParams }) {
         />
 
         <Select
-          label="Minimum rating"
+          label={t('profCmp.minRating')}
           name="minRating"
           value={params.minRating || ''}
           onChange={(e) => update({ minRating: e.target.value || undefined })}
@@ -145,12 +152,12 @@ export default function ProfessionalFilters({ params = {}, setParams }) {
         />
 
         <Select
-          label="Language"
+          label={t('profCmp.language')}
           name="language"
           value={params.language || ''}
           onChange={(e) => update({ language: e.target.value || undefined })}
           options={[
-            { value: '', label: 'Any language' },
+            { value: '', label: t('profCmp.anyLanguage') },
             ...toOptions(LANGUAGES),
           ]}
         />
@@ -165,7 +172,7 @@ export default function ProfessionalFilters({ params = {}, setParams }) {
             className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
           />
           <span className="text-sm font-medium text-slate-700">
-            Available now only
+            {t('profCmp.availableNowOnly')}
           </span>
         </label>
       </div>

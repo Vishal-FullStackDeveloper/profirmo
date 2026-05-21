@@ -1,93 +1,83 @@
+'use client';
+
 import { Check, Clock, Users, Briefcase, Building2, ArrowRight } from 'lucide-react';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
-
-export const metadata = {
-  title: 'Pricing — Pro Firmo',
-  description:
-    'Pro Firmo uses a simple pay-per-minute model — no subscriptions, no hidden fees.',
-};
+import { useLanguage } from '@/components/LanguageProvider';
 
 const PLANS = [
   {
     icon: Users,
-    badge: 'For clients',
+    badgeKey: 'pricing.plan.client.badge',
     badgeVariant: 'blue',
-    title: 'Pay per minute',
-    price: 'From ₹30',
-    unit: '/min',
-    description: 'Only pay for the consultation time you actually use.',
-    features: [
-      'No subscription or sign-up fee',
-      'Transparent per-minute rates on every profile',
-      'See an estimated cost before you book',
-      'Instant and scheduled consultations',
-      'Secure online payments',
+    titleKey: 'pricing.plan.client.title',
+    priceKey: 'pricing.plan.client.price',
+    unitKey: 'pricing.plan.client.unit',
+    descKey: 'pricing.plan.client.desc',
+    featureKeys: [
+      'pricing.plan.client.f1',
+      'pricing.plan.client.f2',
+      'pricing.plan.client.f3',
+      'pricing.plan.client.f4',
+      'pricing.plan.client.f5',
     ],
-    cta: { label: 'Find a professional', href: '/professionals' },
+    cta: { labelKey: 'pricing.plan.client.cta', href: '/professionals' },
     highlight: true,
   },
   {
     icon: Briefcase,
-    badge: 'For professionals',
+    badgeKey: 'pricing.plan.pro.badge',
     badgeVariant: 'green',
-    title: 'Independent professionals',
-    price: 'Free',
-    unit: ' to join',
-    description: 'List your practice and earn from online consultations.',
-    features: [
-      'Free verified professional profile',
-      'Set your own per-minute rate',
-      'Publish your own availability slots',
-      'A small platform fee per consultation',
-      'Automated, reliable payouts',
+    titleKey: 'pricing.plan.pro.title',
+    priceKey: 'pricing.plan.pro.price',
+    unitKey: 'pricing.plan.pro.unit',
+    descKey: 'pricing.plan.pro.desc',
+    featureKeys: [
+      'pricing.plan.pro.f1',
+      'pricing.plan.pro.f2',
+      'pricing.plan.pro.f3',
+      'pricing.plan.pro.f4',
+      'pricing.plan.pro.f5',
     ],
-    cta: { label: 'Join as a professional', href: '/auth/register-professional' },
+    cta: {
+      labelKey: 'pricing.plan.pro.cta',
+      href: '/auth/register-professional',
+    },
     highlight: false,
   },
   {
     icon: Building2,
-    badge: 'For firms',
+    badgeKey: 'pricing.plan.firm.badge',
     badgeVariant: 'green',
-    title: 'Legal & tax firms',
-    price: 'Free',
-    unit: ' to join',
-    description: 'Bring your whole team onto Pro Firmo under one firm profile.',
-    features: [
-      'Free verified firm profile',
-      'Add and manage multiple professionals',
-      'Unified firm dashboard and reporting',
-      'A small platform fee per consultation',
-      'Consolidated billing and payouts',
+    titleKey: 'pricing.plan.firm.title',
+    priceKey: 'pricing.plan.firm.price',
+    unitKey: 'pricing.plan.firm.unit',
+    descKey: 'pricing.plan.firm.desc',
+    featureKeys: [
+      'pricing.plan.firm.f1',
+      'pricing.plan.firm.f2',
+      'pricing.plan.firm.f3',
+      'pricing.plan.firm.f4',
+      'pricing.plan.firm.f5',
     ],
-    cta: { label: 'Register your firm', href: '/auth/register-firm' },
+    cta: { labelKey: 'pricing.plan.firm.cta', href: '/auth/register-firm' },
     highlight: false,
   },
 ];
 
 const FAQS = [
-  {
-    q: 'How is the cost of a consultation calculated?',
-    a: 'Each professional sets a per-minute rate shown on their profile. You are billed for the actual minutes of your consultation, so a 20-minute call at ₹45/min costs ₹900.',
-  },
-  {
-    q: 'Are there any subscription fees?',
-    a: 'No. Pro Firmo is completely pay-as-you-go for clients. You only pay when you book a consultation — there are no monthly charges or hidden fees.',
-  },
-  {
-    q: 'How do professionals and firms get paid?',
-    a: 'Joining Pro Firmo is free for professionals and firms. We charge a small platform fee per completed consultation, and the rest is paid out to you automatically.',
-  },
-  {
-    q: 'Can I see the price before booking?',
-    a: 'Yes. Before you confirm a booking you will always see the per-minute rate and an estimated cost based on the duration you choose.',
-  },
+  { qKey: 'pricing.faq.q1', aKey: 'pricing.faq.a1' },
+  { qKey: 'pricing.faq.q2', aKey: 'pricing.faq.a2' },
+  { qKey: 'pricing.faq.q3', aKey: 'pricing.faq.a3' },
+  { qKey: 'pricing.faq.q4', aKey: 'pricing.faq.a4' },
 ];
 
 export default function PricingPage() {
+  const { t } = useLanguage();
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -96,11 +86,10 @@ export default function PricingPage() {
         <section className="border-b border-slate-200 bg-slate-50">
           <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              Simple, transparent pricing
+              {t('pricing.hero.title')}
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-600 sm:text-lg">
-              Pro Firmo runs on a pay-per-minute model. No subscriptions, no
-              hidden fees — you only pay for the advice you receive.
+              {t('pricing.hero.subtitle')}
             </p>
           </div>
         </section>
@@ -112,12 +101,10 @@ export default function PricingPage() {
               <Clock size={26} />
             </span>
             <h2 className="mt-5 text-3xl font-bold tracking-tight text-slate-900">
-              Pay only for the minutes you use
+              {t('pricing.explainer.title')}
             </h2>
             <p className="mt-3 text-base text-slate-600">
-              Every professional on Pro Firmo sets a clear per-minute rate.
-              Whether your consultation lasts five minutes or fifty, you are
-              billed precisely for the time spent — nothing more.
+              {t('pricing.explainer.desc')}
             </p>
           </div>
         </section>
@@ -130,7 +117,7 @@ export default function PricingPage() {
                 const Icon = plan.icon;
                 return (
                   <Card
-                    key={plan.title}
+                    key={plan.titleKey}
                     className={`flex flex-col ${
                       plan.highlight
                         ? 'border-blue-300 ring-1 ring-blue-200'
@@ -141,33 +128,35 @@ export default function PricingPage() {
                       <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                         <Icon size={20} />
                       </span>
-                      <Badge variant={plan.badgeVariant}>{plan.badge}</Badge>
+                      <Badge variant={plan.badgeVariant}>
+                        {t(plan.badgeKey)}
+                      </Badge>
                     </div>
                     <h3 className="mt-4 text-lg font-semibold text-slate-900">
-                      {plan.title}
+                      {t(plan.titleKey)}
                     </h3>
                     <p className="mt-1 text-sm text-slate-600">
-                      {plan.description}
+                      {t(plan.descKey)}
                     </p>
                     <div className="mt-4 flex items-baseline gap-1">
                       <span className="text-3xl font-bold text-slate-900">
-                        {plan.price}
+                        {t(plan.priceKey)}
                       </span>
                       <span className="text-sm text-slate-500">
-                        {plan.unit}
+                        {t(plan.unitKey)}
                       </span>
                     </div>
                     <ul className="mt-5 flex-1 space-y-3">
-                      {plan.features.map((feature) => (
+                      {plan.featureKeys.map((featureKey) => (
                         <li
-                          key={feature}
+                          key={featureKey}
                           className="flex items-start gap-3"
                         >
                           <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                             <Check size={13} />
                           </span>
                           <span className="text-sm text-slate-700">
-                            {feature}
+                            {t(featureKey)}
                           </span>
                         </li>
                       ))}
@@ -179,7 +168,7 @@ export default function PricingPage() {
                         size="md"
                         className="w-full"
                       >
-                        {plan.cta.label}
+                        {t(plan.cta.labelKey)}
                       </Button>
                     </div>
                   </Card>
@@ -193,24 +182,24 @@ export default function PricingPage() {
         <section className="bg-slate-50 py-16 lg:py-20">
           <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
             <h2 className="text-center text-3xl font-bold tracking-tight text-slate-900">
-              Pricing questions
+              {t('pricing.faq.title')}
             </h2>
             <div className="mt-10 space-y-4">
               {FAQS.map((faq) => (
-                <Card key={faq.q}>
+                <Card key={faq.qKey}>
                   <h3 className="text-base font-semibold text-slate-800">
-                    {faq.q}
+                    {t(faq.qKey)}
                   </h3>
-                  <p className="mt-2 text-sm text-slate-600">{faq.a}</p>
+                  <p className="mt-2 text-sm text-slate-600">{t(faq.aKey)}</p>
                 </Card>
               ))}
             </div>
             <div className="mt-10 text-center">
               <p className="text-sm text-slate-600">
-                Still have questions about pricing?
+                {t('pricing.faq.moreQuestions')}
               </p>
               <Button href="/contact" variant="outline" size="md" className="mt-3">
-                Contact our team
+                {t('pricing.faq.contactCta')}
                 <ArrowRight size={16} />
               </Button>
             </div>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { NotebookPen, Check } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
+import { useLanguage } from '@/components/LanguageProvider';
 
 /**
  * ConsultationNotes — labelled textarea for private consultation notes.
@@ -13,6 +14,7 @@ import Button from '@/components/common/Button';
  *   onSave() — called when "Save notes" is clicked
  */
 export default function ConsultationNotes({ value, onChange, onSave }) {
+  const { t } = useLanguage();
   const [saved, setSaved] = useState(false);
 
   function handleSave() {
@@ -26,12 +28,12 @@ export default function ConsultationNotes({ value, onChange, onSave }) {
       <div className="flex items-center gap-2">
         <NotebookPen size={16} className="text-slate-400" />
         <h3 className="text-sm font-semibold text-slate-800">
-          Consultation notes
+          {t('consultCmp.consultationNotes')}
         </h3>
       </div>
 
       <label htmlFor="consultation-notes" className="sr-only">
-        Consultation notes
+        {t('consultCmp.consultationNotes')}
       </label>
       <textarea
         id="consultation-notes"
@@ -39,17 +41,19 @@ export default function ConsultationNotes({ value, onChange, onSave }) {
         value={value}
         onChange={onChange}
         rows={6}
-        placeholder="Jot down key points, advice given and follow-up actions…"
+        placeholder={t('consultCmp.notesPlaceholder')}
         className="mt-3 w-full resize-none rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
       />
 
       <div className="mt-3 flex items-center justify-between">
         <span className="text-xs text-slate-400">
-          {saved ? 'Notes saved' : 'Notes are private to this consultation.'}
+          {saved
+            ? t('consultCmp.notesSaved')
+            : t('consultCmp.notesPrivate')}
         </span>
         <Button variant="secondary" size="sm" onClick={handleSave}>
           {saved ? <Check size={15} /> : <NotebookPen size={15} />}
-          {saved ? 'Saved' : 'Save notes'}
+          {saved ? t('consultCmp.saved') : t('consultCmp.saveNotes')}
         </Button>
       </div>
     </Card>

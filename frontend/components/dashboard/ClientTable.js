@@ -3,6 +3,7 @@
 import { Users } from 'lucide-react';
 import Badge from '@/components/common/Badge';
 import EmptyState from '@/components/common/EmptyState';
+import { useLanguage } from '@/components/LanguageProvider';
 import { getInitials } from '@/utils/formatters';
 
 const AVATAR_COLORS = [
@@ -26,14 +27,15 @@ function colorFor(id) {
  * Props: { clients }
  */
 export default function ClientTable({ clients }) {
+  const { t } = useLanguage();
   const list = clients || [];
 
   if (list.length === 0) {
     return (
       <EmptyState
         icon={<Users size={24} />}
-        title="No clients yet"
-        description="Clients you consult with will appear here."
+        title={t('dash.clientTable.emptyTitle')}
+        description={t('dash.clientTable.emptyDesc')}
       />
     );
   }
@@ -44,11 +46,11 @@ export default function ClientTable({ clients }) {
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50">
             <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <th className="px-4 py-3">Client</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Phone</th>
-              <th className="px-4 py-3">City</th>
-              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">{t('dash.table.client')}</th>
+              <th className="px-4 py-3">{t('dash.table.email')}</th>
+              <th className="px-4 py-3">{t('dash.table.phone')}</th>
+              <th className="px-4 py-3">{t('dash.table.city')}</th>
+              <th className="px-4 py-3">{t('dash.table.type')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -73,7 +75,9 @@ export default function ClientTable({ clients }) {
                 <td className="px-4 py-3 text-slate-600">{c.city || '—'}</td>
                 <td className="px-4 py-3">
                   <Badge variant={c.userType === 'business' ? 'blue' : 'gray'}>
-                    {c.userType === 'business' ? 'Business' : 'Individual'}
+                    {c.userType === 'business'
+                      ? t('dash.table.business')
+                      : t('dash.table.individual')}
                   </Badge>
                 </td>
               </tr>

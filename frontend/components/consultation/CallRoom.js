@@ -10,6 +10,7 @@ import {
   PhoneOff,
 } from 'lucide-react';
 import { getInitials } from '@/utils/formatters';
+import { useLanguage } from '@/components/LanguageProvider';
 
 /**
  * CallRoom — video call stage with placeholder controls.
@@ -17,12 +18,15 @@ import { getInitials } from '@/utils/formatters';
  * Props: { professional, client, onEndCall }
  */
 export default function CallRoom({ professional, client, onEndCall }) {
+  const { t } = useLanguage();
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
   const [sharing, setSharing] = useState(false);
 
-  const proName = professional ? professional.name : 'Professional';
-  const clientName = client ? client.name : 'You';
+  const proName = professional
+    ? professional.name
+    : t('consultCmp.professionalFallback');
+  const clientName = client ? client.name : t('consultCmp.youFallback');
 
   const controlBase =
     'flex h-12 w-12 items-center justify-center rounded-full transition-colors';
@@ -38,7 +42,7 @@ export default function CallRoom({ professional, client, onEndCall }) {
           <p className="mt-4 text-lg font-semibold text-white">{proName}</p>
           <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            Connected
+            {t('consultCmp.connected')}
           </span>
           {professional && professional.professionType && (
             <p className="mt-2 text-xs text-slate-400">
@@ -58,14 +62,14 @@ export default function CallRoom({ professional, client, onEndCall }) {
           )}
           <span className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-300">
             {!micOn && <MicOff size={11} className="text-red-400" />}
-            You
+            {t('consultCmp.you')}
           </span>
         </div>
 
         {sharing && (
           <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 px-3 py-1 text-xs font-medium text-blue-300">
             <MonitorUp size={12} />
-            Sharing screen
+            {t('consultCmp.sharingScreen')}
           </span>
         )}
       </div>
@@ -75,7 +79,9 @@ export default function CallRoom({ professional, client, onEndCall }) {
         <button
           type="button"
           onClick={() => setMicOn((v) => !v)}
-          aria-label={micOn ? 'Mute microphone' : 'Unmute microphone'}
+          aria-label={
+            micOn ? t('consultCmp.muteMic') : t('consultCmp.unmuteMic')
+          }
           className={`${controlBase} ${
             micOn
               ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -87,7 +93,11 @@ export default function CallRoom({ professional, client, onEndCall }) {
         <button
           type="button"
           onClick={() => setCameraOn((v) => !v)}
-          aria-label={cameraOn ? 'Turn off camera' : 'Turn on camera'}
+          aria-label={
+            cameraOn
+              ? t('consultCmp.turnOffCamera')
+              : t('consultCmp.turnOnCamera')
+          }
           className={`${controlBase} ${
             cameraOn
               ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -99,7 +109,7 @@ export default function CallRoom({ professional, client, onEndCall }) {
         <button
           type="button"
           onClick={() => setSharing((v) => !v)}
-          aria-label="Share screen"
+          aria-label={t('consultCmp.shareScreen')}
           className={`${controlBase} ${
             sharing
               ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
@@ -111,16 +121,16 @@ export default function CallRoom({ professional, client, onEndCall }) {
         <button
           type="button"
           onClick={onEndCall}
-          aria-label="End call"
+          aria-label={t('consultCmp.endCall')}
           className={`${controlBase} w-auto gap-2 bg-red-600 px-5 text-sm font-medium text-white hover:bg-red-700`}
         >
           <PhoneOff size={18} />
-          End call
+          {t('consultCmp.endCall')}
         </button>
       </div>
 
       <p className="mt-3 text-center text-xs text-slate-400">
-        Video/audio calling integration placeholder.
+        {t('consultCmp.callPlaceholder')}
       </p>
     </div>
   );

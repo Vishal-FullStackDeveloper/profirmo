@@ -1,8 +1,11 @@
+'use client';
+
 import { MapPin, BadgeCheck, Briefcase } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
 import RatingStars from '@/components/common/RatingStars';
+import { useLanguage } from '@/components/LanguageProvider';
 import { formatRate, getInitials } from '@/utils/formatters';
 
 /**
@@ -11,6 +14,7 @@ import { formatRate, getInitials } from '@/utils/formatters';
  * Props: { professional }
  */
 export default function ProfessionalCard({ professional }) {
+  const { t } = useLanguage();
   if (!professional) return null;
 
   const {
@@ -42,7 +46,7 @@ export default function ProfessionalCard({ professional }) {
               <BadgeCheck
                 size={16}
                 className="shrink-0 text-blue-600"
-                aria-label="Verified"
+                aria-label={t('profCmp.verified')}
               />
             )}
           </div>
@@ -60,7 +64,7 @@ export default function ProfessionalCard({ professional }) {
         </span>
         <span className="inline-flex items-center gap-1">
           <Briefcase size={14} className="text-slate-400" />
-          {experience} yrs exp
+          {t('profCmp.yrsExp', { count: experience })}
         </span>
       </div>
 
@@ -73,12 +77,14 @@ export default function ProfessionalCard({ professional }) {
           <p className="text-base font-semibold text-slate-900">
             {formatRate(perMinuteRate)}
           </p>
-          <p className="text-xs text-slate-400">Consultation rate</p>
+          <p className="text-xs text-slate-400">
+            {t('profCmp.consultationRate')}
+          </p>
         </div>
         {availableNow ? (
-          <Badge variant="green">Available now</Badge>
+          <Badge variant="green">{t('profCmp.availableNow')}</Badge>
         ) : (
-          <Badge variant="gray">Offline</Badge>
+          <Badge variant="gray">{t('profCmp.offline')}</Badge>
         )}
       </div>
 
@@ -89,7 +95,7 @@ export default function ProfessionalCard({ professional }) {
           size="sm"
           className="flex-1"
         >
-          View profile
+          {t('profCmp.viewProfile')}
         </Button>
         <Button
           href={`/booking/${id}`}
@@ -97,7 +103,7 @@ export default function ProfessionalCard({ professional }) {
           size="sm"
           className="flex-1"
         >
-          Book now
+          {t('profCmp.bookNow')}
         </Button>
       </div>
     </Card>

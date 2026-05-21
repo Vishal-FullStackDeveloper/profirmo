@@ -18,6 +18,7 @@ import CallRoom from '@/components/consultation/CallRoom';
 import RecordingStatus from '@/components/consultation/RecordingStatus';
 import TranscriptPanel from '@/components/consultation/TranscriptPanel';
 import ConsultationNotes from '@/components/consultation/ConsultationNotes';
+import { useLanguage } from '@/components/LanguageProvider';
 import {
   consultations,
   clients,
@@ -40,6 +41,7 @@ function formatElapsed(totalSeconds) {
 }
 
 export default function ConsultationPage() {
+  const { t } = useLanguage();
   const { consultationId } = useParams();
 
   const consultation =
@@ -96,11 +98,11 @@ export default function ConsultationPage() {
           </Link>
           <div className="flex items-center gap-3">
             {callEnded ? (
-              <Badge variant="gray">Call ended</Badge>
+              <Badge variant="gray">{t('consultPage.callEnded')}</Badge>
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                Live consultation
+                {t('consultPage.liveConsultation')}
               </span>
             )}
             <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 font-mono text-sm font-semibold text-slate-700">
@@ -122,23 +124,27 @@ export default function ConsultationPage() {
                     <CheckCircle2 size={30} />
                   </span>
                   <h2 className="mt-4 text-xl font-bold text-slate-900">
-                    Consultation ended
+                    {t('consultPage.consultationEnded')}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Here is a summary of your session with {professional.name}.
+                    {t('consultPage.summaryIntro', {
+                      name: professional.name,
+                    })}
                   </p>
 
                   <dl className="mx-auto mt-6 grid max-w-md grid-cols-2 gap-4">
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                       <dt className="text-xs text-slate-500">
-                        Total duration
+                        {t('consultPage.totalDuration')}
                       </dt>
                       <dd className="mt-1 text-lg font-bold text-slate-900">
                         {formatDuration(billedMinutes)}
                       </dd>
                     </div>
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <dt className="text-xs text-slate-500">Total cost</dt>
+                      <dt className="text-xs text-slate-500">
+                        {t('consultPage.totalCost')}
+                      </dt>
                       <dd className="mt-1 text-lg font-bold text-slate-900">
                         {formatCurrency(runningCost)}
                       </dd>
@@ -147,7 +153,7 @@ export default function ConsultationPage() {
 
                   <div className="mt-6">
                     <Button href="/dashboard/client" size="lg">
-                      Back to dashboard
+                      {t('consultPage.backToDashboard')}
                     </Button>
                   </div>
                 </Card>
@@ -169,7 +175,9 @@ export default function ConsultationPage() {
                       <Timer size={18} />
                     </span>
                     <div>
-                      <p className="text-xs text-slate-500">Elapsed time</p>
+                      <p className="text-xs text-slate-500">
+                        {t('consultPage.elapsedTime')}
+                      </p>
                       <p className="font-mono text-base font-semibold text-slate-900">
                         {formatElapsed(elapsed)}
                       </p>
@@ -182,7 +190,9 @@ export default function ConsultationPage() {
                     </span>
                     <div>
                       <p className="text-xs text-slate-500">
-                        Running cost ({billedMinutes} min)
+                        {t('consultPage.runningCost', {
+                          count: billedMinutes,
+                        })}
                       </p>
                       <p className="text-base font-semibold text-slate-900">
                         {formatCurrency(runningCost)}
@@ -200,7 +210,7 @@ export default function ConsultationPage() {
               {/* Client detail */}
               <Card>
                 <h3 className="text-sm font-semibold text-slate-800">
-                  Client
+                  {t('consultPage.client')}
                 </h3>
                 <div className="mt-3 flex items-center gap-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700">
@@ -217,13 +227,17 @@ export default function ConsultationPage() {
                 </div>
                 <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-xs">
                   <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Email</dt>
+                    <dt className="text-slate-500">
+                      {t('consultPage.email')}
+                    </dt>
                     <dd className="truncate font-medium text-slate-700">
                       {client.email}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Phone</dt>
+                    <dt className="text-slate-500">
+                      {t('consultPage.phone')}
+                    </dt>
                     <dd className="font-medium text-slate-700">
                       {client.phone}
                     </dd>
@@ -234,7 +248,7 @@ export default function ConsultationPage() {
               {/* Professional detail */}
               <Card>
                 <h3 className="text-sm font-semibold text-slate-800">
-                  Professional
+                  {t('consultPage.professional')}
                 </h3>
                 <div className="mt-3 flex items-center gap-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
@@ -253,7 +267,7 @@ export default function ConsultationPage() {
                   <div className="flex justify-between gap-3">
                     <dt className="flex items-center gap-1 text-slate-500">
                       <Briefcase size={12} />
-                      Specialization
+                      {t('consultPage.specialization')}
                     </dt>
                     <dd className="truncate font-medium text-slate-700">
                       {professional.specialization}
@@ -262,16 +276,18 @@ export default function ConsultationPage() {
                   <div className="flex justify-between gap-3">
                     <dt className="flex items-center gap-1 text-slate-500">
                       <User size={12} />
-                      City
+                      {t('consultPage.city')}
                     </dt>
                     <dd className="font-medium text-slate-700">
                       {professional.city}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Rate</dt>
+                    <dt className="text-slate-500">{t('consultPage.rate')}</dt>
                     <dd className="font-medium text-slate-700">
-                      {formatCurrency(rate)}/min
+                      {t('consultPage.ratePerMin', {
+                        amount: formatCurrency(rate),
+                      })}
                     </dd>
                   </div>
                 </dl>

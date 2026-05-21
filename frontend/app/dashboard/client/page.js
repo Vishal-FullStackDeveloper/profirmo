@@ -19,6 +19,7 @@ import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import Badge from '@/components/common/Badge';
 import RatingStars from '@/components/common/RatingStars';
+import { useLanguage } from '@/components/LanguageProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboard } from '@/hooks/useDashboard';
 import { ROLES } from '@/utils/constants';
@@ -40,6 +41,7 @@ function SectionTitle({ title, description, action }) {
 }
 
 export default function ClientDashboardPage() {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const linkedId = user ? user.linkedId || user.firmId : undefined;
   const dashboard = useDashboard(ROLES.CLIENT, linkedId);
@@ -58,69 +60,73 @@ export default function ClientDashboardPage() {
   return (
     <DashboardLayout
       role={ROLES.CLIENT}
-      title="Client dashboard"
-      subtitle={`Welcome back${user && user.name ? `, ${user.name}` : ''}`}
+      title={t('dashClient.title')}
+      subtitle={
+        user && user.name
+          ? t('dash.common.welcomeBackName', { name: user.name })
+          : t('dash.common.welcomeBack')
+      }
     >
       <div className="space-y-8">
         {/* Stats */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatsCard
-            label="Upcoming bookings"
+            label={t('dashClient.stat.upcomingBookings')}
             value={stats.upcomingBookings || 0}
             icon={<CalendarClock size={20} />}
             variant="blue"
-            hint="Confirmed & pending"
+            hint={t('dash.common.confirmedPending')}
           />
           <StatsCard
-            label="Active cases"
+            label={t('dashClient.stat.activeCases')}
             value={stats.activeCases || 0}
             icon={<Briefcase size={20} />}
             variant="amber"
-            hint="Currently in progress"
+            hint={t('dash.common.inProgress')}
           />
           <StatsCard
-            label="Completed consultations"
+            label={t('dashClient.stat.completedConsultations')}
             value={stats.completedConsultations || 0}
             icon={<CheckCircle2 size={20} />}
             variant="green"
           />
           <StatsCard
-            label="Total spent"
+            label={t('dashClient.stat.totalSpent')}
             value={formatCurrency(stats.totalSpent || 0)}
             icon={<Wallet size={20} />}
             variant="slate"
-            hint="Across completed bookings"
+            hint={t('dash.common.completedBookings')}
           />
         </div>
 
         {/* Upcoming consultations */}
         <section>
           <SectionTitle
-            title="Upcoming consultations"
-            description="Sessions that are scheduled or currently live."
+            title={t('dashClient.upcoming.title')}
+            description={t('dashClient.upcoming.desc')}
             action={
               <Button variant="outline" size="sm" href="/professionals">
-                Book new
+                {t('dashClient.upcoming.bookNew')}
               </Button>
             }
           />
           <ConsultationTable
             consultations={upcoming}
-            emptyTitle="No upcoming consultations"
-            emptyDescription="Book a consultation with a professional to get started."
+            emptyTitle={t('dashClient.upcoming.emptyTitle')}
+            emptyDescription={t('dashClient.upcoming.emptyDesc')}
           />
         </section>
 
         {/* Past consultations */}
         <section>
           <SectionTitle
-            title="Past consultations"
-            description="Your completed consultation history."
+            title={t('dashClient.past.title')}
+            description={t('dashClient.past.desc')}
           />
           <ConsultationTable
             consultations={past}
-            emptyTitle="No past consultations"
-            emptyDescription="Completed consultations will appear here."
+            emptyTitle={t('dashClient.past.emptyTitle')}
+            emptyDescription={t('dashClient.past.emptyDesc')}
           />
         </section>
 
@@ -128,8 +134,8 @@ export default function ClientDashboardPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <SectionTitle
-              title="Favorite professionals"
-              description="Quickly rebook the experts you trust."
+              title={t('dashClient.favorites.title')}
+              description={t('dashClient.favorites.desc')}
             />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {favorites.map((pro) => (
@@ -163,7 +169,7 @@ export default function ClientDashboardPage() {
                     className="mt-3 w-full"
                     href={`/professionals/${pro.id}`}
                   >
-                    View profile
+                    {t('dashClient.favorites.viewProfile')}
                   </Button>
                 </Card>
               ))}
@@ -171,20 +177,20 @@ export default function ClientDashboardPage() {
           </div>
 
           <div>
-            <SectionTitle title="Payment history" />
+            <SectionTitle title={t('dashClient.payments.title')} />
             <Card>
               <div className="flex h-full flex-col items-center justify-center py-8 text-center">
                 <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                   <CreditCard size={22} />
                 </span>
                 <p className="text-sm font-medium text-slate-700">
-                  Payments & invoices
+                  {t('dashClient.payments.heading')}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  Detailed receipts and invoices will be available here soon.
+                  {t('dashClient.payments.desc')}
                 </p>
                 <Button variant="ghost" size="sm" className="mt-3" disabled>
-                  Download statement
+                  {t('dashClient.payments.download')}
                 </Button>
               </div>
             </Card>
@@ -194,8 +200,8 @@ export default function ClientDashboardPage() {
         {/* Documents */}
         <section>
           <SectionTitle
-            title="Uploaded documents"
-            description="Files you have shared for your consultations."
+            title={t('dashClient.documents.title')}
+            description={t('dashClient.documents.desc')}
           />
           <FileManager files={caseFiles} />
         </section>
@@ -203,15 +209,15 @@ export default function ClientDashboardPage() {
         {/* Cases */}
         <section>
           <SectionTitle
-            title="Cases shared with professionals"
-            description="Track the status of every matter you have opened."
+            title={t('dashClient.cases.title')}
+            description={t('dashClient.cases.desc')}
           />
           <CaseTable cases={cases} />
         </section>
 
         {/* Profile settings */}
         <section>
-          <SectionTitle title="Profile settings" />
+          <SectionTitle title={t('dashClient.profile.title')} />
           <Card>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
@@ -220,19 +226,23 @@ export default function ClientDashboardPage() {
                 </span>
                 <div>
                   <p className="font-medium text-slate-800">
-                    {user && user.name ? user.name : 'Guest user'}
+                    {user && user.name
+                      ? user.name
+                      : t('dash.layout.guestUser')}
                   </p>
                   <p className="text-sm text-slate-500">
-                    {user && user.email ? user.email : 'Not signed in'}
+                    {user && user.email
+                      ? user.email
+                      : t('dashClient.profile.notSignedIn')}
                   </p>
                   <Badge variant="blue" className="mt-1">
-                    Client account
+                    {t('dashClient.profile.accountBadge')}
                   </Badge>
                 </div>
               </div>
               <Button variant="outline" size="sm">
                 <Settings size={15} />
-                Manage settings
+                {t('dashClient.profile.manage')}
               </Button>
             </div>
           </Card>
@@ -243,7 +253,7 @@ export default function ClientDashboardPage() {
             href="/professionals"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
           >
-            Explore more professionals
+            {t('dashClient.explore')}
             <ArrowRight size={15} />
           </Link>
         </div>

@@ -5,6 +5,7 @@ import { Plus, X, Calendar } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
+import { useLanguage } from '@/components/LanguageProvider';
 
 const DAYS = [
   'Monday',
@@ -21,6 +22,7 @@ const DAYS = [
  * Props: { professional }
  */
 export default function AvailabilityManager({ professional }) {
+  const { t } = useLanguage();
   const pro = professional || {};
   const [availableNow, setAvailableNow] = useState(!!pro.availableNow);
   const [rate, setRate] = useState(
@@ -65,22 +67,23 @@ export default function AvailabilityManager({ professional }) {
     <Card>
       <div className="mb-4">
         <h3 className="text-base font-semibold text-slate-900">
-          Availability & rate
+          {t('dash.availability.title')}
         </h3>
         <p className="text-sm text-slate-500">
-          Control whether you appear as available and set your consultation
-          rate.
+          {t('dash.availability.subtitle')}
         </p>
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
         <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3 sm:flex-1">
           <div>
-            <p className="text-sm font-medium text-slate-800">Available now</p>
+            <p className="text-sm font-medium text-slate-800">
+              {t('dash.availability.availableNow')}
+            </p>
             <p className="text-xs text-slate-500">
               {availableNow
-                ? 'Clients can book instant consultations.'
-                : 'You are currently shown as offline.'}
+                ? t('dash.availability.availableOn')
+                : t('dash.availability.availableOff')}
             </p>
           </div>
           <button
@@ -101,12 +104,12 @@ export default function AvailabilityManager({ professional }) {
         </div>
         <div className="sm:w-48">
           <Input
-            label="Per-minute rate (₹)"
+            label={t('dash.availability.rateLabel')}
             name="perMinuteRate"
             type="number"
             value={rate}
             onChange={(e) => setRate(e.target.value)}
-            placeholder="e.g. 50"
+            placeholder={t('dash.availability.ratePlaceholder')}
             min="0"
           />
         </div>
@@ -115,7 +118,7 @@ export default function AvailabilityManager({ professional }) {
       <div className="mt-6">
         <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
           <Calendar size={16} className="text-slate-400" />
-          Weekly availability
+          {t('dash.availability.weekly')}
         </p>
         <div className="space-y-2">
           {DAYS.map((day) => (
@@ -124,11 +127,13 @@ export default function AvailabilityManager({ professional }) {
               className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3 sm:flex-row sm:items-center"
             >
               <span className="w-28 shrink-0 text-sm font-medium text-slate-700">
-                {day}
+                {t(`dash.availability.day.${day}`)}
               </span>
               <div className="flex flex-wrap gap-2">
                 {(slotsByDay[day] || []).length === 0 && (
-                  <span className="text-xs text-slate-400">No slots</span>
+                  <span className="text-xs text-slate-400">
+                    {t('dash.availability.noSlots')}
+                  </span>
                 )}
                 {(slotsByDay[day] || []).map((time) => (
                   <span
@@ -139,7 +144,10 @@ export default function AvailabilityManager({ professional }) {
                     <button
                       type="button"
                       onClick={() => removeSlot(day, time)}
-                      aria-label={`Remove ${time} on ${day}`}
+                      aria-label={t('dash.availability.removeSlot', {
+                        time,
+                        day: t(`dash.availability.day.${day}`),
+                      })}
                       className="text-blue-400 hover:text-blue-600"
                     >
                       <X size={12} />
@@ -157,7 +165,7 @@ export default function AvailabilityManager({ professional }) {
               htmlFor="slot-day"
               className="mb-1.5 block text-sm font-medium text-slate-700"
             >
-              Day
+              {t('dash.availability.day')}
             </label>
             <select
               id="slot-day"
@@ -167,32 +175,32 @@ export default function AvailabilityManager({ professional }) {
             >
               {DAYS.map((d) => (
                 <option key={d} value={d}>
-                  {d}
+                  {t(`dash.availability.day.${d}`)}
                 </option>
               ))}
             </select>
           </div>
           <div className="sm:w-40">
             <Input
-              label="Time slot"
+              label={t('dash.availability.timeSlot')}
               name="slot-time"
               value={draft.time}
               onChange={(e) =>
                 setDraft((d) => ({ ...d, time: e.target.value }))
               }
-              placeholder="HH:MM"
-              hint="24-hour format"
+              placeholder={t('dash.availability.timePlaceholder')}
+              hint={t('dash.availability.timeHint')}
             />
           </div>
           <Button variant="outline" size="md" onClick={addSlot}>
             <Plus size={15} />
-            Add slot
+            {t('dash.availability.addSlot')}
           </Button>
         </div>
       </div>
 
       <div className="mt-5 flex justify-end border-t border-slate-200 pt-4">
-        <Button>Save changes</Button>
+        <Button>{t('dash.common.save')}</Button>
       </div>
     </Card>
   );

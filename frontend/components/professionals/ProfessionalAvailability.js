@@ -1,5 +1,8 @@
+'use client';
+
 import { CalendarClock } from 'lucide-react';
 import Card from '@/components/common/Card';
+import { useLanguage } from '@/components/LanguageProvider';
 import { formatTime } from '@/utils/formatters';
 
 /**
@@ -8,6 +11,7 @@ import { formatTime } from '@/utils/formatters';
  * Props: { professional }
  */
 export default function ProfessionalAvailability({ professional }) {
+  const { t } = useLanguage();
   const slots =
     (professional && Array.isArray(professional.availabilitySlots)
       ? professional.availabilitySlots
@@ -17,12 +21,14 @@ export default function ProfessionalAvailability({ professional }) {
     <Card>
       <div className="mb-4 flex items-center gap-2">
         <CalendarClock size={18} className="text-blue-600" />
-        <h2 className="text-base font-semibold text-slate-900">Availability</h2>
+        <h2 className="text-base font-semibold text-slate-900">
+          {t('profCmp.availability')}
+        </h2>
       </div>
 
       {slots.length === 0 ? (
         <p className="text-sm text-slate-500">
-          No availability has been published yet.
+          {t('profCmp.noAvailability')}
         </p>
       ) : (
         <div className="space-y-4">
@@ -46,7 +52,9 @@ export default function ProfessionalAvailability({ professional }) {
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-slate-400">No slots this day</p>
+                <p className="text-xs text-slate-400">
+                  {t('profCmp.noSlotsThisDay')}
+                </p>
               )}
             </div>
           ))}

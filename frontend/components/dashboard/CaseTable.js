@@ -3,6 +3,7 @@
 import { Briefcase } from 'lucide-react';
 import Badge from '@/components/common/Badge';
 import EmptyState from '@/components/common/EmptyState';
+import { useLanguage } from '@/components/LanguageProvider';
 import { formatDate } from '@/utils/formatters';
 import { STATUS_LABELS, STATUS_VARIANTS } from '@/utils/constants';
 
@@ -11,14 +12,15 @@ import { STATUS_LABELS, STATUS_VARIANTS } from '@/utils/constants';
  * Props: { cases }
  */
 export default function CaseTable({ cases }) {
+  const { t } = useLanguage();
   const list = cases || [];
 
   if (list.length === 0) {
     return (
       <EmptyState
         icon={<Briefcase size={24} />}
-        title="No cases yet"
-        description="Cases shared between clients and professionals will appear here."
+        title={t('dash.caseTable.emptyTitle')}
+        description={t('dash.caseTable.emptyDesc')}
       />
     );
   }
@@ -29,10 +31,10 @@ export default function CaseTable({ cases }) {
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50">
             <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <th className="px-4 py-3">Case</th>
-              <th className="px-4 py-3">Category</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Created</th>
+              <th className="px-4 py-3">{t('dash.table.case')}</th>
+              <th className="px-4 py-3">{t('dash.table.category')}</th>
+              <th className="px-4 py-3">{t('dash.table.status')}</th>
+              <th className="px-4 py-3">{t('dash.table.created')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -51,7 +53,9 @@ export default function CaseTable({ cases }) {
                 </td>
                 <td className="px-4 py-3">
                   <Badge variant={STATUS_VARIANTS[c.status] || 'gray'}>
-                    {STATUS_LABELS[c.status] || c.status || 'Unknown'}
+                    {STATUS_LABELS[c.status] ||
+                      c.status ||
+                      t('dash.table.unknown')}
                   </Badge>
                 </td>
                 <td className="px-4 py-3 text-slate-600">

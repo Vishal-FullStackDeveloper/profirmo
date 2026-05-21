@@ -11,6 +11,7 @@ import {
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import EmptyState from '@/components/common/EmptyState';
+import { useLanguage } from '@/components/LanguageProvider';
 import { formatDate } from '@/utils/formatters';
 
 const DEFAULT_FILES = [
@@ -72,28 +73,33 @@ function iconFor(file) {
  * Props: { files }
  */
 export default function FileManager({ files }) {
+  const { t } = useLanguage();
   const list = files && files.length > 0 ? files : DEFAULT_FILES;
 
   return (
     <Card>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold text-slate-900">Documents</h3>
+          <h3 className="text-base font-semibold text-slate-900">
+            {t('dash.files.documents')}
+          </h3>
           <p className="text-sm text-slate-500">
-            {list.length} {list.length === 1 ? 'file' : 'files'}
+            {list.length === 1
+              ? t('dash.files.fileOne', { count: list.length })
+              : t('dash.files.fileMany', { count: list.length })}
           </p>
         </div>
         <Button variant="outline" size="sm">
           <Upload size={15} />
-          Upload document
+          {t('dash.files.upload')}
         </Button>
       </div>
 
       {list.length === 0 ? (
         <EmptyState
           icon={<FileIcon size={24} />}
-          title="No documents yet"
-          description="Uploaded files will be listed here."
+          title={t('dash.files.emptyTitle')}
+          description={t('dash.files.emptyDesc')}
         />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -119,7 +125,7 @@ export default function FileManager({ files }) {
                 </div>
                 <button
                   type="button"
-                  aria-label={`Download ${file.name}`}
+                  aria-label={t('dash.common.download', { name: file.name })}
                   className="rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                 >
                   <Download size={16} />

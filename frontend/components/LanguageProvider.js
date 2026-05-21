@@ -7,7 +7,32 @@ import {
   useEffect,
   useCallback,
 } from 'react';
-import { translations } from '@/data/translations';
+import { translations as coreT } from '@/data/translations';
+import { translations as cmsT } from '@/data/translations.cms';
+import { translations as authT } from '@/data/translations.auth';
+import { translations as dashboardT } from '@/data/translations.dashboard';
+import { translations as marketplaceT } from '@/data/translations.marketplace';
+import { translations as bookingT } from '@/data/translations.booking';
+
+// Merge the core dictionary with the per-area dictionaries into one lookup table.
+const translations = {
+  en: {
+    ...coreT.en,
+    ...cmsT.en,
+    ...authT.en,
+    ...dashboardT.en,
+    ...marketplaceT.en,
+    ...bookingT.en,
+  },
+  hi: {
+    ...coreT.hi,
+    ...cmsT.hi,
+    ...authT.hi,
+    ...dashboardT.hi,
+    ...marketplaceT.hi,
+    ...bookingT.hi,
+  },
+};
 
 const STORAGE_KEY = 'profirmo_lang';
 const SUPPORTED = ['en', 'hi'];

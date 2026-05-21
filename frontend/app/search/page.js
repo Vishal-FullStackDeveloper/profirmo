@@ -10,6 +10,7 @@ import Select from '@/components/common/Select';
 import EmptyState from '@/components/common/EmptyState';
 import ProfessionalCard from '@/components/professionals/ProfessionalCard';
 import FirmCard from '@/components/firms/FirmCard';
+import { useLanguage } from '@/components/LanguageProvider';
 import { professionals, firms } from '@/data/mockData';
 import {
   PROFESSION_TYPES,
@@ -17,13 +18,6 @@ import {
   EXPERIENCE_RANGES,
   RATE_RANGES,
 } from '@/utils/constants';
-
-const RATING_OPTIONS = [
-  { value: '', label: 'Any rating' },
-  { value: '3', label: '3.0 & up' },
-  { value: '4', label: '4.0 & up' },
-  { value: '4.5', label: '4.5 & up' },
-];
 
 const toOptions = (arr) => arr.map((v) => ({ value: v, label: v }));
 
@@ -38,8 +32,16 @@ const INITIAL_FILTERS = {
 };
 
 export default function SearchPage() {
+  const { t } = useLanguage();
   const [mode, setMode] = useState('individual');
   const [filters, setFilters] = useState(INITIAL_FILTERS);
+
+  const RATING_OPTIONS = [
+    { value: '', label: t('searchPage.anyRating') },
+    { value: '3', label: t('searchPage.rating3') },
+    { value: '4', label: t('searchPage.rating4') },
+    { value: '4.5', label: t('searchPage.rating45') },
+  ];
 
   const update = (patch) => setFilters((prev) => ({ ...prev, ...patch }));
   const resetFilters = () => setFilters(INITIAL_FILTERS);
@@ -110,11 +112,10 @@ export default function SearchPage() {
         <div className="border-b border-slate-200 bg-white">
           <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-              Advanced search
+              {t('searchPage.title')}
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600">
-              Search across individual professionals and firms. Combine filters
-              to pinpoint exactly the expertise you need.
+              {t('searchPage.subtitle')}
             </p>
           </div>
         </div>
@@ -133,7 +134,7 @@ export default function SearchPage() {
                 }`}
               >
                 <Users size={16} />
-                Individuals
+                {t('searchPage.individuals')}
               </button>
               <button
                 type="button"
@@ -145,40 +146,40 @@ export default function SearchPage() {
                 }`}
               >
                 <Building2 size={16} />
-                Firms
+                {t('searchPage.firms')}
               </button>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Input
-                label="Keyword"
+                label={t('searchPage.keyword')}
                 name="keyword"
                 value={filters.keyword}
                 onChange={(e) => update({ keyword: e.target.value })}
-                placeholder="Name, expertise or keyword"
+                placeholder={t('searchPage.keywordPlaceholder')}
               />
               <Select
-                label="Category"
+                label={t('searchPage.category')}
                 name="category"
                 value={filters.category}
                 onChange={(e) => update({ category: e.target.value })}
                 options={[
-                  { value: '', label: 'All categories' },
+                  { value: '', label: t('searchPage.allCategories') },
                   ...toOptions(PROFESSION_TYPES),
                 ]}
               />
               <Select
-                label="Location"
+                label={t('searchPage.location')}
                 name="location"
                 value={filters.location}
                 onChange={(e) => update({ location: e.target.value })}
                 options={[
-                  { value: '', label: 'All cities' },
+                  { value: '', label: t('searchPage.allCities') },
                   ...toOptions(CITIES),
                 ]}
               />
               <Select
-                label="Experience"
+                label={t('searchPage.experience')}
                 name="experience"
                 value={filters.experience}
                 onChange={(e) => update({ experience: e.target.value })}
@@ -188,14 +189,14 @@ export default function SearchPage() {
                 }))}
               />
               <Select
-                label="Minimum rating"
+                label={t('searchPage.minRating')}
                 name="rating"
                 value={filters.rating}
                 onChange={(e) => update({ rating: e.target.value })}
                 options={RATING_OPTIONS}
               />
               <Select
-                label="Price range"
+                label={t('searchPage.priceRange')}
                 name="rateRange"
                 value={filters.rateRange}
                 onChange={(e) => update({ rateRange: e.target.value })}
@@ -220,7 +221,7 @@ export default function SearchPage() {
                   className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-sm font-medium text-slate-700">
-                  Available now only
+                  {t('searchPage.availableNowOnly')}
                 </span>
               </label>
               <button
@@ -228,7 +229,7 @@ export default function SearchPage() {
                 onClick={resetFilters}
                 className="text-sm font-medium text-blue-600 hover:text-blue-700"
               >
-                Reset filters
+                {t('searchPage.resetFilters')}
               </button>
             </div>
           </Card>
@@ -238,16 +239,19 @@ export default function SearchPage() {
               {results.length}
             </span>{' '}
             {mode === 'individual'
-              ? `professional${results.length === 1 ? '' : 's'}`
-              : `firm${results.length === 1 ? '' : 's'}`}{' '}
-            found
+              ? results.length === 1
+                ? t('searchPage.profCountOne')
+                : t('searchPage.profCountOther')
+              : results.length === 1
+                ? t('searchPage.firmCountOne')
+                : t('searchPage.firmCountOther')}
           </p>
 
           {results.length === 0 ? (
             <EmptyState
               icon={<Search size={24} />}
-              title="No results found"
-              description="Try a different keyword or adjust your filters to broaden the search."
+              title={t('searchPage.emptyTitle')}
+              description={t('searchPage.emptyDesc')}
             />
           ) : mode === 'individual' ? (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

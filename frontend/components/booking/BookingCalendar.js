@@ -1,5 +1,7 @@
 'use client';
 
+import { useLanguage } from '@/components/LanguageProvider';
+
 /**
  * BookingCalendar — selectable grid of the next 14 days.
  *
@@ -8,6 +10,7 @@
  *   onSelectDate(isoDateString) — called when a date cell is clicked
  */
 export default function BookingCalendar({ selectedDate, onSelectDate }) {
+  const { t } = useLanguage();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -58,7 +61,7 @@ export default function BookingCalendar({ selectedDate, onSelectDate }) {
                 }`}
               >
                 {isToday
-                  ? 'Today'
+                  ? t('bookCmp.today')
                   : d.toLocaleDateString('en-IN', { month: 'short' })}
               </span>
             </button>

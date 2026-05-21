@@ -1,5 +1,8 @@
+'use client';
+
 import { FileText } from 'lucide-react';
 import Card from '@/components/common/Card';
+import { useLanguage } from '@/components/LanguageProvider';
 
 const PLACEHOLDER_LINES = [
   { speaker: 'Professional', text: 'Hello, thanks for joining. How can I help you today?' },
@@ -15,6 +18,7 @@ const PLACEHOLDER_LINES = [
  * Props: { transcript } — optional array of { speaker, text }
  */
 export default function TranscriptPanel({ transcript }) {
+  const { t } = useLanguage();
   const lines =
     Array.isArray(transcript) && transcript.length > 0
       ? transcript
@@ -24,10 +28,12 @@ export default function TranscriptPanel({ transcript }) {
     <Card padding={false}>
       <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
         <FileText size={16} className="text-slate-400" />
-        <h3 className="text-sm font-semibold text-slate-800">Live transcript</h3>
+        <h3 className="text-sm font-semibold text-slate-800">
+          {t('consultCmp.liveTranscript')}
+        </h3>
         <span className="ml-auto flex items-center gap-1 text-xs font-medium text-emerald-600">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          Live
+          {t('consultCmp.live')}
         </span>
       </div>
 
@@ -50,7 +56,7 @@ export default function TranscriptPanel({ transcript }) {
       </div>
 
       <p className="border-t border-slate-100 px-4 py-2.5 text-xs text-slate-400">
-        AI transcription integration placeholder.
+        {t('consultCmp.transcriptPlaceholder')}
       </p>
     </Card>
   );

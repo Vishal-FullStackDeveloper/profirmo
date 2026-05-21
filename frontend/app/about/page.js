@@ -1,3 +1,5 @@
+'use client';
+
 import {
   ShieldCheck,
   Handshake,
@@ -11,48 +13,41 @@ import {
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 import Card from '@/components/common/Card';
-
-export const metadata = {
-  title: 'About — Pro Firmo',
-  description:
-    'Learn about Pro Firmo, the platform connecting clients with verified legal and tax professionals.',
-};
+import { useLanguage } from '@/components/LanguageProvider';
 
 const VALUES = [
   {
     icon: ShieldCheck,
-    title: 'Trust & verification',
-    description:
-      'Every professional and firm on Pro Firmo is verified before they can offer consultations.',
+    titleKey: 'about.values.trust.title',
+    descKey: 'about.values.trust.desc',
   },
   {
     icon: Eye,
-    title: 'Transparency',
-    description:
-      'Clear per-minute rates, honest reviews and no hidden fees — you always know what you pay for.',
+    titleKey: 'about.values.transparency.title',
+    descKey: 'about.values.transparency.desc',
   },
   {
     icon: Handshake,
-    title: 'Client first',
-    description:
-      'We design every feature around making expert advice accessible, simple and stress-free.',
+    titleKey: 'about.values.clientFirst.title',
+    descKey: 'about.values.clientFirst.desc',
   },
   {
     icon: Sparkles,
-    title: 'Quality of advice',
-    description:
-      'We champion experienced practitioners and surface the experts our clients rate the highest.',
+    titleKey: 'about.values.quality.title',
+    descKey: 'about.values.quality.desc',
   },
 ];
 
 const STATS = [
-  { icon: Users, value: '500+', label: 'Verified professionals' },
-  { icon: Building2, value: '120+', label: 'Partner firms' },
-  { icon: MapPin, value: '50+', label: 'Cities covered' },
-  { icon: Star, value: '4.8', label: 'Average rating' },
+  { icon: Users, value: '500+', labelKey: 'about.stats.professionals' },
+  { icon: Building2, value: '120+', labelKey: 'about.stats.firms' },
+  { icon: MapPin, value: '50+', labelKey: 'about.stats.cities' },
+  { icon: Star, value: '4.8', labelKey: 'about.stats.rating' },
 ];
 
 export default function AboutPage() {
+  const { t } = useLanguage();
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -61,11 +56,10 @@ export default function AboutPage() {
         <section className="border-b border-slate-200 bg-slate-50">
           <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              About Pro Firmo
+              {t('about.hero.title')}
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-600 sm:text-lg">
-              We are on a mission to make trusted legal and tax advice
-              accessible to everyone, everywhere.
+              {t('about.hero.subtitle')}
             </p>
           </div>
         </section>
@@ -76,39 +70,30 @@ export default function AboutPage() {
             <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
               <div>
                 <span className="text-sm font-semibold uppercase tracking-wide text-blue-600">
-                  Our mission
+                  {t('about.mission.badge')}
                 </span>
                 <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
-                  Expert advice, without the friction
+                  {t('about.mission.title')}
                 </h2>
                 <p className="mt-4 text-base text-slate-600">
-                  Finding the right advocate or tax consultant has always been
-                  hard — relying on word of mouth, unclear pricing and long
-                  waits for an appointment. Pro Firmo changes that.
+                  {t('about.mission.p1')}
                 </p>
                 <p className="mt-4 text-base text-slate-600">
-                  We bring verified professionals and firms online, so anyone
-                  can compare experts, book a consultation and get qualified
-                  advice in minutes — paying only for the time they use.
+                  {t('about.mission.p2')}
                 </p>
               </div>
               <div>
                 <span className="text-sm font-semibold uppercase tracking-wide text-blue-600">
-                  Our story
+                  {t('about.story.badge')}
                 </span>
                 <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
-                  Built by people who needed it
+                  {t('about.story.title')}
                 </h2>
                 <p className="mt-4 text-base text-slate-600">
-                  Pro Firmo started with a simple frustration: getting reliable
-                  legal and tax help should not depend on who you happen to
-                  know. We saw skilled professionals struggling to reach
-                  clients, and clients struggling to find them.
+                  {t('about.story.p1')}
                 </p>
                 <p className="mt-4 text-base text-slate-600">
-                  So we built a single, trusted platform that connects both —
-                  with verified profiles, transparent pricing and secure online
-                  consultations from anywhere in the country.
+                  {t('about.story.p2')}
                 </p>
               </div>
             </div>
@@ -120,25 +105,25 @@ export default function AboutPage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                What we stand for
+                {t('about.values.title')}
               </h2>
               <p className="mt-3 text-base text-slate-600">
-                The principles that guide every decision we make.
+                {t('about.values.subtitle')}
               </p>
             </div>
             <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {VALUES.map((value) => {
                 const Icon = value.icon;
                 return (
-                  <Card key={value.title}>
+                  <Card key={value.titleKey}>
                     <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-600 text-white">
                       <Icon size={22} />
                     </span>
                     <h3 className="mt-4 text-base font-semibold text-slate-800">
-                      {value.title}
+                      {t(value.titleKey)}
                     </h3>
                     <p className="mt-2 text-sm text-slate-600">
-                      {value.description}
+                      {t(value.descKey)}
                     </p>
                   </Card>
                 );
@@ -154,14 +139,16 @@ export default function AboutPage() {
               {STATS.map((stat) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={stat.label} className="text-center">
+                  <div key={stat.labelKey} className="text-center">
                     <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-white/15 text-blue-100">
                       <Icon size={22} />
                     </span>
                     <p className="mt-3 text-3xl font-bold text-white">
                       {stat.value}
                     </p>
-                    <p className="mt-1 text-sm text-blue-100">{stat.label}</p>
+                    <p className="mt-1 text-sm text-blue-100">
+                      {t(stat.labelKey)}
+                    </p>
                   </div>
                 );
               })}

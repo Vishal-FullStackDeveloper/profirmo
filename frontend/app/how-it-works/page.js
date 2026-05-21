@@ -1,3 +1,5 @@
+'use client';
+
 import {
   Search,
   GitCompare,
@@ -12,68 +14,55 @@ import {
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 import Button from '@/components/common/Button';
-
-export const metadata = {
-  title: 'How it works — Pro Firmo',
-  description:
-    'Understand how Pro Firmo connects clients with verified legal and tax professionals.',
-};
+import { useLanguage } from '@/components/LanguageProvider';
 
 const CLIENT_STEPS = [
   {
     icon: Search,
-    title: 'Search professionals',
-    description:
-      'Browse verified advocates, lawyers and tax consultants. Filter by category, city, language and rate to narrow down your options.',
+    titleKey: 'howItWorksPage.client.search.title',
+    descKey: 'howItWorksPage.client.search.desc',
   },
   {
     icon: GitCompare,
-    title: 'Compare & choose',
-    description:
-      'Review detailed profiles — experience, specialization, client reviews and per-minute rates — and shortlist the expert who fits your need.',
+    titleKey: 'howItWorksPage.client.compare.title',
+    descKey: 'howItWorksPage.client.compare.desc',
   },
   {
     icon: CalendarCheck,
-    title: 'Book & pay securely',
-    description:
-      'Book an instant consultation or pick a scheduled slot. You see an estimated cost upfront and pay only for the minutes you use.',
+    titleKey: 'howItWorksPage.client.book.title',
+    descKey: 'howItWorksPage.client.book.desc',
   },
   {
     icon: Video,
-    title: 'Consult online',
-    description:
-      'Join a secure video consultation, share relevant documents, and receive clear professional advice — all from one place.',
+    titleKey: 'howItWorksPage.client.consult.title',
+    descKey: 'howItWorksPage.client.consult.desc',
   },
 ];
 
 const PROFESSIONAL_STEPS = [
   {
     icon: UserPlus,
-    title: 'Create your profile',
-    description:
-      'Register as an individual professional or as a firm. Add your specialization, experience, languages and services offered.',
+    titleKey: 'howItWorksPage.pro.profile.title',
+    descKey: 'howItWorksPage.pro.profile.desc',
   },
   {
     icon: ClipboardCheck,
-    title: 'Get verified',
-    description:
-      'Our team reviews your registration and credentials. Once approved, your verified profile goes live to clients.',
+    titleKey: 'howItWorksPage.pro.verify.title',
+    descKey: 'howItWorksPage.pro.verify.desc',
   },
   {
     icon: CalendarClock,
-    title: 'Set rates & availability',
-    description:
-      'Define your per-minute rate and publish the time slots you are available for instant or scheduled consultations.',
+    titleKey: 'howItWorksPage.pro.rates.title',
+    descKey: 'howItWorksPage.pro.rates.desc',
   },
   {
     icon: Wallet,
-    title: 'Consult & get paid',
-    description:
-      'Connect with clients over secure video calls. Billing is automated and transparent, with reliable payouts.',
+    titleKey: 'howItWorksPage.pro.paid.title',
+    descKey: 'howItWorksPage.pro.paid.desc',
   },
 ];
 
-function Track({ badge, title, description, steps, accent }) {
+function Track({ badge, title, description, steps, accent, t }) {
   return (
     <div>
       <span
@@ -90,7 +79,7 @@ function Track({ badge, title, description, steps, accent }) {
           const Icon = step.icon;
           return (
             <div
-              key={step.title}
+              key={step.titleKey}
               className="flex gap-4 rounded-xl border border-slate-200 bg-white p-5"
             >
               <div className="flex flex-col items-center">
@@ -104,14 +93,14 @@ function Track({ badge, title, description, steps, accent }) {
               <div className="pb-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-slate-400">
-                    Step {index + 1}
+                    {t('howItWorksPage.step', { n: index + 1 })}
                   </span>
                 </div>
                 <h3 className="mt-0.5 text-base font-semibold text-slate-800">
-                  {step.title}
+                  {t(step.titleKey)}
                 </h3>
                 <p className="mt-1 text-sm text-slate-600">
-                  {step.description}
+                  {t(step.descKey)}
                 </p>
               </div>
             </div>
@@ -123,6 +112,8 @@ function Track({ badge, title, description, steps, accent }) {
 }
 
 export default function HowItWorksPage() {
+  const { t } = useLanguage();
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -131,11 +122,10 @@ export default function HowItWorksPage() {
         <section className="border-b border-slate-200 bg-slate-50">
           <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              How Pro Firmo works
+              {t('howItWorksPage.hero.title')}
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-600 sm:text-lg">
-              A simple, transparent process — whether you are looking for advice
-              or providing it.
+              {t('howItWorksPage.hero.subtitle')}
             </p>
           </div>
         </section>
@@ -145,18 +135,20 @@ export default function HowItWorksPage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
               <Track
-                badge="For clients"
-                title="Get expert advice in 4 steps"
-                description="From your first search to a finished consultation, Pro Firmo keeps every step clear and secure."
+                badge={t('howItWorksPage.clients.badge')}
+                title={t('howItWorksPage.clients.title')}
+                description={t('howItWorksPage.clients.desc')}
                 steps={CLIENT_STEPS}
                 accent="text-blue-600"
+                t={t}
               />
               <Track
-                badge="For professionals & firms"
-                title="Grow your practice online"
-                description="Reach clients actively looking for your expertise and run consultations on your own terms."
+                badge={t('howItWorksPage.pros.badge')}
+                title={t('howItWorksPage.pros.title')}
+                description={t('howItWorksPage.pros.desc')}
                 steps={PROFESSIONAL_STEPS}
                 accent="text-emerald-600"
+                t={t}
               />
             </div>
           </div>
@@ -166,15 +158,14 @@ export default function HowItWorksPage() {
         <section className="bg-slate-50 py-16">
           <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              Ready to get started?
+              {t('howItWorksPage.cta.title')}
             </h2>
             <p className="mt-3 text-base text-slate-600">
-              Find the right professional today, or join Pro Firmo to grow your
-              practice.
+              {t('howItWorksPage.cta.desc')}
             </p>
             <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button href="/professionals" size="lg">
-                Find a professional
+                {t('howItWorksPage.cta.findPro')}
                 <ArrowRight size={18} />
               </Button>
               <Button
@@ -182,7 +173,7 @@ export default function HowItWorksPage() {
                 variant="outline"
                 size="lg"
               >
-                Join as a professional
+                {t('howItWorksPage.cta.joinPro')}
               </Button>
             </div>
           </div>

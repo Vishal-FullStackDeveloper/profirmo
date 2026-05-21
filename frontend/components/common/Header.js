@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Menu, X, ArrowRight, Languages } from 'lucide-react';
 import { NAV_LINKS } from '@/utils/constants';
 import { useLanguage } from '@/components/LanguageProvider';
+import BrandLogo from '@/components/common/BrandLogo';
 
 const NAV_KEYS = {
   '/professionals': 'nav.professionals',
@@ -14,25 +15,6 @@ const NAV_KEYS = {
   '/pricing': 'nav.pricing',
   '/contact': 'nav.contact',
 };
-
-function Logo({ onClick }) {
-  return (
-    <Link
-      href="/"
-      onClick={onClick}
-      className="group flex items-center gap-2.5"
-      aria-label="Pro Firmo home"
-    >
-      <span className="relative grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-amber-500 via-amber-600 to-teal-600 text-white shadow-glow-sm transition group-hover:shadow-glow">
-        <span className="text-[13px] font-extrabold tracking-tight">PF</span>
-        <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-teal-400 ring-2 ring-white" />
-      </span>
-      <span className="text-lg font-bold tracking-tight text-slate-900">
-        Pro<span className="text-gradient"> Firmo</span>
-      </span>
-    </Link>
-  );
-}
 
 function LangSwitch({ lang, setLang, className = '' }) {
   return (
@@ -90,7 +72,7 @@ export default function Header() {
       }`}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Logo />
+        <BrandLogo />
 
         <nav className="hidden items-center gap-1 lg:flex">
           {NAV_LINKS.map((link) => {

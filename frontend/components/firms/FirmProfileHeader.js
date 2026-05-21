@@ -1,8 +1,11 @@
+'use client';
+
 import { MapPin, Users, Mail, Phone } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
 import RatingStars from '@/components/common/RatingStars';
+import { useLanguage } from '@/components/LanguageProvider';
 import { getInitials } from '@/utils/formatters';
 
 /**
@@ -11,6 +14,7 @@ import { getInitials } from '@/utils/formatters';
  * Props: { firm }
  */
 export default function FirmProfileHeader({ firm }) {
+  const { t } = useLanguage();
   if (!firm) return null;
 
   const {
@@ -48,8 +52,13 @@ export default function FirmProfileHeader({ firm }) {
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Users size={15} className="text-slate-400" />
-                {professionalCount} professional
-                {professionalCount === 1 ? '' : 's'}
+                {professionalCount === 1
+                  ? t('firmCmp.professionalCountOne', {
+                      count: professionalCount,
+                    })
+                  : t('firmCmp.professionalCountOther', {
+                      count: professionalCount,
+                    })}
               </span>
               <RatingStars rating={rating} count={reviewsCount} size="sm" />
             </div>
@@ -88,10 +97,10 @@ export default function FirmProfileHeader({ firm }) {
             size="md"
             className="w-full"
           >
-            Contact firm
+            {t('firmCmp.contactFirm')}
           </Button>
           <p className="mt-2 text-center text-xs text-slate-400">
-            Typically responds within a day
+            {t('firmCmp.respondsWithinDay')}
           </p>
         </div>
       </div>

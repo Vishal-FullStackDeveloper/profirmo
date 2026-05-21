@@ -1,8 +1,11 @@
+'use client';
+
 import { Users, BadgeCheck } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import RatingStars from '@/components/common/RatingStars';
 import EmptyState from '@/components/common/EmptyState';
+import { useLanguage } from '@/components/LanguageProvider';
 import { formatRate, getInitials } from '@/utils/formatters';
 import { getProfessionalsByFirm } from '@/data/mockData';
 
@@ -12,6 +15,7 @@ import { getProfessionalsByFirm } from '@/data/mockData';
  * Props: { firm }
  */
 export default function FirmProfessionalsList({ firm }) {
+  const { t } = useLanguage();
   const professionals = firm ? getProfessionalsByFirm(firm.id) || [] : [];
 
   return (
@@ -19,15 +23,15 @@ export default function FirmProfessionalsList({ firm }) {
       <div className="mb-5 flex items-center gap-2">
         <Users size={18} className="text-blue-600" />
         <h2 className="text-base font-semibold text-slate-900">
-          Professionals at this firm
+          {t('firmCmp.professionalsAtFirm')}
         </h2>
       </div>
 
       {professionals.length === 0 ? (
         <EmptyState
           icon={<Users size={24} />}
-          title="No professionals listed"
-          description="This firm has not added any professionals yet."
+          title={t('firmCmp.noProfessionalsTitle')}
+          description={t('firmCmp.noProfessionalsDesc')}
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -49,7 +53,7 @@ export default function FirmProfessionalsList({ firm }) {
                       <BadgeCheck
                         size={14}
                         className="shrink-0 text-blue-600"
-                        aria-label="Verified"
+                        aria-label={t('firmCmp.verified')}
                       />
                     )}
                   </div>
@@ -77,7 +81,7 @@ export default function FirmProfessionalsList({ firm }) {
                   size="sm"
                   className="flex-1"
                 >
-                  View
+                  {t('firmCmp.view')}
                 </Button>
                 <Button
                   href={`/booking/${pro.id}`}
@@ -85,7 +89,7 @@ export default function FirmProfessionalsList({ firm }) {
                   size="sm"
                   className="flex-1"
                 >
-                  Book
+                  {t('firmCmp.book')}
                 </Button>
               </div>
             </div>

@@ -11,10 +11,12 @@ import EmptyState from '@/components/common/EmptyState';
 import FirmProfileHeader from '@/components/firms/FirmProfileHeader';
 import FirmServices from '@/components/firms/FirmServices';
 import FirmProfessionalsList from '@/components/firms/FirmProfessionalsList';
+import { useLanguage } from '@/components/LanguageProvider';
 import { getFirmById, reviews } from '@/data/mockData';
 import { formatDate, getInitials } from '@/utils/formatters';
 
 export default function FirmProfilePage() {
+  const { t } = useLanguage();
   const { id } = useParams();
   const firm = getFirmById(id);
 
@@ -26,11 +28,11 @@ export default function FirmProfilePage() {
           <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
             <EmptyState
               icon={<Building2 size={24} />}
-              title="Firm not found"
-              description="The firm you are looking for does not exist or may have been removed."
+              title={t('firmDetail.notFoundTitle')}
+              description={t('firmDetail.notFoundDesc')}
               action={
                 <Button href="/firms" variant="primary">
-                  Browse all firms
+                  {t('firmDetail.browseAll')}
                 </Button>
               }
             />
@@ -63,7 +65,7 @@ export default function FirmProfilePage() {
               <div className="flex items-center gap-2">
                 <MessageSquare size={18} className="text-blue-600" />
                 <h2 className="text-base font-semibold text-slate-900">
-                  Client reviews
+                  {t('firmDetail.clientReviews')}
                 </h2>
               </div>
               {reviewCount > 0 && (
@@ -77,7 +79,11 @@ export default function FirmProfilePage() {
                     showValue={false}
                   />
                   <span className="text-slate-500">
-                    ({reviewCount} review{reviewCount === 1 ? '' : 's'})
+                    {reviewCount === 1
+                      ? t('firmDetail.reviewCountOne', { count: reviewCount })
+                      : t('firmDetail.reviewCountOther', {
+                          count: reviewCount,
+                        })}
                   </span>
                 </div>
               )}
@@ -86,8 +92,8 @@ export default function FirmProfilePage() {
             {reviewCount === 0 ? (
               <EmptyState
                 icon={<Star size={24} />}
-                title="No reviews yet"
-                description="This firm has not received any client reviews so far."
+                title={t('firmDetail.noReviewsTitle')}
+                description={t('firmDetail.noReviewsDesc')}
               />
             ) : (
               <ul className="space-y-4">

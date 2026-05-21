@@ -24,6 +24,7 @@ import Input from '@/components/common/Input';
 import Select from '@/components/common/Select';
 import RatingStars from '@/components/common/RatingStars';
 import EmptyState from '@/components/common/EmptyState';
+import { useLanguage } from '@/components/LanguageProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboard } from '@/hooks/useDashboard';
 import { ROLES, PROFESSION_TYPES, SPECIALIZATIONS } from '@/utils/constants';
@@ -51,6 +52,7 @@ function SectionTitle({ title, description, action }) {
 }
 
 export default function FirmDashboardPage() {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const linkedId = user ? user.firmId || user.linkedId : undefined;
   const dashboard = useDashboard(ROLES.FIRM_ADMIN, linkedId);
@@ -95,63 +97,69 @@ export default function FirmDashboardPage() {
   return (
     <DashboardLayout
       role={ROLES.FIRM_ADMIN}
-      title={firm.name ? `${firm.name} — Firm console` : 'Firm console'}
-      subtitle="Manage your team, clients and consultations"
+      title={
+        firm.name
+          ? t('dashFirm.titleNamed', { name: firm.name })
+          : t('dashFirm.title')
+      }
+      subtitle={t('dashFirm.subtitle')}
     >
       <div className="space-y-8">
         {/* Stats */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <StatsCard
-            label="Professionals"
+            label={t('dashFirm.stat.professionals')}
             value={stats.totalProfessionals || 0}
             icon={<Users size={20} />}
             variant="blue"
           />
           <StatsCard
-            label="Clients"
+            label={t('dashFirm.stat.clients')}
             value={clientCount}
             icon={<UserCheck size={20} />}
             variant="green"
           />
           <StatsCard
-            label="Total cases"
+            label={t('dashFirm.stat.totalCases')}
             value={stats.totalCases || 0}
             icon={<Briefcase size={20} />}
             variant="amber"
-            hint={`${stats.activeCases || 0} active`}
+            hint={t('dashFirm.stat.activeCases', {
+              count: stats.activeCases || 0,
+            })}
           />
           <StatsCard
-            label="Consultations"
+            label={t('dashFirm.stat.consultations')}
             value={firmConsultations.length}
             icon={<Video size={20} />}
             variant="slate"
           />
           <StatsCard
-            label="Revenue"
+            label={t('dashFirm.stat.revenue')}
             value={formatCurrency(stats.revenue || 0)}
             icon={<Wallet size={20} />}
             variant="green"
-            hint="Completed bookings"
+            hint={t('dash.common.completedBookingsShort')}
           />
         </div>
 
         {/* Team management */}
         <section>
           <SectionTitle
-            title="Team management"
-            description="Lawyers and consultants in your firm."
+            title={t('dashFirm.team.title')}
+            description={t('dashFirm.team.desc')}
             action={
               <Button size="sm" onClick={() => setModalOpen(true)}>
                 <Plus size={15} />
-                Add lawyer / consultant
+                {t('dashFirm.team.add')}
               </Button>
             }
           />
           {firmProfessionals.length === 0 ? (
             <EmptyState
               icon={<Users size={24} />}
-              title="No team members yet"
-              description="Add your first professional to get started."
+              title={t('dashFirm.team.emptyTitle')}
+              description={t('dashFirm.team.emptyDesc')}
             />
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -173,13 +181,19 @@ export default function FirmDashboardPage() {
                         <Badge
                           variant={pro.availableNow ? 'green' : 'gray'}
                         >
-                          {pro.availableNow ? 'Available' : 'Offline'}
+                          {pro.availableNow
+                            ? t('dashFirm.team.available')
+                            : t('dashFirm.team.offline')}
                         </Badge>
                       </div>
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
-                    <span>{pro.experience} yrs experience</span>
+                    <span>
+                      {t('dashFirm.team.experience', {
+                        years: pro.experience,
+                      })}
+                    </span>
                     <span className="font-medium text-slate-700">
                       {formatRate(pro.perMinuteRate)}
                     </span>
@@ -192,21 +206,20 @@ export default function FirmDashboardPage() {
 
         {/* Assign clients placeholder */}
         <section>
-          <SectionTitle title="Assign clients" />
+          <SectionTitle title={t('dashFirm.assign.title')} />
           <Card>
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                 <UserPlus size={22} />
               </span>
               <p className="text-sm font-medium text-slate-700">
-                Client assignment
+                {t('dashFirm.assign.heading')}
               </p>
               <p className="mt-1 max-w-md text-xs text-slate-500">
-                Route incoming clients to the right professional in your firm.
-                This workflow will be available here soon.
+                {t('dashFirm.assign.desc')}
               </p>
               <Button variant="ghost" size="sm" className="mt-3" disabled>
-                Configure routing
+                {t('dashFirm.assign.configure')}
               </Button>
             </div>
           </Card>
@@ -215,8 +228,8 @@ export default function FirmDashboardPage() {
         {/* Cases */}
         <section>
           <SectionTitle
-            title="All cases"
-            description="Every matter handled across your firm."
+            title={t('dashFirm.cases.title')}
+            description={t('dashFirm.cases.desc')}
           />
           <CaseTable cases={cases} />
         </section>
@@ -224,8 +237,8 @@ export default function FirmDashboardPage() {
         {/* Consultations */}
         <section>
           <SectionTitle
-            title="Consultation history"
-            description="All sessions conducted by your professionals."
+            title={t('dashFirm.consultations.title')}
+            description={t('dashFirm.consultations.desc')}
           />
           <ConsultationTable consultations={firmConsultations} />
         </section>
@@ -233,8 +246,8 @@ export default function FirmDashboardPage() {
         {/* Files */}
         <section>
           <SectionTitle
-            title="All files"
-            description="Documents shared across firm cases."
+            title={t('dashFirm.files.title')}
+            description={t('dashFirm.files.desc')}
           />
           <FileManager files={caseFiles} />
         </section>
@@ -242,8 +255,8 @@ export default function FirmDashboardPage() {
         {/* Reviews */}
         <section>
           <SectionTitle
-            title="Ratings & reviews"
-            description="Client feedback for your firm's professionals."
+            title={t('dashFirm.reviews.title')}
+            description={t('dashFirm.reviews.desc')}
           />
           <ReviewManager reviews={firmReviews} />
         </section>
@@ -252,7 +265,7 @@ export default function FirmDashboardPage() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Add lawyer / consultant"
+        title={t('dashFirm.modal.title')}
         footer={
           <>
             <Button
@@ -260,45 +273,45 @@ export default function FirmDashboardPage() {
               size="sm"
               onClick={() => setModalOpen(false)}
             >
-              Cancel
+              {t('dash.common.cancel')}
             </Button>
             <Button size="sm" type="submit" form="add-pro-form">
-              Add to team
+              {t('dashFirm.modal.addToTeam')}
             </Button>
           </>
         }
       >
         <form id="add-pro-form" onSubmit={handleAddPro} className="space-y-4">
           <Input
-            label="Full name"
+            label={t('dashFirm.modal.fullName')}
             name="name"
             value={newPro.name}
             onChange={handleNewProChange}
-            placeholder="Professional's full name"
+            placeholder={t('dashFirm.modal.fullNamePlaceholder')}
           />
           <Input
-            label="Email address"
+            label={t('dashFirm.modal.email')}
             name="email"
             type="email"
             value={newPro.email}
             onChange={handleNewProChange}
-            placeholder="name@firm.com"
+            placeholder={t('dashFirm.modal.emailPlaceholder')}
           />
           <Select
-            label="Profession type"
+            label={t('dashFirm.modal.professionType')}
             name="professionType"
             value={newPro.professionType}
             onChange={handleNewProChange}
             options={professionOptions}
-            placeholder="Select profession"
+            placeholder={t('dashFirm.modal.professionPlaceholder')}
           />
           <Select
-            label="Specialization"
+            label={t('dashFirm.modal.specialization')}
             name="specialization"
             value={newPro.specialization}
             onChange={handleNewProChange}
             options={specializationOptions}
-            placeholder="Select specialization"
+            placeholder={t('dashFirm.modal.specializationPlaceholder')}
           />
         </form>
       </Modal>

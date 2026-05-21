@@ -1,6 +1,7 @@
 'use client';
 
 import { Circle } from 'lucide-react';
+import { useLanguage } from '@/components/LanguageProvider';
 
 /**
  * RecordingStatus — pill showing whether the call is being recorded.
@@ -8,6 +9,7 @@ import { Circle } from 'lucide-react';
  * Props: { recording }
  */
 export default function RecordingStatus({ recording }) {
+  const { t } = useLanguage();
   return (
     <div>
       {recording ? (
@@ -16,16 +18,16 @@ export default function RecordingStatus({ recording }) {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
           </span>
-          Recording
+          {t('consultCmp.recording')}
         </span>
       ) : (
         <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
           <Circle size={8} className="fill-slate-400 text-slate-400" />
-          Not recording
+          {t('consultCmp.notRecording')}
         </span>
       )}
       <p className="mt-1.5 text-xs text-slate-400">
-        Call recording integration placeholder.
+        {t('consultCmp.recordingPlaceholder')}
       </p>
     </div>
   );

@@ -12,9 +12,11 @@ import ProfessionalServices from '@/components/professionals/ProfessionalService
 import ProfessionalAvailability from '@/components/professionals/ProfessionalAvailability';
 import ProfessionalReviews from '@/components/professionals/ProfessionalReviews';
 import ProfessionalCard from '@/components/professionals/ProfessionalCard';
+import { useLanguage } from '@/components/LanguageProvider';
 import { getProfessionalById, professionals } from '@/data/mockData';
 
 export default function ProfessionalProfilePage() {
+  const { t } = useLanguage();
   const { id } = useParams();
   const professional = getProfessionalById(id);
 
@@ -26,11 +28,11 @@ export default function ProfessionalProfilePage() {
           <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
             <EmptyState
               icon={<UserX size={24} />}
-              title="Professional not found"
-              description="The professional you are looking for does not exist or may have been removed."
+              title={t('profDetail.notFoundTitle')}
+              description={t('profDetail.notFoundDesc')}
               action={
                 <Button href="/professionals" variant="primary">
-                  Browse all professionals
+                  {t('profDetail.browseAll')}
                 </Button>
               }
             />
@@ -59,7 +61,9 @@ export default function ProfessionalProfilePage() {
           <Card>
             <div className="mb-3 flex items-center gap-2">
               <FileText size={18} className="text-blue-600" />
-              <h2 className="text-base font-semibold text-slate-900">About</h2>
+              <h2 className="text-base font-semibold text-slate-900">
+                {t('profDetail.about')}
+              </h2>
             </div>
             <p className="text-sm leading-relaxed text-slate-600">
               {professional.bio}
@@ -73,7 +77,7 @@ export default function ProfessionalProfilePage() {
           {similar.length > 0 && (
             <section>
               <h2 className="mb-4 text-lg font-bold text-slate-900">
-                Similar professionals
+                {t('profDetail.similar')}
               </h2>
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {similar.map((pro) => (

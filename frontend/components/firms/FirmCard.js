@@ -1,8 +1,11 @@
+'use client';
+
 import { MapPin, Users } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
 import RatingStars from '@/components/common/RatingStars';
+import { useLanguage } from '@/components/LanguageProvider';
 import { getInitials } from '@/utils/formatters';
 
 /**
@@ -11,6 +14,7 @@ import { getInitials } from '@/utils/formatters';
  * Props: { firm }
  */
 export default function FirmCard({ firm }) {
+  const { t } = useLanguage();
   if (!firm) return null;
 
   const {
@@ -49,7 +53,11 @@ export default function FirmCard({ firm }) {
         </span>
         <span className="inline-flex items-center gap-1">
           <Users size={14} className="text-slate-400" />
-          {professionalCount} professional{professionalCount === 1 ? '' : 's'}
+          {professionalCount === 1
+            ? t('firmCmp.professionalCountOne', { count: professionalCount })
+            : t('firmCmp.professionalCountOther', {
+                count: professionalCount,
+              })}
         </span>
       </div>
 
@@ -69,7 +77,7 @@ export default function FirmCard({ firm }) {
           ))}
           {services.length > 3 && (
             <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
-              +{services.length - 3} more
+              {t('firmCmp.moreServices', { count: services.length - 3 })}
             </span>
           )}
         </div>
@@ -82,7 +90,7 @@ export default function FirmCard({ firm }) {
           size="sm"
           className="w-full"
         >
-          View firm
+          {t('firmCmp.viewFirm')}
         </Button>
       </div>
     </Card>

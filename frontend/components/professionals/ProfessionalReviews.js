@@ -1,7 +1,10 @@
+'use client';
+
 import { MessageSquare, Star } from 'lucide-react';
 import Card from '@/components/common/Card';
 import RatingStars from '@/components/common/RatingStars';
 import EmptyState from '@/components/common/EmptyState';
+import { useLanguage } from '@/components/LanguageProvider';
 import { formatDate, getInitials } from '@/utils/formatters';
 import { getReviewsByProfessional } from '@/data/mockData';
 
@@ -11,6 +14,7 @@ import { getReviewsByProfessional } from '@/data/mockData';
  * Props: { professionalId }
  */
 export default function ProfessionalReviews({ professionalId }) {
+  const { t } = useLanguage();
   const reviews = getReviewsByProfessional(professionalId) || [];
   const count = reviews.length;
   const average =
@@ -24,7 +28,7 @@ export default function ProfessionalReviews({ professionalId }) {
         <div className="flex items-center gap-2">
           <MessageSquare size={18} className="text-blue-600" />
           <h2 className="text-base font-semibold text-slate-900">
-            Client reviews
+            {t('profCmp.clientReviews')}
           </h2>
         </div>
         {count > 0 && (
@@ -34,7 +38,9 @@ export default function ProfessionalReviews({ professionalId }) {
             </span>
             <RatingStars rating={average} size="sm" showValue={false} />
             <span className="text-slate-500">
-              ({count} review{count === 1 ? '' : 's'})
+              {count === 1
+                ? t('profCmp.reviewCountOne', { count })
+                : t('profCmp.reviewCountOther', { count })}
             </span>
           </div>
         )}
@@ -43,8 +49,8 @@ export default function ProfessionalReviews({ professionalId }) {
       {count === 0 ? (
         <EmptyState
           icon={<Star size={24} />}
-          title="No reviews yet"
-          description="This professional has not received any client reviews so far."
+          title={t('profCmp.noReviewsTitle')}
+          description={t('profCmp.noReviewsDesc')}
         />
       ) : (
         <ul className="space-y-4">

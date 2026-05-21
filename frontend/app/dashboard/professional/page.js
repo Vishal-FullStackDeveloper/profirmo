@@ -18,6 +18,7 @@ import CaseTable from '@/components/dashboard/CaseTable';
 import FileManager from '@/components/dashboard/FileManager';
 import ReviewManager from '@/components/dashboard/ReviewManager';
 import Card from '@/components/common/Card';
+import { useLanguage } from '@/components/LanguageProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboard } from '@/hooks/useDashboard';
 import { ROLES } from '@/utils/constants';
@@ -48,6 +49,7 @@ function PlaceholderCard({ icon, title, description }) {
 }
 
 export default function ProfessionalDashboardPage() {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const linkedId = user ? user.linkedId || user.firmId : undefined;
   const dashboard = useDashboard(ROLES.PROFESSIONAL, linkedId);
@@ -85,8 +87,12 @@ export default function ProfessionalDashboardPage() {
   return (
     <DashboardLayout
       role={ROLES.PROFESSIONAL}
-      title="Professional dashboard"
-      subtitle={`Welcome back${user && user.name ? `, ${user.name}` : ''}`}
+      title={t('dashPro.title')}
+      subtitle={
+        user && user.name
+          ? t('dash.common.welcomeBackName', { name: user.name })
+          : t('dash.common.welcomeBack')
+      }
     >
       <div className="space-y-8">
         {/* Profile completion */}
@@ -94,10 +100,10 @@ export default function ProfessionalDashboardPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-slate-900">
-                Profile completion
+                {t('dashPro.completion.title')}
               </h2>
               <p className="text-sm text-slate-500">
-                A complete profile ranks higher in search results.
+                {t('dashPro.completion.desc')}
               </p>
             </div>
             <span className="text-2xl font-bold text-blue-600">
@@ -118,48 +124,50 @@ export default function ProfessionalDashboardPage() {
         {/* Today's & upcoming consultations */}
         <section>
           <SectionTitle
-            title="Upcoming consultations"
-            description="Scheduled and live sessions with your clients."
+            title={t('dashPro.upcoming.title')}
+            description={t('dashPro.upcoming.desc')}
           />
           <ConsultationTable
             consultations={upcoming}
-            emptyTitle="No upcoming consultations"
-            emptyDescription="New bookings from clients will show up here."
+            emptyTitle={t('dashPro.upcoming.emptyTitle')}
+            emptyDescription={t('dashPro.upcoming.emptyDesc')}
           />
         </section>
 
         {/* Earnings */}
         <section>
           <SectionTitle
-            title="Earnings"
-            description="Your performance at a glance."
+            title={t('dashPro.earnings.title')}
+            description={t('dashPro.earnings.desc')}
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatsCard
-              label="Total earnings"
+              label={t('dashPro.stat.totalEarnings')}
               value={formatCurrency(stats.totalEarnings || 0)}
               icon={<Wallet size={20} />}
               variant="green"
-              hint="From completed bookings"
+              hint={t('dash.common.fromCompletedBookings')}
             />
             <StatsCard
-              label="Completed consultations"
+              label={t('dashPro.stat.completedConsultations')}
               value={stats.completedConsultations || 0}
               icon={<CheckCircle2 size={20} />}
               variant="blue"
             />
             <StatsCard
-              label="Pending bookings"
+              label={t('dashPro.stat.pendingBookings')}
               value={stats.pendingBookings || 0}
               icon={<CalendarClock size={20} />}
               variant="amber"
             />
             <StatsCard
-              label="Average rating"
+              label={t('dashPro.stat.averageRating')}
               value={(stats.averageRating || 0).toFixed(1)}
               icon={<Star size={20} />}
               variant="amber"
-              hint={`${stats.reviewsCount || 0} reviews`}
+              hint={t('dashPro.stat.reviewsCount', {
+                count: stats.reviewsCount || 0,
+              })}
             />
           </div>
         </section>
@@ -167,8 +175,8 @@ export default function ProfessionalDashboardPage() {
         {/* Clients */}
         <section>
           <SectionTitle
-            title="Client list"
-            description="Clients you are currently advising."
+            title={t('dashPro.clients.title')}
+            description={t('dashPro.clients.desc')}
           />
           <ClientTable clients={myClients} />
         </section>
@@ -176,8 +184,8 @@ export default function ProfessionalDashboardPage() {
         {/* Cases */}
         <section>
           <SectionTitle
-            title="Case list"
-            description="Matters assigned to you across clients."
+            title={t('dashPro.cases.title')}
+            description={t('dashPro.cases.desc')}
           />
           <CaseTable cases={cases} />
         </section>
@@ -185,21 +193,21 @@ export default function ProfessionalDashboardPage() {
         {/* Past consultations */}
         <section>
           <SectionTitle
-            title="Consultation history"
-            description="Completed sessions and their details."
+            title={t('dashPro.history.title')}
+            description={t('dashPro.history.desc')}
           />
           <ConsultationTable
             consultations={ended}
-            emptyTitle="No consultation history"
-            emptyDescription="Completed consultations will appear here."
+            emptyTitle={t('dashPro.history.emptyTitle')}
+            emptyDescription={t('dashPro.history.emptyDesc')}
           />
         </section>
 
         {/* Documents */}
         <section>
           <SectionTitle
-            title="Shared documents"
-            description="Files exchanged with your clients."
+            title={t('dashPro.documents.title')}
+            description={t('dashPro.documents.desc')}
           />
           <FileManager files={caseFiles} />
         </section>
@@ -207,19 +215,19 @@ export default function ProfessionalDashboardPage() {
         {/* Recordings & transcripts */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div>
-            <SectionTitle title="Call recordings" />
+            <SectionTitle title={t('dashPro.recordings.title')} />
             <PlaceholderCard
               icon={<Video size={22} />}
-              title="Recordings"
-              description="Consultation call recordings will be available here once enabled."
+              title={t('dashPro.recordings.heading')}
+              description={t('dashPro.recordings.desc')}
             />
           </div>
           <div>
-            <SectionTitle title="Transcripts" />
+            <SectionTitle title={t('dashPro.transcripts.title')} />
             <PlaceholderCard
               icon={<FileText size={22} />}
-              title="Transcripts"
-              description="Automatic transcripts of your consultations will appear here."
+              title={t('dashPro.transcripts.heading')}
+              description={t('dashPro.transcripts.desc')}
             />
           </div>
         </div>
@@ -227,8 +235,8 @@ export default function ProfessionalDashboardPage() {
         {/* Reviews */}
         <section>
           <SectionTitle
-            title="Reviews received"
-            description="What your clients say about working with you."
+            title={t('dashPro.reviews.title')}
+            description={t('dashPro.reviews.desc')}
           />
           <ReviewManager reviews={reviews} />
         </section>

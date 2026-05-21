@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Menu, X, Bell, LogOut } from 'lucide-react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Button from '@/components/common/Button';
+import { useLanguage } from '@/components/LanguageProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { getInitials } from '@/utils/formatters';
 
@@ -14,6 +15,7 @@ import { getInitials } from '@/utils/formatters';
  */
 export default function DashboardLayout({ children, role, title, subtitle }) {
   const router = useRouter();
+  const { t } = useLanguage();
   const { user, logout } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -22,7 +24,8 @@ export default function DashboardLayout({ children, role, title, subtitle }) {
     router.push('/');
   }
 
-  const displayName = user && user.name ? user.name : 'Guest user';
+  const displayName =
+    user && user.name ? user.name : t('dash.layout.guestUser');
   const displayEmail = user && user.email ? user.email : '';
 
   return (
@@ -44,7 +47,7 @@ export default function DashboardLayout({ children, role, title, subtitle }) {
             <button
               type="button"
               onClick={() => setDrawerOpen(false)}
-              aria-label="Close menu"
+              aria-label={t('dash.layout.closeMenu')}
               className="absolute right-3 top-4 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
             >
               <X size={20} />
@@ -62,7 +65,7 @@ export default function DashboardLayout({ children, role, title, subtitle }) {
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
-                aria-label="Open menu"
+                aria-label={t('dash.layout.openMenu')}
                 className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden"
               >
                 <Menu size={20} />
@@ -80,7 +83,7 @@ export default function DashboardLayout({ children, role, title, subtitle }) {
             <div className="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"
-                aria-label="Notifications"
+                aria-label={t('dash.layout.notifications')}
                 className="relative rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100"
               >
                 <Bell size={19} />
@@ -107,7 +110,9 @@ export default function DashboardLayout({ children, role, title, subtitle }) {
                 onClick={handleLogout}
               >
                 <LogOut size={15} />
-                <span className="hidden sm:inline">Logout</span>
+                <span className="hidden sm:inline">
+                  {t('dash.layout.logout')}
+                </span>
               </Button>
             </div>
           </div>

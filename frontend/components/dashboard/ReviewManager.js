@@ -4,6 +4,7 @@ import { Star } from 'lucide-react';
 import Card from '@/components/common/Card';
 import RatingStars from '@/components/common/RatingStars';
 import EmptyState from '@/components/common/EmptyState';
+import { useLanguage } from '@/components/LanguageProvider';
 import { formatDate, getInitials } from '@/utils/formatters';
 
 /**
@@ -11,14 +12,15 @@ import { formatDate, getInitials } from '@/utils/formatters';
  * Props: { reviews }
  */
 export default function ReviewManager({ reviews }) {
+  const { t } = useLanguage();
   const list = reviews || [];
 
   if (list.length === 0) {
     return (
       <EmptyState
         icon={<Star size={24} />}
-        title="No reviews yet"
-        description="Reviews from clients will appear here after consultations."
+        title={t('dash.reviews.emptyTitle')}
+        description={t('dash.reviews.emptyDesc')}
       />
     );
   }
@@ -44,7 +46,9 @@ export default function ReviewManager({ reviews }) {
               <RatingStars rating={average} size="md" showValue={false} />
             </div>
             <p className="mt-1 text-sm text-slate-500">
-              {list.length} {list.length === 1 ? 'review' : 'reviews'}
+              {list.length === 1
+                ? t('dash.reviews.reviewOne', { count: list.length })
+                : t('dash.reviews.reviewMany', { count: list.length })}
             </p>
           </div>
           <div className="flex-1 space-y-1.5">
@@ -52,7 +56,9 @@ export default function ReviewManager({ reviews }) {
               const pct = list.length ? (count / list.length) * 100 : 0;
               return (
                 <div key={star} className="flex items-center gap-2 text-xs">
-                  <span className="w-10 text-slate-500">{star} star</span>
+                  <span className="w-10 text-slate-500">
+                    {t('dash.reviews.starLabel', { star })}
+                  </span>
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
                     <div
                       className="h-full rounded-full bg-amber-400"
@@ -79,7 +85,7 @@ export default function ReviewManager({ reviews }) {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-medium text-slate-800">
-                    {review.clientName || 'Anonymous client'}
+                    {review.clientName || t('dash.reviews.anonymous')}
                   </p>
                   <span className="text-xs text-slate-400">
                     {formatDate(review.date)}

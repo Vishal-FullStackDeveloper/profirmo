@@ -9,20 +9,22 @@ import Select from '@/components/common/Select';
 import EmptyState from '@/components/common/EmptyState';
 import FirmCard from '@/components/firms/FirmCard';
 import { useFirms } from '@/hooks/useFirms';
+import { useLanguage } from '@/components/LanguageProvider';
 import { CITIES, FIRM_TYPES } from '@/utils/constants';
-
-const RATING_OPTIONS = [
-  { value: '', label: 'Any rating' },
-  { value: '3', label: '3.0 & up' },
-  { value: '4', label: '4.0 & up' },
-  { value: '4.5', label: '4.5 & up' },
-];
 
 const toOptions = (arr) => arr.map((v) => ({ value: v, label: v }));
 
 export default function FirmsPage() {
+  const { t } = useLanguage();
   const { firms, loading, params, setParams } = useFirms();
   const update = (patch) => setParams((prev) => ({ ...prev, ...patch }));
+
+  const RATING_OPTIONS = [
+    { value: '', label: t('firmList.anyRating') },
+    { value: '3', label: t('firmList.rating3') },
+    { value: '4', label: t('firmList.rating4') },
+    { value: '4.5', label: t('firmList.rating45') },
+  ];
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -31,11 +33,10 @@ export default function FirmsPage() {
         <div className="border-b border-slate-200 bg-white">
           <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-              Browse firms
+              {t('firmList.title')}
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600">
-              Discover established legal and tax firms. Connect with a full team
-              of professionals under one trusted practice.
+              {t('firmList.subtitle')}
             </p>
           </div>
         </div>
@@ -44,36 +45,36 @@ export default function FirmsPage() {
           <Card className="mb-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Input
-                label="Search"
+                label={t('firmList.search')}
                 name="search"
                 value={params.search || ''}
                 onChange={(e) => update({ search: e.target.value })}
-                placeholder="Firm name or keyword"
+                placeholder={t('firmList.searchPlaceholder')}
               />
               <Select
-                label="City"
+                label={t('firmList.city')}
                 name="city"
                 value={params.city || ''}
                 onChange={(e) => update({ city: e.target.value || undefined })}
                 options={[
-                  { value: '', label: 'All cities' },
+                  { value: '', label: t('firmList.allCities') },
                   ...toOptions(CITIES),
                 ]}
               />
               <Select
-                label="Firm type"
+                label={t('firmList.firmType')}
                 name="firmType"
                 value={params.firmType || ''}
                 onChange={(e) =>
                   update({ firmType: e.target.value || undefined })
                 }
                 options={[
-                  { value: '', label: 'All firm types' },
+                  { value: '', label: t('firmList.allFirmTypes') },
                   ...toOptions(FIRM_TYPES),
                 ]}
               />
               <Select
-                label="Minimum rating"
+                label={t('firmList.minRating')}
                 name="minRating"
                 value={params.minRating || ''}
                 onChange={(e) =>
@@ -86,13 +87,15 @@ export default function FirmsPage() {
 
           <p className="mb-4 text-sm text-slate-600">
             {loading ? (
-              'Loading firms…'
+              t('firmList.loading')
             ) : (
               <>
                 <span className="font-semibold text-slate-900">
                   {firms.length}
                 </span>{' '}
-                firm{firms.length === 1 ? '' : 's'} found
+                {firms.length === 1
+                  ? t('firmList.countOne')
+                  : t('firmList.countOther')}
               </>
             )}
           </p>
@@ -109,8 +112,8 @@ export default function FirmsPage() {
           ) : firms.length === 0 ? (
             <EmptyState
               icon={<Building2 size={24} />}
-              title="No firms match your filters"
-              description="Try adjusting your search or removing some filters to see more firms."
+              title={t('firmList.emptyTitle')}
+              description={t('firmList.emptyDesc')}
             />
           ) : (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

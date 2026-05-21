@@ -1,5 +1,8 @@
+'use client';
+
 import { CheckCircle2, Layers } from 'lucide-react';
 import Card from '@/components/common/Card';
+import { useLanguage } from '@/components/LanguageProvider';
 
 /**
  * ProfessionalServices — checklist of services offered.
@@ -7,6 +10,7 @@ import Card from '@/components/common/Card';
  * Props: { professional }
  */
 export default function ProfessionalServices({ professional }) {
+  const { t } = useLanguage();
   const services =
     (professional && Array.isArray(professional.servicesOffered)
       ? professional.servicesOffered
@@ -17,12 +21,12 @@ export default function ProfessionalServices({ professional }) {
       <div className="mb-4 flex items-center gap-2">
         <Layers size={18} className="text-blue-600" />
         <h2 className="text-base font-semibold text-slate-900">
-          Services offered
+          {t('profCmp.servicesOffered')}
         </h2>
       </div>
 
       {services.length === 0 ? (
-        <p className="text-sm text-slate-500">No services listed yet.</p>
+        <p className="text-sm text-slate-500">{t('profCmp.noServices')}</p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
           {services.map((service) => (

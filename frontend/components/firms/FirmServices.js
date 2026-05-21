@@ -1,5 +1,8 @@
+'use client';
+
 import { Briefcase, CheckCircle2 } from 'lucide-react';
 import Card from '@/components/common/Card';
+import { useLanguage } from '@/components/LanguageProvider';
 
 /**
  * FirmServices — grid of services offered by a firm.
@@ -7,6 +10,7 @@ import Card from '@/components/common/Card';
  * Props: { firm }
  */
 export default function FirmServices({ firm }) {
+  const { t } = useLanguage();
   const services =
     (firm && Array.isArray(firm.services) ? firm.services : []) || [];
 
@@ -15,12 +19,12 @@ export default function FirmServices({ firm }) {
       <div className="mb-4 flex items-center gap-2">
         <Briefcase size={18} className="text-blue-600" />
         <h2 className="text-base font-semibold text-slate-900">
-          Practice areas &amp; services
+          {t('firmCmp.practiceAreas')}
         </h2>
       </div>
 
       {services.length === 0 ? (
-        <p className="text-sm text-slate-500">No services listed yet.</p>
+        <p className="text-sm text-slate-500">{t('firmCmp.noServices')}</p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
           {services.map((service) => (

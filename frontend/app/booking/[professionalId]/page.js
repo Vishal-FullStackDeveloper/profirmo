@@ -20,6 +20,7 @@ import BookingCalendar from '@/components/booking/BookingCalendar';
 import TimeSlotSelector from '@/components/booking/TimeSlotSelector';
 import ConsultationSummary from '@/components/booking/ConsultationSummary';
 import PaymentPlaceholder from '@/components/booking/PaymentPlaceholder';
+import { useLanguage } from '@/components/LanguageProvider';
 import { professionals, getProfessionalById, consultations } from '@/data/mockData';
 import { BOOKING_TYPES } from '@/utils/constants';
 import { formatCurrency, formatDate, formatTime, getInitials } from '@/utils/formatters';
@@ -27,6 +28,7 @@ import { formatCurrency, formatDate, formatTime, getInitials } from '@/utils/for
 const DURATIONS = [15, 30, 45, 60];
 
 export default function BookingPage() {
+  const { t } = useLanguage();
   const { professionalId } = useParams();
   const professional =
     getProfessionalById(professionalId) || professionals[0];
@@ -86,10 +88,10 @@ export default function BookingPage() {
           {/* Page header */}
           <div className="mb-6">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              Book a consultation
+              {t('bookingPage.title')}
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Choose how and when you would like to connect with your expert.
+              {t('bookingPage.subtitle')}
             </p>
           </div>
 
@@ -108,7 +110,9 @@ export default function BookingPage() {
                         {professional.name}
                       </h2>
                       {professional.verified && (
-                        <Badge variant="green">Verified</Badge>
+                        <Badge variant="green">
+                          {t('bookingPage.verified')}
+                        </Badge>
                       )}
                     </div>
                     <p className="mt-0.5 text-sm text-slate-500">
@@ -121,8 +125,11 @@ export default function BookingPage() {
                           size={13}
                           className="fill-amber-400 text-amber-400"
                         />
-                        {professional.rating} ({professional.reviewsCount}{' '}
-                        reviews)
+                        {professional.rating} (
+                        {t('bookingPage.reviews', {
+                          count: professional.reviewsCount,
+                        })}
+                        )
                       </span>
                       <span className="flex items-center gap-1">
                         <MapPin size={13} />
@@ -136,7 +143,7 @@ export default function BookingPage() {
               {/* Consultation type chooser */}
               <Card>
                 <h3 className="text-sm font-semibold text-slate-800">
-                  Consultation type
+                  {t('bookingPage.consultationType')}
                 </h3>
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <button
@@ -157,13 +164,13 @@ export default function BookingPage() {
                         }
                       />
                       <span className="text-sm font-semibold text-slate-800">
-                        Instant consultation
+                        {t('bookingPage.instant')}
                       </span>
                     </div>
                     <p className="mt-1.5 text-xs text-slate-500">
                       {professional.availableNow
-                        ? 'Connect right now — the expert is available.'
-                        : 'The expert is not available right now.'}
+                        ? t('bookingPage.instantAvailable')
+                        : t('bookingPage.instantUnavailable')}
                     </p>
                   </button>
 
@@ -184,11 +191,11 @@ export default function BookingPage() {
                         }
                       />
                       <span className="text-sm font-semibold text-slate-800">
-                        Scheduled consultation
+                        {t('bookingPage.scheduled')}
                       </span>
                     </div>
                     <p className="mt-1.5 text-xs text-slate-500">
-                      Pick a date and time slot that works for you.
+                      {t('bookingPage.scheduledDesc')}
                     </p>
                   </button>
                 </div>
@@ -199,10 +206,10 @@ export default function BookingPage() {
                 <>
                   <Card>
                     <h3 className="text-sm font-semibold text-slate-800">
-                      Select a date
+                      {t('bookingPage.selectDate')}
                     </h3>
                     <p className="mb-3 mt-0.5 text-xs text-slate-500">
-                      Available within the next 14 days.
+                      {t('bookingPage.selectDateDesc')}
                     </p>
                     <BookingCalendar
                       selectedDate={selectedDate}
@@ -212,12 +219,14 @@ export default function BookingPage() {
 
                   <Card>
                     <h3 className="text-sm font-semibold text-slate-800">
-                      Select a time slot
+                      {t('bookingPage.selectSlot')}
                     </h3>
                     <p className="mb-3 mt-0.5 text-xs text-slate-500">
                       {selectedDate
-                        ? `Slots for ${formatDate(selectedDate)}.`
-                        : 'Pick a date first to see available slots.'}
+                        ? t('bookingPage.slotsFor', {
+                            date: formatDate(selectedDate),
+                          })
+                        : t('bookingPage.pickDateFirst')}
                     </p>
                     {selectedDate ? (
                       <TimeSlotSelector
@@ -227,7 +236,7 @@ export default function BookingPage() {
                       />
                     ) : (
                       <p className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">
-                        No date selected yet.
+                        {t('bookingPage.noDateSelected')}
                       </p>
                     )}
                   </Card>
@@ -237,10 +246,10 @@ export default function BookingPage() {
               {/* Duration selector */}
               <Card>
                 <h3 className="text-sm font-semibold text-slate-800">
-                  Estimated duration
+                  {t('bookingPage.estimatedDuration')}
                 </h3>
                 <p className="mb-3 mt-0.5 text-xs text-slate-500">
-                  You are billed per minute for the actual call length.
+                  {t('bookingPage.durationDesc')}
                 </p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {DURATIONS.map((d) => {
@@ -252,14 +261,14 @@ export default function BookingPage() {
                         onClick={() => setDuration(d)}
                       >
                         <Clock size={15} />
-                        {d} min
+                        {t('bookingPage.minutesShort', { count: d })}
                       </Button>
                     );
                   })}
                 </div>
                 <div className="mt-4 flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
                   <span className="text-sm text-slate-600">
-                    Estimated cost
+                    {t('bookingPage.estimatedCost')}
                   </span>
                   <span className="text-base font-bold text-slate-900">
                     {formatCurrency(estimatedCost)}
@@ -281,7 +290,7 @@ export default function BookingPage() {
 
                 {!isInstant && !canConfirm && (
                   <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    Select a date and time slot to continue.
+                    {t('bookingPage.selectDateTimeWarning')}
                   </p>
                 )}
 
@@ -302,14 +311,14 @@ export default function BookingPage() {
       <Modal
         open={confirmed}
         onClose={() => setConfirmed(false)}
-        title="Booking confirmed!"
+        title={t('bookingPage.confirmedTitle')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirmed(false)}>
-              Close
+              {t('bookingPage.close')}
             </Button>
             <Button href={`/consultation/${consultationId}`}>
-              Join consultation room
+              {t('bookingPage.joinRoom')}
             </Button>
           </>
         }
@@ -319,35 +328,37 @@ export default function BookingPage() {
             <CheckCircle2 size={26} />
           </span>
           <p className="mt-3 text-sm text-slate-600">
-            Your consultation with{' '}
-            <span className="font-semibold text-slate-800">
-              {professional.name}
-            </span>{' '}
-            is confirmed.
+            {t('bookingPage.confirmedBody', {
+              name: professional.name,
+            })}
           </p>
         </div>
 
         <dl className="mt-5 space-y-2.5 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
           <div className="flex justify-between">
-            <dt className="text-slate-500">Type</dt>
+            <dt className="text-slate-500">{t('bookingPage.type')}</dt>
             <dd className="font-medium text-slate-800">
-              {isInstant ? 'Instant' : 'Scheduled'}
+              {isInstant
+                ? t('bookingPage.typeInstant')
+                : t('bookingPage.typeScheduled')}
             </dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-slate-500">When</dt>
+            <dt className="text-slate-500">{t('bookingPage.when')}</dt>
             <dd className="font-medium text-slate-800">
               {isInstant
-                ? 'Now'
+                ? t('bookingPage.whenNow')
                 : `${formatDate(selectedDate)}, ${formatTime(selectedSlot)}`}
             </dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-slate-500">Duration</dt>
-            <dd className="font-medium text-slate-800">{duration} minutes</dd>
+            <dt className="text-slate-500">{t('bookingPage.duration')}</dt>
+            <dd className="font-medium text-slate-800">
+              {t('bookingPage.durationMinutes', { count: duration })}
+            </dd>
           </div>
           <div className="flex justify-between border-t border-slate-200 pt-2.5">
-            <dt className="text-slate-500">Amount paid</dt>
+            <dt className="text-slate-500">{t('bookingPage.amountPaid')}</dt>
             <dd className="font-bold text-slate-900">
               {formatCurrency(estimatedCost)}
             </dd>

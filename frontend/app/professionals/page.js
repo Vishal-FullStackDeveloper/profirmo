@@ -11,12 +11,21 @@ import EmptyState from '@/components/common/EmptyState';
 import ProfessionalCard from '@/components/professionals/ProfessionalCard';
 import ProfessionalFilters from '@/components/professionals/ProfessionalFilters';
 import { useProfessionals } from '@/hooks/useProfessionals';
-import { SORT_OPTIONS } from '@/utils/constants';
+import { useLanguage } from '@/components/LanguageProvider';
 
 function ProfessionalsContent() {
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const { professionals, loading, params, setParams } = useProfessionals();
   const seeded = useRef(false);
+
+  const sortOptions = [
+    { value: 'rating', label: t('profList.sortRating') },
+    { value: 'experience', label: t('profList.sortExperience') },
+    { value: 'price_low', label: t('profList.sortPriceLow') },
+    { value: 'price_high', label: t('profList.sortPriceHigh') },
+    { value: 'availability', label: t('profList.sortAvailability') },
+  ];
 
   useEffect(() => {
     if (seeded.current) return;
@@ -44,13 +53,15 @@ function ProfessionalsContent() {
           <Card padding={false} className="mb-6 flex flex-wrap items-center justify-between gap-3 p-4">
             <p className="text-sm text-slate-600">
               {loading ? (
-                'Loading professionals…'
+                t('profList.loading')
               ) : (
                 <>
                   <span className="font-semibold text-slate-900">
                     {professionals.length}
                   </span>{' '}
-                  professional{professionals.length === 1 ? '' : 's'} found
+                  {professionals.length === 1
+                    ? t('profList.countOne')
+                    : t('profList.countOther')}
                 </>
               )}
             </p>
@@ -61,7 +72,7 @@ function ProfessionalsContent() {
                 onChange={(e) =>
                   setParams((prev) => ({ ...prev, sort: e.target.value }))
                 }
-                options={SORT_OPTIONS}
+                options={sortOptions}
               />
             </div>
           </Card>
@@ -78,8 +89,8 @@ function ProfessionalsContent() {
           ) : professionals.length === 0 ? (
             <EmptyState
               icon={<Search size={24} />}
-              title="No professionals match your filters"
-              description="Try widening your search or clearing some filters to see more results."
+              title={t('profList.emptyTitle')}
+              description={t('profList.emptyDesc')}
             />
           ) : (
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -95,6 +106,7 @@ function ProfessionalsContent() {
 }
 
 export default function ProfessionalsPage() {
+  const { t } = useLanguage();
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -102,11 +114,10 @@ export default function ProfessionalsPage() {
         <div className="border-b border-slate-200 bg-white">
           <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-              Find a professional
+              {t('profList.title')}
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600">
-              Browse verified advocates, lawyers and tax consultants. Filter by
-              expertise, city and rate to find the right expert for your matter.
+              {t('profList.subtitle')}
             </p>
           </div>
         </div>
@@ -114,7 +125,7 @@ export default function ProfessionalsPage() {
         <Suspense
           fallback={
             <div className="mx-auto max-w-7xl px-4 py-12 text-sm text-slate-500 sm:px-6 lg:px-8">
-              Loading…
+              {t('profList.loadingShort')}
             </div>
           }
         >

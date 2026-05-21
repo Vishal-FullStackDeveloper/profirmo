@@ -3,23 +3,27 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Scale, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import BrandLogo from '@/components/common/BrandLogo';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 import Select from '@/components/common/Select';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/components/LanguageProvider';
 import { validateForm, clientRegisterRules } from '@/utils/validators';
 import { CITIES, USER_TYPES, SITE } from '@/utils/constants';
 
 const cityOptions = CITIES.map((c) => ({ value: c, label: c }));
-const userTypeOptions = USER_TYPES.map((t) => ({
-  value: t,
-  label: t.charAt(0).toUpperCase() + t.slice(1),
-}));
+
+const USER_TYPE_LABEL_KEYS = {
+  individual: 'regClient.userTypeIndividual',
+  business: 'regClient.userTypeBusiness',
+};
 
 export default function RegisterClientPage() {
   const router = useRouter();
   const { registerClient } = useAuth();
+  const { t } = useLanguage();
   const [values, setValues] = useState({
     name: '',
     email: '',
@@ -31,6 +35,13 @@ export default function RegisterClientPage() {
   const [errors, setErrors] = useState({});
   const [banner, setBanner] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const userTypeOptions = USER_TYPES.map((type) => ({
+    value: type,
+    label: USER_TYPE_LABEL_KEYS[type]
+      ? t(USER_TYPE_LABEL_KEYS[type])
+      : type.charAt(0).toUpperCase() + type.slice(1),
+  }));
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -50,10 +61,7 @@ export default function RegisterClientPage() {
       await registerClient(values);
       router.push('/dashboard/client');
     } catch (err) {
-      setBanner(
-        (err && err.message) ||
-          'We could not create your account right now. Please try again shortly.'
-      );
+      setBanner((err && err.message) || t('auth.genericError'));
     } finally {
       setSubmitting(false);
     }
@@ -63,14 +71,7 @@ export default function RegisterClientPage() {
     <div className="flex min-h-screen flex-col bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center px-4 py-4">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white">
-              <Scale size={18} />
-            </span>
-            <span className="text-lg font-bold text-slate-900">
-              {SITE.name}
-            </span>
-          </Link>
+          <BrandLogo variant="light" />
         </div>
       </header>
 
@@ -78,10 +79,10 @@ export default function RegisterClientPage() {
         <div className="w-full max-w-lg">
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-bold text-slate-900">
-              Create a client account
+              {t('regClient.title')}
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Book consultations with verified legal & tax professionals.
+              {t('regClient.subtitle')}
             </p>
           </div>
 
@@ -95,58 +96,58 @@ export default function RegisterClientPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <Input
-                label="Full name"
+                label={t('auth.fullName')}
                 name="name"
                 value={values.name}
                 onChange={handleChange}
-                placeholder="Your full name"
+                placeholder={t('auth.fullNamePlaceholder')}
                 error={errors.name}
                 required
               />
               <Input
-                label="Email address"
+                label={t('auth.email')}
                 name="email"
                 type="email"
                 value={values.email}
                 onChange={handleChange}
-                placeholder="you@example.com"
+                placeholder={t('auth.emailPlaceholder')}
                 error={errors.email}
                 required
               />
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Input
-                  label="Phone number"
+                  label={t('auth.phone')}
                   name="phone"
                   value={values.phone}
                   onChange={handleChange}
-                  placeholder="10-digit mobile"
+                  placeholder={t('auth.phonePlaceholder')}
                   error={errors.phone}
                   required
                 />
                 <Select
-                  label="City"
+                  label={t('auth.city')}
                   name="city"
                   value={values.city}
                   onChange={handleChange}
                   options={cityOptions}
-                  placeholder="Select your city"
+                  placeholder={t('auth.cityPlaceholder')}
                   error={errors.city}
                   required
                 />
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Input
-                  label="Password"
+                  label={t('auth.password')}
                   name="password"
                   type="password"
                   value={values.password}
                   onChange={handleChange}
-                  placeholder="Min. 8 characters"
+                  placeholder={t('auth.passwordPlaceholder')}
                   error={errors.password}
                   required
                 />
                 <Select
-                  label="Account type"
+                  label={t('regClient.accountType')}
                   name="userType"
                   value={values.userType}
                   onChange={handleChange}
@@ -156,18 +157,18 @@ export default function RegisterClientPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting ? 'Creating account…' : 'Create account'}
+                {submitting ? t('auth.creating') : t('regClient.submit')}
               </Button>
             </form>
           </div>
 
           <p className="mt-6 text-center text-sm text-slate-600">
-            Already have an account?{' '}
+            {t('auth.alreadyHaveAccount')}{' '}
             <Link
               href="/auth/login"
               className="font-medium text-blue-600 hover:text-blue-700"
             >
-              Sign in
+              {t('auth.signIn')}
             </Link>
           </p>
         </div>

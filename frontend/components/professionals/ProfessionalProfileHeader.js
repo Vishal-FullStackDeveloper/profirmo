@@ -1,8 +1,11 @@
+'use client';
+
 import { MapPin, BadgeCheck, Briefcase, ShieldCheck } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
 import RatingStars from '@/components/common/RatingStars';
+import { useLanguage } from '@/components/LanguageProvider';
 import { formatRate, getInitials } from '@/utils/formatters';
 
 /**
@@ -11,6 +14,7 @@ import { formatRate, getInitials } from '@/utils/formatters';
  * Props: { professional }
  */
 export default function ProfessionalProfileHeader({ professional }) {
+  const { t } = useLanguage();
   if (!professional) return null;
 
   const {
@@ -32,8 +36,8 @@ export default function ProfessionalProfileHeader({ professional }) {
   const isLegal =
     /lawyer|advocate/i.test(professionType || '');
   const regLabel = isLegal
-    ? 'Bar Council Reg. No.'
-    : 'Tax / Professional Reg. No.';
+    ? t('profCmp.regBar')
+    : t('profCmp.regTax');
 
   return (
     <Card>
@@ -48,13 +52,13 @@ export default function ProfessionalProfileHeader({ professional }) {
               {verified && (
                 <Badge variant="blue">
                   <BadgeCheck size={13} className="mr-1" />
-                  Verified
+                  {t('profCmp.verified')}
                 </Badge>
               )}
               {availableNow ? (
-                <Badge variant="green">Available now</Badge>
+                <Badge variant="green">{t('profCmp.availableNow')}</Badge>
               ) : (
-                <Badge variant="gray">Offline</Badge>
+                <Badge variant="gray">{t('profCmp.offline')}</Badge>
               )}
             </div>
             <p className="mt-1 text-base font-semibold text-blue-700">
@@ -69,7 +73,7 @@ export default function ProfessionalProfileHeader({ professional }) {
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Briefcase size={15} className="text-slate-400" />
-                {experience} years experience
+                {t('profCmp.yearsExperience', { count: experience })}
               </span>
               <RatingStars rating={rating} count={reviewsCount} size="sm" />
             </div>
@@ -101,7 +105,7 @@ export default function ProfessionalProfileHeader({ professional }) {
 
         <div className="shrink-0 rounded-xl bg-slate-50 p-5 text-center lg:w-56">
           <p className="text-xs uppercase tracking-wide text-slate-400">
-            Consultation rate
+            {t('profCmp.consultationRate')}
           </p>
           <p className="mt-1 text-2xl font-bold text-slate-900">
             {formatRate(perMinuteRate)}
@@ -112,10 +116,10 @@ export default function ProfessionalProfileHeader({ professional }) {
             size="md"
             className="mt-4 w-full"
           >
-            Book consultation
+            {t('profCmp.bookConsultation')}
           </Button>
           <p className="mt-2 text-xs text-slate-400">
-            Pay only for the minutes you use
+            {t('profCmp.payOnlyMinutes')}
           </p>
         </div>
       </div>
