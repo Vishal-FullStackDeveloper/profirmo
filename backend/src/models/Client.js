@@ -1,19 +1,41 @@
-// Future DB schema (MongoDB/PostgreSQL):
-//   id, name, email, phone, city, userType, createdAt
+// Sequelize model: Client
+//   id, name, email, phone, city, userType + timestamps
 // userType: 'individual' | 'business'
 
-let seq = 0;
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-function createClient(data = {}) {
-  return {
-    id: data.id || `client-${Date.now()}-${++seq}`,
-    name: data.name || '',
-    email: (data.email || '').toLowerCase(),
-    phone: data.phone || '',
-    city: data.city || '',
-    userType: data.userType || 'individual',
-    createdAt: data.createdAt || new Date().toISOString(),
-  };
-}
+const genId = () =>
+  `client-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-module.exports = { createClient };
+const Client = sequelize.define(
+  'Client',
+  {
+    id: {
+      type: DataTypes.STRING(64),
+      primaryKey: true,
+      allowNull: false,
+      defaultValue: genId,
+    },
+    name: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    email: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    phone: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    city: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    userType: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'individual',
+    },
+  },
+  {
+    tableName: 'clients',
+    timestamps: true,
+    indexes: [
+      { fields: ['email'] },
+      { fields: ['city'] },
+      { fields: ['userType'] },
+    ],
+  }
+);
+
+module.exports = Client;

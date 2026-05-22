@@ -1,6 +1,4 @@
-const db = require('../data/mockData');
-const { createBooking } = require('../models/Booking');
-const { createConsultation } = require('../models/Consultation');
+const { Booking, Consultation, Professional, Client } = require('../models');
 const { paginate } = require('./professionalService');
 
 const VALID_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled'];
@@ -8,35 +6,31 @@ const VALID_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled'];
 /**
  * List bookings with optional filters and pagination.
  * Supported filters: status, type, clientId, professionalId.
+ * @returns {Promise<{ items, page, limit, total }>}
  */
-const list = ({ filters = {}, page, limit } = {}) => {
-  let result = [...db.bookings];
+const list = async ({ filters = {}, page, limit } = {}) => {
+  const { page: p, limit: l, offset } = paginate(page, limit);
+  const where = {};
 
-  if (filters.status) {
-    const q = String(filters.status).toLowerCase();
-    result = result.filter((b) => b.status.toLowerCase() === q);
-  }
-  if (filters.type) {
-    const q = String(filters.type).toLowerCase();
-    result = result.filter((b) => b.type.toLowerCase() === q);
-  }
-  if (filters.clientId) {
-    result = result.filter((b) => b.clientId === filters.clientId);
-  }
-  if (filters.professionalId) {
-    result = result.filter((b) => b.professionalId === filters.professionalId);
-  }
+  if (filters.status) where.status = String(filters.status);
+  if (filters.type) where.type = String(filters.type);
+  if (filters.clientId) where.clientId = filters.clientId;
+  if (filters.professionalId) where.professionalId = filters.professionalId;
 
-  return paginate(result, page, limit);
+  const { rows, count } = await Booking.findAndCountAll({
+    where,
+    limit: l,
+    offset,
+    raw: true,
+  });
+
+  return { items: rows, page: p, limit: l, total: count };
 };
 
-/** Find a booking by id or throw 404. */
-const getById = (id) => {
-  const booking = db.bookings.find((b) => b.id === id);
-  if (!booking) {
-    throw { statusCode: 404, message: `Booking not found: ${id}` };
-  }
-  return booking;
+/** Find a booking by id, or null when not found. */
+const getById = async (id) => {
+  const booking = await Booking.findByPk(id, { raw: true });
+  return booking || null;
 };
 
 /**
@@ -44,17 +38,15 @@ const getById = (id) => {
  * per-minute rate and the requested duration. A matching scheduled
  * consultation record is also created.
  */
-const create = (data = {}) => {
-  const professional = db.professionals.find(
-    (p) => p.id === data.professionalId
-  );
+const create = async (data = {}) => {
+  const professional = await Professional.findByPk(data.professionalId);
   if (!professional) {
     throw {
       statusCode: 404,
       message: `Professional not found: ${data.professionalId}`,
     };
   }
-  const client = db.clients.find((c) => c.id === data.clientId);
+  const client = await Client.findByPk(data.clientId);
   if (!client) {
     throw { statusCode: 404, message: `Client not found: ${data.clientId}` };
   }
@@ -62,7 +54,7 @@ const create = (data = {}) => {
   const duration = Number(data.duration) || 0;
   const estimatedCost = duration * professional.perMinuteRate;
 
-  const booking = createBooking({
+  const booking = await Booking.create({
     clientId: data.clientId,
     professionalId: data.professionalId,
     date: data.date,
@@ -72,40 +64,39 @@ const create = (data = {}) => {
     estimatedCost,
     status: data.status || 'pending',
   });
-  db.bookings.push(booking);
 
   // Auto-create the consultation shell for this booking.
-  const consultation = createConsultation({
+  await Consultation.create({
     bookingId: booking.id,
     clientId: booking.clientId,
     professionalId: booking.professionalId,
     callStatus: 'scheduled',
   });
-  db.consultations.push(consultation);
 
-  return booking;
+  return booking.get({ plain: true });
 };
 
-/** Update a booking's status. */
-const updateStatus = (id, status) => {
+/** Update a booking's status. Returns null when the booking is not found. */
+const updateStatus = async (id, status) => {
   if (!VALID_STATUSES.includes(status)) {
     throw {
       statusCode: 422,
       message: `Invalid status. Allowed: ${VALID_STATUSES.join(', ')}`,
     };
   }
-  const booking = getById(id);
-  booking.status = status;
-  return booking;
+  const booking = await Booking.findByPk(id);
+  if (!booking) return null;
+  await booking.update({ status });
+  return booking.get({ plain: true });
 };
 
 /** Get all bookings for a given client. */
-const getByClient = (clientId) =>
-  db.bookings.filter((b) => b.clientId === clientId);
+const getByClient = async (clientId) =>
+  Booking.findAll({ where: { clientId }, raw: true });
 
 /** Get all bookings for a given professional. */
-const getByProfessional = (professionalId) =>
-  db.bookings.filter((b) => b.professionalId === professionalId);
+const getByProfessional = async (professionalId) =>
+  Booking.findAll({ where: { professionalId }, raw: true });
 
 module.exports = {
   list,

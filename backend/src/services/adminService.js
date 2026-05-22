@@ -1,8 +1,18 @@
-const db = require('../data/mockData');
+const {
+  User,
+  Professional,
+  Firm,
+  Client,
+  Case,
+  Booking,
+  Consultation,
+  Review,
+} = require('../models');
 
 // Strip the password before exposing a user record.
 const sanitizeUser = (user) => {
-  const { password, ...rest } = user;
+  const plain = typeof user.get === 'function' ? user.get({ plain: true }) : user;
+  const { password, ...rest } = plain;
   return rest;
 };
 
@@ -11,13 +21,39 @@ const sanitizeUser = (user) => {
  * `revenue` is a placeholder sum of completed-booking estimated costs
  * and ended-consultation costs.
  */
-const getStats = () => {
-  const completedBookings = db.bookings.filter(
-    (b) => b.status === 'completed'
-  );
-  const endedConsultations = db.consultations.filter(
-    (c) => c.callStatus === 'ended'
-  );
+const getStats = async () => {
+  const [
+    users,
+    professionals,
+    firms,
+    clients,
+    cases,
+    bookings,
+    consultations,
+    reviews,
+    pendingProfessionals,
+  ] = await Promise.all([
+    User.count(),
+    Professional.count(),
+    Firm.count(),
+    Client.count(),
+    Case.count(),
+    Booking.count(),
+    Consultation.count(),
+    Review.count(),
+    Professional.count({ where: { status: 'pending' } }),
+  ]);
+
+  const completedBookings = await Booking.findAll({
+    where: { status: 'completed' },
+    attributes: ['estimatedCost'],
+    raw: true,
+  });
+  const endedConsultations = await Consultation.findAll({
+    where: { callStatus: 'ended' },
+    attributes: ['cost'],
+    raw: true,
+  });
 
   const bookingRevenue = completedBookings.reduce(
     (sum, b) => sum + (b.estimatedCost || 0),
@@ -30,51 +66,49 @@ const getStats = () => {
 
   return {
     totals: {
-      users: db.users.length,
-      professionals: db.professionals.length,
-      firms: db.firms.length,
-      clients: db.clients.length,
-      cases: db.cases.length,
-      bookings: db.bookings.length,
-      consultations: db.consultations.length,
-      reviews: db.reviews.length,
+      users,
+      professionals,
+      firms,
+      clients,
+      cases,
+      bookings,
+      consultations,
+      reviews,
     },
-    pendingProfessionals: db.professionals.filter(
-      (p) => p.status === 'pending'
-    ).length,
+    pendingProfessionals,
     revenue: {
       currency: 'INR',
       fromBookings: bookingRevenue,
       fromConsultations: consultationRevenue,
       total: bookingRevenue + consultationRevenue,
-      note: 'Placeholder revenue figure derived from mock data.',
+      note: 'Placeholder revenue figure derived from stored data.',
     },
   };
 };
 
 /** List all users (sanitized). */
-const listUsers = () => db.users.map(sanitizeUser);
+const listUsers = async () => {
+  const users = await User.findAll();
+  return users.map(sanitizeUser);
+};
 
 /** List professionals awaiting admin approval. */
-const getPendingProfessionals = () =>
-  db.professionals.filter((p) => p.status === 'pending');
+const getPendingProfessionals = async () =>
+  Professional.findAll({ where: { status: 'pending' }, raw: true });
 
-/** Approve a pending professional. */
-const approveProfessional = (id) => {
-  const professional = db.professionals.find((p) => p.id === id);
-  if (!professional) {
-    throw { statusCode: 404, message: `Professional not found: ${id}` };
-  }
-  professional.status = 'approved';
-  professional.verified = true;
-  return professional;
+/** Approve a pending professional. Returns null when not found. */
+const approveProfessional = async (id) => {
+  const professional = await Professional.findByPk(id);
+  if (!professional) return null;
+  await professional.update({ status: 'approved', verified: true });
+  return professional.get({ plain: true });
 };
 
 /** List all firms. */
-const listFirms = () => [...db.firms];
+const listFirms = async () => Firm.findAll({ raw: true });
 
 /** List all bookings. */
-const listBookings = () => [...db.bookings];
+const listBookings = async () => Booking.findAll({ raw: true });
 
 module.exports = {
   getStats,

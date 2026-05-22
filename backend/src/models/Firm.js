@@ -1,35 +1,59 @@
-// Future DB schema (MongoDB/PostgreSQL):
+// Sequelize model: Firm
 //   id, name, firmType, city, address, email, phone, rating, reviewsCount,
-//   professionalCount, services[], description, professionalIds[], adminName,
-//   createdAt
+//   professionalCount, services[], description, professionalIds[], adminName
+//   + timestamps
 // firmType: 'Legal Firm' | 'Tax Firm'
 
-let seq = 0;
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-function createFirm(data = {}) {
-  const professionalIds = Array.isArray(data.professionalIds)
-    ? data.professionalIds
-    : [];
-  return {
-    id: data.id || `firm-${Date.now()}-${++seq}`,
-    name: data.name || '',
-    firmType: data.firmType || 'Legal Firm',
-    city: data.city || '',
-    address: data.address || '',
-    email: (data.email || '').toLowerCase(),
-    phone: data.phone || '',
-    rating: typeof data.rating === 'number' ? data.rating : 0,
-    reviewsCount: typeof data.reviewsCount === 'number' ? data.reviewsCount : 0,
-    professionalCount:
-      typeof data.professionalCount === 'number'
-        ? data.professionalCount
-        : professionalIds.length,
-    services: Array.isArray(data.services) ? data.services : [],
-    description: data.description || '',
-    professionalIds,
-    adminName: data.adminName || '',
-    createdAt: data.createdAt || new Date().toISOString(),
-  };
-}
+const genId = () =>
+  `firm-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-module.exports = { createFirm };
+const Firm = sequelize.define(
+  'Firm',
+  {
+    id: {
+      type: DataTypes.STRING(64),
+      primaryKey: true,
+      allowNull: false,
+      defaultValue: genId,
+    },
+    name: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    firmType: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'Legal Firm',
+    },
+    city: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    address: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    email: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    phone: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    rating: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
+    reviewsCount: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    professionalCount: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    services: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
+    description: { type: DataTypes.TEXT, allowNull: true },
+    professionalIds: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: [],
+    },
+    adminName: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+  },
+  {
+    tableName: 'firms',
+    timestamps: true,
+    indexes: [{ fields: ['city'] }, { fields: ['firmType'] }],
+  }
+);
+
+module.exports = Firm;

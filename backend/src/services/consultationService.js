@@ -1,56 +1,58 @@
-const db = require('../data/mockData');
+const { Consultation, Professional, Booking } = require('../models');
 const { paginate } = require('./professionalService');
 
 /**
  * List consultations with optional filters and pagination.
  * Supported filters: callStatus, clientId, professionalId, bookingId.
+ * @returns {Promise<{ items, page, limit, total }>}
  */
-const list = ({ filters = {}, page, limit } = {}) => {
-  let result = [...db.consultations];
+const list = async ({ filters = {}, page, limit } = {}) => {
+  const { page: p, limit: l, offset } = paginate(page, limit);
+  const where = {};
 
-  if (filters.callStatus) {
-    const q = String(filters.callStatus).toLowerCase();
-    result = result.filter((c) => c.callStatus.toLowerCase() === q);
-  }
-  if (filters.clientId) {
-    result = result.filter((c) => c.clientId === filters.clientId);
-  }
-  if (filters.professionalId) {
-    result = result.filter((c) => c.professionalId === filters.professionalId);
-  }
-  if (filters.bookingId) {
-    result = result.filter((c) => c.bookingId === filters.bookingId);
-  }
+  if (filters.callStatus) where.callStatus = String(filters.callStatus);
+  if (filters.clientId) where.clientId = filters.clientId;
+  if (filters.professionalId) where.professionalId = filters.professionalId;
+  if (filters.bookingId) where.bookingId = filters.bookingId;
 
-  return paginate(result, page, limit);
+  const { rows, count } = await Consultation.findAndCountAll({
+    where,
+    limit: l,
+    offset,
+    raw: true,
+  });
+
+  return { items: rows, page: p, limit: l, total: count };
 };
 
-/** Find a consultation by id or throw 404. */
-const getById = (id) => {
-  const consultation = db.consultations.find((c) => c.id === id);
-  if (!consultation) {
-    throw { statusCode: 404, message: `Consultation not found: ${id}` };
-  }
-  return consultation;
+/** Find a consultation by id, or null when not found. */
+const getById = async (id) => {
+  const consultation = await Consultation.findByPk(id, { raw: true });
+  return consultation || null;
 };
 
-/** Start a consultation call. */
-const start = (id) => {
-  const consultation = getById(id);
+/** Start a consultation call. Returns null when the consultation is missing. */
+const start = async (id) => {
+  const consultation = await Consultation.findByPk(id);
+  if (!consultation) return null;
   if (consultation.callStatus === 'ended') {
     throw { statusCode: 422, message: 'Consultation has already ended' };
   }
-  consultation.callStatus = 'ongoing';
-  consultation.startedAt = consultation.startedAt || new Date().toISOString();
-  return consultation;
+  await consultation.update({
+    callStatus: 'ongoing',
+    startedAt: consultation.startedAt || new Date(),
+  });
+  return consultation.get({ plain: true });
 };
 
 /**
  * End a consultation call. Computes durationMinutes from start/end times
  * and cost from the professional's per-minute rate.
+ * Returns null when the consultation is missing.
  */
-const end = (id) => {
-  const consultation = getById(id);
+const end = async (id) => {
+  const consultation = await Consultation.findByPk(id);
+  if (!consultation) return null;
   if (consultation.callStatus !== 'ongoing') {
     throw {
       statusCode: 422,
@@ -68,28 +70,33 @@ const end = (id) => {
     0
   );
 
-  const professional = db.professionals.find(
-    (p) => p.id === consultation.professionalId
+  const professional = await Professional.findByPk(
+    consultation.professionalId
   );
   const rate = professional ? professional.perMinuteRate : 0;
 
-  consultation.callStatus = 'ended';
-  consultation.endedAt = endedAt.toISOString();
-  consultation.durationMinutes = durationMinutes;
-  consultation.cost = durationMinutes * rate;
+  await consultation.update({
+    callStatus: 'ended',
+    endedAt,
+    durationMinutes,
+    cost: durationMinutes * rate,
+  });
 
   // Mark the linked booking as completed if present.
-  const booking = db.bookings.find((b) => b.id === consultation.bookingId);
-  if (booking && booking.status !== 'cancelled') {
-    booking.status = 'completed';
+  if (consultation.bookingId) {
+    const booking = await Booking.findByPk(consultation.bookingId);
+    if (booking && booking.status !== 'cancelled') {
+      await booking.update({ status: 'completed' });
+    }
   }
 
-  return consultation;
+  return consultation.get({ plain: true });
 };
 
-/** Placeholder: get the recording URL for a consultation. */
-const getRecording = (id) => {
-  const consultation = getById(id);
+/** Get the recording URL for a consultation. Returns null if missing. */
+const getRecording = async (id) => {
+  const consultation = await Consultation.findByPk(id, { raw: true });
+  if (!consultation) return null;
   return {
     consultationId: consultation.id,
     recordingUrl: consultation.recordingUrl,
@@ -97,9 +104,10 @@ const getRecording = (id) => {
   };
 };
 
-/** Placeholder: get the transcript for a consultation. */
-const getTranscript = (id) => {
-  const consultation = getById(id);
+/** Get the transcript for a consultation. Returns null if missing. */
+const getTranscript = async (id) => {
+  const consultation = await Consultation.findByPk(id, { raw: true });
+  if (!consultation) return null;
   return {
     consultationId: consultation.id,
     transcript: consultation.transcript,
@@ -107,11 +115,12 @@ const getTranscript = (id) => {
   };
 };
 
-/** Append/replace notes on a consultation. */
-const addNotes = (id, notes) => {
-  const consultation = getById(id);
-  consultation.notes = notes || '';
-  return consultation;
+/** Append/replace notes on a consultation. Returns null if missing. */
+const addNotes = async (id, notes) => {
+  const consultation = await Consultation.findByPk(id);
+  if (!consultation) return null;
+  await consultation.update({ notes: notes || '' });
+  return consultation.get({ plain: true });
 };
 
 module.exports = {

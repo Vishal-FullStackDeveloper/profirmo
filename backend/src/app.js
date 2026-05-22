@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 
 const env = require('./config/env');
+const sequelize = require('./config/database');
 const { successResponse } = require('./utils/responseHandler');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 
@@ -36,11 +37,19 @@ app.get('/', (req, res) => {
   res.send('Profirmo API is running');
 });
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  let database = 'disconnected';
+  try {
+    await sequelize.authenticate();
+    database = 'connected';
+  } catch (err) {
+    database = 'disconnected';
+  }
   return successResponse(res, 200, 'Backend API is running successfully', {
     timestamp: new Date().toISOString(),
     environment: env.nodeEnv,
     uptime: process.uptime(),
+    database,
   });
 });
 

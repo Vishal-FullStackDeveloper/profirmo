@@ -1,8 +1,8 @@
-// In-memory mock datastore for the Profirmo backend.
+// Demo dataset for the Profirmo backend.
 //
-// These arrays stand in for a real database. Services import this module and
-// read/mutate the arrays directly (push/splice). Because the arrays are held
-// on the exported object, all services share the same live references.
+// This file is the SEED SOURCE consumed by ./seed.js. It used to back the
+// in-memory datastore; now it is plain data only (no model builders) and is
+// inserted into MySQL on first boot when the database is empty.
 //
 // Demo accounts (all passwords: "password123"):
 //   client@demo.com      -> client
@@ -11,20 +11,11 @@
 //   firmpro@demo.com     -> firm_professional
 //   admin@demo.com       -> platform_admin
 
-const { createProfessional } = require('../models/Professional');
-const { createFirm } = require('../models/Firm');
-const { createClient } = require('../models/Client');
-const { createCase } = require('../models/Case');
-const { createBooking } = require('../models/Booking');
-const { createConsultation } = require('../models/Consultation');
-const { createReview } = require('../models/Review');
-const { createUser } = require('../models/User');
-
 /* -------------------------------------------------------------------------- */
 /* Firms                                                                      */
 /* -------------------------------------------------------------------------- */
 const firms = [
-  createFirm({
+  {
     id: 'firm-1',
     name: 'Sharma & Associates Legal',
     firmType: 'Legal Firm',
@@ -34,14 +25,14 @@ const firms = [
     phone: '+91 22 4001 2200',
     rating: 4.7,
     reviewsCount: 128,
+    professionalCount: 2,
     services: ['Corporate Law', 'Property Law', 'Civil Litigation'],
     description:
       'A full-service legal firm serving corporate and individual clients across western India for over two decades.',
     professionalIds: ['prof-6', 'prof-7'],
     adminName: 'Rohan Sharma',
-    createdAt: '2023-01-12T09:00:00.000Z',
-  }),
-  createFirm({
+  },
+  {
     id: 'firm-2',
     name: 'Verma Defence Chambers',
     firmType: 'Legal Firm',
@@ -51,14 +42,14 @@ const firms = [
     phone: '+91 11 2334 5566',
     rating: 4.5,
     reviewsCount: 94,
+    professionalCount: 2,
     services: ['Criminal Defence', 'Family Law', 'Bail Matters'],
     description:
       'Specialist criminal and family law chambers with a strong courtroom track record in the Delhi NCR region.',
     professionalIds: ['prof-3', 'prof-2'],
     adminName: 'Anjali Verma',
-    createdAt: '2022-08-03T09:00:00.000Z',
-  }),
-  createFirm({
+  },
+  {
     id: 'firm-3',
     name: 'Iyer Tax Advisory',
     firmType: 'Tax Firm',
@@ -68,14 +59,14 @@ const firms = [
     phone: '+91 80 4567 8900',
     rating: 4.8,
     reviewsCount: 156,
+    professionalCount: 2,
     services: ['GST Compliance', 'Income Tax Filing', 'Tax Planning'],
     description:
       'Boutique tax advisory firm helping startups and SMEs stay compliant and tax-efficient.',
     professionalIds: ['prof-8', 'prof-9'],
     adminName: 'Lakshmi Iyer',
-    createdAt: '2023-03-21T09:00:00.000Z',
-  }),
-  createFirm({
+  },
+  {
     id: 'firm-4',
     name: 'Mehta Compliance Partners',
     firmType: 'Tax Firm',
@@ -85,20 +76,20 @@ const firms = [
     phone: '+91 20 6677 8899',
     rating: 4.4,
     reviewsCount: 71,
+    professionalCount: 2,
     services: ['Company Registration', 'GST Returns', 'ROC Filing'],
     description:
       'End-to-end corporate compliance and registration services for new and growing businesses.',
     professionalIds: ['prof-10', 'prof-11'],
     adminName: 'Sanjay Mehta',
-    createdAt: '2023-06-10T09:00:00.000Z',
-  }),
+  },
 ];
 
 /* -------------------------------------------------------------------------- */
 /* Professionals                                                              */
 /* -------------------------------------------------------------------------- */
 const professionals = [
-  createProfessional({
+  {
     id: 'prof-1',
     name: 'Adv. Priya Nair',
     email: 'priya.nair@profirmo.in',
@@ -112,6 +103,7 @@ const professionals = [
     reviewsCount: 64,
     perMinuteRate: 55,
     availableNow: true,
+    profileImage: null,
     bio: 'Compassionate divorce lawyer focused on amicable settlements and protecting client interests.',
     registrationNumber: 'MAH/12345/2012',
     firmId: null,
@@ -122,9 +114,8 @@ const professionals = [
     ],
     verified: true,
     status: 'approved',
-    createdAt: '2023-02-01T09:00:00.000Z',
-  }),
-  createProfessional({
+  },
+  {
     id: 'prof-2',
     name: 'Adv. Rahul Deshpande',
     email: 'rahul.deshpande@profirmo.in',
@@ -138,6 +129,7 @@ const professionals = [
     reviewsCount: 41,
     perMinuteRate: 45,
     availableNow: false,
+    profileImage: null,
     bio: 'Family law practitioner handling sensitive custody and maintenance disputes.',
     registrationNumber: 'DEL/23456/2015',
     firmId: 'firm-2',
@@ -148,9 +140,8 @@ const professionals = [
     ],
     verified: true,
     status: 'approved',
-    createdAt: '2023-02-05T09:00:00.000Z',
-  }),
-  createProfessional({
+  },
+  {
     id: 'prof-3',
     name: 'Adv. Kabir Khan',
     email: 'kabir.khan@profirmo.in',
@@ -164,6 +155,7 @@ const professionals = [
     reviewsCount: 102,
     perMinuteRate: 95,
     availableNow: true,
+    profileImage: null,
     bio: 'Senior criminal defence advocate with extensive trial and appellate experience.',
     registrationNumber: 'DEL/34567/2006',
     firmId: 'firm-2',
@@ -174,9 +166,8 @@ const professionals = [
     ],
     verified: true,
     status: 'approved',
-    createdAt: '2022-11-15T09:00:00.000Z',
-  }),
-  createProfessional({
+  },
+  {
     id: 'prof-4',
     name: 'Adv. Sneha Reddy',
     email: 'sneha.reddy@profirmo.in',
@@ -190,6 +181,7 @@ const professionals = [
     reviewsCount: 33,
     perMinuteRate: 40,
     availableNow: true,
+    profileImage: null,
     bio: 'Civil litigator handling contractual and property-related disputes.',
     registrationNumber: 'TS/45678/2017',
     firmId: null,
@@ -200,9 +192,8 @@ const professionals = [
     ],
     verified: true,
     status: 'approved',
-    createdAt: '2023-04-18T09:00:00.000Z',
-  }),
-  createProfessional({
+  },
+  {
     id: 'prof-5',
     name: 'Adv. Arjun Pillai',
     email: 'arjun.pillai@profirmo.in',
@@ -216,6 +207,7 @@ const professionals = [
     reviewsCount: 58,
     perMinuteRate: 60,
     availableNow: false,
+    profileImage: null,
     bio: 'Property law expert advising buyers, builders and landlords on real estate matters.',
     registrationNumber: 'TN/56789/2010',
     firmId: null,
@@ -226,9 +218,8 @@ const professionals = [
     ],
     verified: true,
     status: 'approved',
-    createdAt: '2023-01-25T09:00:00.000Z',
-  }),
-  createProfessional({
+  },
+  {
     id: 'prof-6',
     name: 'Adv. Nisha Gupta',
     email: 'nisha.gupta@profirmo.in',
@@ -242,6 +233,7 @@ const professionals = [
     reviewsCount: 87,
     perMinuteRate: 110,
     availableNow: true,
+    profileImage: null,
     bio: 'Corporate lawyer advising on mergers, acquisitions and commercial contracts.',
     registrationNumber: 'MAH/67890/2008',
     firmId: 'firm-1',
@@ -252,9 +244,8 @@ const professionals = [
     ],
     verified: true,
     status: 'approved',
-    createdAt: '2022-09-12T09:00:00.000Z',
-  }),
-  createProfessional({
+  },
+  {
     id: 'prof-7',
     name: 'Adv. Vikram Singh',
     email: 'vikram.singh@profirmo.in',
@@ -268,6 +259,7 @@ const professionals = [
     reviewsCount: 19,
     perMinuteRate: 30,
     availableNow: true,
+    profileImage: null,
     bio: 'General practice advocate assisting clients with everyday legal needs.',
     registrationNumber: 'MAH/78901/2019',
     firmId: 'firm-1',
@@ -278,9 +270,8 @@ const professionals = [
     ],
     verified: true,
     status: 'approved',
-    createdAt: '2023-07-02T09:00:00.000Z',
-  }),
-  createProfessional({
+  },
+  {
     id: 'prof-8',
     name: 'CA Lakshmi Iyer',
     email: 'lakshmi.iyer@profirmo.in',
@@ -294,6 +285,7 @@ const professionals = [
     reviewsCount: 143,
     perMinuteRate: 90,
     availableNow: true,
+    profileImage: null,
     bio: 'Veteran tax consultant guiding businesses through complex tax structures.',
     registrationNumber: 'ICAI/089012/2004',
     firmId: 'firm-3',
@@ -304,9 +296,8 @@ const professionals = [
     ],
     verified: true,
     status: 'approved',
-    createdAt: '2022-05-19T09:00:00.000Z',
-  }),
-  createProfessional({
+  },
+  {
     id: 'prof-9',
     name: 'CA Deepak Joshi',
     email: 'deepak.joshi@profirmo.in',
@@ -320,6 +311,7 @@ const professionals = [
     reviewsCount: 52,
     perMinuteRate: 50,
     availableNow: false,
+    profileImage: null,
     bio: 'GST specialist helping businesses with registration, filing and reconciliation.',
     registrationNumber: 'ICAI/090123/2016',
     firmId: 'firm-3',
@@ -330,9 +322,8 @@ const professionals = [
     ],
     verified: true,
     status: 'approved',
-    createdAt: '2023-03-08T09:00:00.000Z',
-  }),
-  createProfessional({
+  },
+  {
     id: 'prof-10',
     name: 'CA Meera Banerjee',
     email: 'meera.banerjee@profirmo.in',
@@ -346,6 +337,7 @@ const professionals = [
     reviewsCount: 67,
     perMinuteRate: 48,
     availableNow: true,
+    profileImage: null,
     bio: 'Income tax consultant focused on individual filings and refund optimization.',
     registrationNumber: 'ICAI/101234/2013',
     firmId: 'firm-4',
@@ -356,9 +348,8 @@ const professionals = [
     ],
     verified: false,
     status: 'pending',
-    createdAt: '2024-01-15T09:00:00.000Z',
-  }),
-  createProfessional({
+  },
+  {
     id: 'prof-11',
     name: 'CS Anil Kapoor',
     email: 'anil.kapoor@profirmo.in',
@@ -372,6 +363,7 @@ const professionals = [
     reviewsCount: 28,
     perMinuteRate: 38,
     availableNow: false,
+    profileImage: null,
     bio: 'Company secretary assisting founders with incorporation and ongoing compliance.',
     registrationNumber: 'ICSI/112345/2018',
     firmId: 'firm-4',
@@ -382,9 +374,8 @@ const professionals = [
     ],
     verified: false,
     status: 'pending',
-    createdAt: '2024-02-20T09:00:00.000Z',
-  }),
-  createProfessional({
+  },
+  {
     id: 'prof-12',
     name: 'Adv. Tara Menon',
     email: 'tara.menon@profirmo.in',
@@ -398,6 +389,7 @@ const professionals = [
     reviewsCount: 11,
     perMinuteRate: 22,
     availableNow: true,
+    profileImage: null,
     bio: 'Early-career property lawyer assisting tenants and landlords with lease matters.',
     registrationNumber: 'KER/123456/2021',
     firmId: null,
@@ -408,75 +400,68 @@ const professionals = [
     ],
     verified: false,
     status: 'pending',
-    createdAt: '2024-03-05T09:00:00.000Z',
-  }),
+  },
 ];
 
 /* -------------------------------------------------------------------------- */
 /* Clients                                                                    */
 /* -------------------------------------------------------------------------- */
 const clients = [
-  createClient({
+  {
     id: 'client-1',
     name: 'Amit Trivedi',
     email: 'amit.trivedi@example.com',
     phone: '+91 99876 22001',
     city: 'Mumbai',
     userType: 'individual',
-    createdAt: '2023-05-10T09:00:00.000Z',
-  }),
-  createClient({
+  },
+  {
     id: 'client-2',
     name: 'Pooja Saxena',
     email: 'pooja.saxena@example.com',
     phone: '+91 99876 22002',
     city: 'Delhi',
     userType: 'individual',
-    createdAt: '2023-06-14T09:00:00.000Z',
-  }),
-  createClient({
+  },
+  {
     id: 'client-3',
     name: 'Greenleaf Retail Pvt Ltd',
     email: 'accounts@greenleafretail.in',
     phone: '+91 99876 22003',
     city: 'Bangalore',
     userType: 'business',
-    createdAt: '2023-07-22T09:00:00.000Z',
-  }),
-  createClient({
+  },
+  {
     id: 'client-4',
     name: 'Rohit Malhotra',
     email: 'rohit.malhotra@example.com',
     phone: '+91 99876 22004',
     city: 'Pune',
     userType: 'individual',
-    createdAt: '2023-09-01T09:00:00.000Z',
-  }),
-  createClient({
+  },
+  {
     id: 'client-5',
     name: 'Sunrise Foods LLP',
     email: 'finance@sunrisefoods.in',
     phone: '+91 99876 22005',
     city: 'Hyderabad',
     userType: 'business',
-    createdAt: '2023-10-12T09:00:00.000Z',
-  }),
-  createClient({
+  },
+  {
     id: 'client-6',
     name: 'Kavya Krishnan',
     email: 'kavya.krishnan@example.com',
     phone: '+91 99876 22006',
     city: 'Chennai',
     userType: 'individual',
-    createdAt: '2024-01-08T09:00:00.000Z',
-  }),
+  },
 ];
 
 /* -------------------------------------------------------------------------- */
-/* Cases                                                                      */
+/* Cases (each `files` array becomes File rows during seeding)                */
 /* -------------------------------------------------------------------------- */
 const cases = [
-  createCase({
+  {
     id: 'case-1',
     clientId: 'client-1',
     professionalId: 'prof-1',
@@ -494,9 +479,8 @@ const cases = [
         uploadedAt: '2024-02-10T09:00:00.000Z',
       },
     ],
-    createdAt: '2024-02-09T09:00:00.000Z',
-  }),
-  createCase({
+  },
+  {
     id: 'case-2',
     clientId: 'client-2',
     professionalId: 'prof-3',
@@ -506,9 +490,8 @@ const cases = [
     status: 'open',
     description: 'Application for anticipatory bail in a property dispute FIR.',
     files: [],
-    createdAt: '2024-02-15T09:00:00.000Z',
-  }),
-  createCase({
+  },
+  {
     id: 'case-3',
     clientId: 'client-3',
     professionalId: 'prof-9',
@@ -526,9 +509,8 @@ const cases = [
         uploadedAt: '2024-01-05T09:00:00.000Z',
       },
     ],
-    createdAt: '2024-01-04T09:00:00.000Z',
-  }),
-  createCase({
+  },
+  {
     id: 'case-4',
     clientId: 'client-4',
     professionalId: 'prof-10',
@@ -538,9 +520,8 @@ const cases = [
     status: 'in-progress',
     description: 'Income tax return preparation and filing with capital gains.',
     files: [],
-    createdAt: '2024-03-20T09:00:00.000Z',
-  }),
-  createCase({
+  },
+  {
     id: 'case-5',
     clientId: 'client-5',
     professionalId: 'prof-8',
@@ -550,9 +531,8 @@ const cases = [
     status: 'open',
     description: 'Annual corporate tax planning and structuring advisory.',
     files: [],
-    createdAt: '2024-03-28T09:00:00.000Z',
-  }),
-  createCase({
+  },
+  {
     id: 'case-6',
     clientId: 'client-1',
     professionalId: 'prof-5',
@@ -570,9 +550,8 @@ const cases = [
         uploadedAt: '2023-12-01T09:00:00.000Z',
       },
     ],
-    createdAt: '2023-11-29T09:00:00.000Z',
-  }),
-  createCase({
+  },
+  {
     id: 'case-7',
     clientId: 'client-6',
     professionalId: 'prof-2',
@@ -582,9 +561,8 @@ const cases = [
     status: 'in-progress',
     description: 'Custody and visitation arrangement negotiation.',
     files: [],
-    createdAt: '2024-02-25T09:00:00.000Z',
-  }),
-  createCase({
+  },
+  {
     id: 'case-8',
     clientId: 'client-3',
     professionalId: 'prof-6',
@@ -594,15 +572,14 @@ const cases = [
     status: 'open',
     description: 'Review and redlining of a long-term vendor supply agreement.',
     files: [],
-    createdAt: '2024-04-02T09:00:00.000Z',
-  }),
+  },
 ];
 
 /* -------------------------------------------------------------------------- */
 /* Bookings                                                                   */
 /* -------------------------------------------------------------------------- */
 const bookings = [
-  createBooking({
+  {
     id: 'booking-1',
     clientId: 'client-1',
     professionalId: 'prof-1',
@@ -612,9 +589,8 @@ const bookings = [
     type: 'scheduled',
     estimatedCost: 1650,
     status: 'completed',
-    createdAt: '2024-04-05T09:00:00.000Z',
-  }),
-  createBooking({
+  },
+  {
     id: 'booking-2',
     clientId: 'client-2',
     professionalId: 'prof-3',
@@ -624,9 +600,8 @@ const bookings = [
     type: 'scheduled',
     estimatedCost: 4275,
     status: 'completed',
-    createdAt: '2024-04-08T09:00:00.000Z',
-  }),
-  createBooking({
+  },
+  {
     id: 'booking-3',
     clientId: 'client-3',
     professionalId: 'prof-9',
@@ -636,9 +611,8 @@ const bookings = [
     type: 'instant',
     estimatedCost: 1000,
     status: 'completed',
-    createdAt: '2024-04-15T09:00:00.000Z',
-  }),
-  createBooking({
+  },
+  {
     id: 'booking-4',
     clientId: 'client-4',
     professionalId: 'prof-10',
@@ -648,9 +622,8 @@ const bookings = [
     type: 'scheduled',
     estimatedCost: 1440,
     status: 'confirmed',
-    createdAt: '2024-04-14T09:00:00.000Z',
-  }),
-  createBooking({
+  },
+  {
     id: 'booking-5',
     clientId: 'client-5',
     professionalId: 'prof-8',
@@ -660,9 +633,8 @@ const bookings = [
     type: 'scheduled',
     estimatedCost: 5400,
     status: 'confirmed',
-    createdAt: '2024-04-16T09:00:00.000Z',
-  }),
-  createBooking({
+  },
+  {
     id: 'booking-6',
     clientId: 'client-6',
     professionalId: 'prof-2',
@@ -672,9 +644,8 @@ const bookings = [
     type: 'scheduled',
     estimatedCost: 1350,
     status: 'pending',
-    createdAt: '2024-04-19T09:00:00.000Z',
-  }),
-  createBooking({
+  },
+  {
     id: 'booking-7',
     clientId: 'client-1',
     professionalId: 'prof-5',
@@ -684,9 +655,8 @@ const bookings = [
     type: 'instant',
     estimatedCost: 1500,
     status: 'pending',
-    createdAt: '2024-04-25T09:00:00.000Z',
-  }),
-  createBooking({
+  },
+  {
     id: 'booking-8',
     clientId: 'client-2',
     professionalId: 'prof-7',
@@ -696,9 +666,8 @@ const bookings = [
     type: 'instant',
     estimatedCost: 450,
     status: 'cancelled',
-    createdAt: '2024-04-26T09:00:00.000Z',
-  }),
-  createBooking({
+  },
+  {
     id: 'booking-9',
     clientId: 'client-3',
     professionalId: 'prof-6',
@@ -708,9 +677,8 @@ const bookings = [
     type: 'scheduled',
     estimatedCost: 4400,
     status: 'confirmed',
-    createdAt: '2024-04-28T09:00:00.000Z',
-  }),
-  createBooking({
+  },
+  {
     id: 'booking-10',
     clientId: 'client-4',
     professionalId: 'prof-11',
@@ -720,9 +688,8 @@ const bookings = [
     type: 'scheduled',
     estimatedCost: 1140,
     status: 'pending',
-    createdAt: '2024-05-01T09:00:00.000Z',
-  }),
-  createBooking({
+  },
+  {
     id: 'booking-11',
     clientId: 'client-6',
     professionalId: 'prof-4',
@@ -732,9 +699,8 @@ const bookings = [
     type: 'scheduled',
     estimatedCost: 1400,
     status: 'completed',
-    createdAt: '2024-05-03T09:00:00.000Z',
-  }),
-  createBooking({
+  },
+  {
     id: 'booking-12',
     clientId: 'client-5',
     professionalId: 'prof-12',
@@ -744,15 +710,14 @@ const bookings = [
     type: 'instant',
     estimatedCost: 440,
     status: 'cancelled',
-    createdAt: '2024-05-10T09:00:00.000Z',
-  }),
+  },
 ];
 
 /* -------------------------------------------------------------------------- */
 /* Consultations                                                              */
 /* -------------------------------------------------------------------------- */
 const consultations = [
-  createConsultation({
+  {
     id: 'consult-1',
     bookingId: 'booking-1',
     clientId: 'client-1',
@@ -765,8 +730,8 @@ const consultations = [
     endedAt: '2024-04-10T10:00:00.000Z',
     durationMinutes: 30,
     cost: 1650,
-  }),
-  createConsultation({
+  },
+  {
     id: 'consult-2',
     bookingId: 'booking-2',
     clientId: 'client-2',
@@ -779,8 +744,8 @@ const consultations = [
     endedAt: '2024-04-12T13:45:00.000Z',
     durationMinutes: 45,
     cost: 4275,
-  }),
-  createConsultation({
+  },
+  {
     id: 'consult-3',
     bookingId: 'booking-3',
     clientId: 'client-3',
@@ -793,8 +758,8 @@ const consultations = [
     endedAt: '2024-04-15T10:20:00.000Z',
     durationMinutes: 20,
     cost: 1000,
-  }),
-  createConsultation({
+  },
+  {
     id: 'consult-4',
     bookingId: 'booking-4',
     clientId: 'client-4',
@@ -807,8 +772,8 @@ const consultations = [
     endedAt: null,
     durationMinutes: 0,
     cost: 0,
-  }),
-  createConsultation({
+  },
+  {
     id: 'consult-5',
     bookingId: 'booking-5',
     clientId: 'client-5',
@@ -821,8 +786,8 @@ const consultations = [
     endedAt: null,
     durationMinutes: 0,
     cost: 0,
-  }),
-  createConsultation({
+  },
+  {
     id: 'consult-6',
     bookingId: 'booking-9',
     clientId: 'client-3',
@@ -835,8 +800,8 @@ const consultations = [
     endedAt: null,
     durationMinutes: 0,
     cost: 0,
-  }),
-  createConsultation({
+  },
+  {
     id: 'consult-7',
     bookingId: 'booking-11',
     clientId: 'client-6',
@@ -849,8 +814,8 @@ const consultations = [
     endedAt: '2024-05-08T09:35:00.000Z',
     durationMinutes: 35,
     cost: 1400,
-  }),
-  createConsultation({
+  },
+  {
     id: 'consult-8',
     bookingId: 'booking-6',
     clientId: 'client-6',
@@ -863,14 +828,14 @@ const consultations = [
     endedAt: null,
     durationMinutes: 0,
     cost: 0,
-  }),
+  },
 ];
 
 /* -------------------------------------------------------------------------- */
 /* Reviews                                                                    */
 /* -------------------------------------------------------------------------- */
 const reviews = [
-  createReview({
+  {
     id: 'review-1',
     clientId: 'client-1',
     clientName: 'Amit Trivedi',
@@ -879,8 +844,8 @@ const reviews = [
     rating: 5,
     comment: 'Priya handled my case with great empathy and professionalism.',
     date: '2024-04-11',
-  }),
-  createReview({
+  },
+  {
     id: 'review-2',
     clientId: 'client-2',
     clientName: 'Pooja Saxena',
@@ -889,8 +854,8 @@ const reviews = [
     rating: 5,
     comment: 'Kabir is an excellent criminal lawyer. Highly recommended.',
     date: '2024-04-13',
-  }),
-  createReview({
+  },
+  {
     id: 'review-3',
     clientId: 'client-3',
     clientName: 'Greenleaf Retail Pvt Ltd',
@@ -899,8 +864,8 @@ const reviews = [
     rating: 4,
     comment: 'Smooth GST registration process. Clear communication.',
     date: '2024-04-16',
-  }),
-  createReview({
+  },
+  {
     id: 'review-4',
     clientId: 'client-4',
     clientName: 'Rohit Malhotra',
@@ -909,8 +874,8 @@ const reviews = [
     rating: 5,
     comment: 'Meera made tax filing stress-free and quick.',
     date: '2024-04-19',
-  }),
-  createReview({
+  },
+  {
     id: 'review-5',
     clientId: 'client-5',
     clientName: 'Sunrise Foods LLP',
@@ -919,8 +884,8 @@ const reviews = [
     rating: 5,
     comment: 'Lakshmi gave us a very practical tax planning roadmap.',
     date: '2024-04-21',
-  }),
-  createReview({
+  },
+  {
     id: 'review-6',
     clientId: 'client-6',
     clientName: 'Kavya Krishnan',
@@ -929,8 +894,8 @@ const reviews = [
     rating: 4,
     comment: 'Patient and understanding throughout the custody process.',
     date: '2024-04-23',
-  }),
-  createReview({
+  },
+  {
     id: 'review-7',
     clientId: 'client-1',
     clientName: 'Amit Trivedi',
@@ -939,8 +904,8 @@ const reviews = [
     rating: 5,
     comment: 'Thorough title verification, caught an important issue.',
     date: '2023-12-05',
-  }),
-  createReview({
+  },
+  {
     id: 'review-8',
     clientId: 'client-2',
     clientName: 'Pooja Saxena',
@@ -949,8 +914,8 @@ const reviews = [
     rating: 3,
     comment: 'Decent help with a legal notice, response was a bit slow.',
     date: '2024-04-27',
-  }),
-  createReview({
+  },
+  {
     id: 'review-9',
     clientId: 'client-3',
     clientName: 'Greenleaf Retail Pvt Ltd',
@@ -959,8 +924,8 @@ const reviews = [
     rating: 5,
     comment: 'Nisha is sharp and detail-oriented on corporate contracts.',
     date: '2024-05-03',
-  }),
-  createReview({
+  },
+  {
     id: 'review-10',
     clientId: 'client-4',
     clientName: 'Rohit Malhotra',
@@ -969,8 +934,8 @@ const reviews = [
     rating: 4,
     comment: 'Company registration completed without hassle.',
     date: '2024-05-06',
-  }),
-  createReview({
+  },
+  {
     id: 'review-11',
     clientId: 'client-6',
     clientName: 'Kavya Krishnan',
@@ -979,8 +944,8 @@ const reviews = [
     rating: 4,
     comment: 'Helpful advice on my contract dispute.',
     date: '2024-05-09',
-  }),
-  createReview({
+  },
+  {
     id: 'review-12',
     clientId: 'client-5',
     clientName: 'Sunrise Foods LLP',
@@ -989,8 +954,8 @@ const reviews = [
     rating: 4,
     comment: 'Good guidance on our lease agreement terms.',
     date: '2024-05-11',
-  }),
-  createReview({
+  },
+  {
     id: 'review-13',
     clientId: 'client-1',
     clientName: 'Amit Trivedi',
@@ -999,8 +964,8 @@ const reviews = [
     rating: 5,
     comment: 'Sharma & Associates is a reliable, professional firm.',
     date: '2024-03-15',
-  }),
-  createReview({
+  },
+  {
     id: 'review-14',
     clientId: 'client-2',
     clientName: 'Pooja Saxena',
@@ -1009,8 +974,8 @@ const reviews = [
     rating: 4,
     comment: 'Verma Defence Chambers handled my matter efficiently.',
     date: '2024-03-20',
-  }),
-  createReview({
+  },
+  {
     id: 'review-15',
     clientId: 'client-3',
     clientName: 'Greenleaf Retail Pvt Ltd',
@@ -1019,8 +984,8 @@ const reviews = [
     rating: 5,
     comment: 'Iyer Tax Advisory is excellent for SME compliance.',
     date: '2024-03-25',
-  }),
-  createReview({
+  },
+  {
     id: 'review-16',
     clientId: 'client-4',
     clientName: 'Rohit Malhotra',
@@ -1029,14 +994,14 @@ const reviews = [
     rating: 4,
     comment: 'Mehta Compliance Partners made registration simple.',
     date: '2024-03-30',
-  }),
+  },
 ];
 
 /* -------------------------------------------------------------------------- */
 /* Demo users (one per role, plus an extra firm_professional)                 */
 /* -------------------------------------------------------------------------- */
 const users = [
-  createUser({
+  {
     id: 'user-1',
     name: 'Demo Client',
     email: 'client@demo.com',
@@ -1044,9 +1009,8 @@ const users = [
     role: 'client',
     linkedId: 'client-1',
     firmId: null,
-    createdAt: '2024-01-01T09:00:00.000Z',
-  }),
-  createUser({
+  },
+  {
     id: 'user-2',
     name: 'Adv. Priya Nair',
     email: 'pro@demo.com',
@@ -1054,9 +1018,8 @@ const users = [
     role: 'professional',
     linkedId: 'prof-1',
     firmId: null,
-    createdAt: '2024-01-01T09:00:00.000Z',
-  }),
-  createUser({
+  },
+  {
     id: 'user-3',
     name: 'Rohan Sharma',
     email: 'firmadmin@demo.com',
@@ -1064,9 +1027,8 @@ const users = [
     role: 'firm_admin',
     linkedId: 'firm-1',
     firmId: 'firm-1',
-    createdAt: '2024-01-01T09:00:00.000Z',
-  }),
-  createUser({
+  },
+  {
     id: 'user-4',
     name: 'Adv. Nisha Gupta',
     email: 'firmpro@demo.com',
@@ -1074,9 +1036,8 @@ const users = [
     role: 'firm_professional',
     linkedId: 'prof-6',
     firmId: 'firm-1',
-    createdAt: '2024-01-01T09:00:00.000Z',
-  }),
-  createUser({
+  },
+  {
     id: 'user-5',
     name: 'Adv. Vikram Singh',
     email: 'firmpro2@demo.com',
@@ -1084,9 +1045,8 @@ const users = [
     role: 'firm_professional',
     linkedId: 'prof-7',
     firmId: 'firm-1',
-    createdAt: '2024-01-01T09:00:00.000Z',
-  }),
-  createUser({
+  },
+  {
     id: 'user-6',
     name: 'Platform Admin',
     email: 'admin@demo.com',
@@ -1094,8 +1054,7 @@ const users = [
     role: 'platform_admin',
     linkedId: null,
     firmId: null,
-    createdAt: '2024-01-01T09:00:00.000Z',
-  }),
+  },
 ];
 
 module.exports = {

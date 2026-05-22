@@ -1,25 +1,55 @@
-// Future DB schema (MongoDB/PostgreSQL):
+// Sequelize model: Booking
 //   id, clientId, professionalId, date, time, duration, type,
-//   estimatedCost, status, createdAt
+//   estimatedCost, status + timestamps
 // type: 'instant' | 'scheduled'
 // status: 'pending' | 'confirmed' | 'completed' | 'cancelled'
 
-let seq = 0;
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-function createBooking(data = {}) {
-  return {
-    id: data.id || `booking-${Date.now()}-${++seq}`,
-    clientId: data.clientId || null,
-    professionalId: data.professionalId || null,
-    date: data.date || '',
-    time: data.time || '',
-    duration: typeof data.duration === 'number' ? data.duration : 0,
-    type: data.type || 'scheduled',
-    estimatedCost:
-      typeof data.estimatedCost === 'number' ? data.estimatedCost : 0,
-    status: data.status || 'pending',
-    createdAt: data.createdAt || new Date().toISOString(),
-  };
-}
+const genId = () =>
+  `booking-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-module.exports = { createBooking };
+const Booking = sequelize.define(
+  'Booking',
+  {
+    id: {
+      type: DataTypes.STRING(64),
+      primaryKey: true,
+      allowNull: false,
+      defaultValue: genId,
+    },
+    clientId: { type: DataTypes.STRING(64), allowNull: true },
+    professionalId: { type: DataTypes.STRING(64), allowNull: true },
+    date: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    time: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    duration: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    type: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'scheduled',
+    },
+    estimatedCost: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'pending',
+    },
+  },
+  {
+    tableName: 'bookings',
+    timestamps: true,
+    indexes: [
+      { fields: ['clientId'] },
+      { fields: ['professionalId'] },
+      { fields: ['status'] },
+      { fields: ['type'] },
+    ],
+  }
+);
+
+module.exports = Booking;

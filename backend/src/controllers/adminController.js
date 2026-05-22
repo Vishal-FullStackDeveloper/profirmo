@@ -4,37 +4,43 @@ const { successResponse } = require('../utils/responseHandler');
 
 // GET /api/admin/stats
 const getStats = asyncHandler(async (req, res) => {
-  const stats = adminService.getStats();
+  const stats = await adminService.getStats();
   return successResponse(res, 200, 'Platform statistics fetched', stats);
 });
 
 // GET /api/admin/users
 const listUsers = asyncHandler(async (req, res) => {
-  const users = adminService.listUsers();
+  const users = await adminService.listUsers();
   return successResponse(res, 200, 'Users fetched', users);
 });
 
 // GET /api/admin/professionals/pending
 const getPendingProfessionals = asyncHandler(async (req, res) => {
-  const pending = adminService.getPendingProfessionals();
+  const pending = await adminService.getPendingProfessionals();
   return successResponse(res, 200, 'Pending professionals fetched', pending);
 });
 
 // PATCH /api/admin/professionals/:id/approve
 const approveProfessional = asyncHandler(async (req, res) => {
-  const professional = adminService.approveProfessional(req.params.id);
+  const professional = await adminService.approveProfessional(req.params.id);
+  if (!professional) {
+    throw {
+      statusCode: 404,
+      message: `Professional not found: ${req.params.id}`,
+    };
+  }
   return successResponse(res, 200, 'Professional approved', professional);
 });
 
 // GET /api/admin/firms
 const listFirms = asyncHandler(async (req, res) => {
-  const firms = adminService.listFirms();
+  const firms = await adminService.listFirms();
   return successResponse(res, 200, 'Firms fetched', firms);
 });
 
 // GET /api/admin/bookings
 const listBookings = asyncHandler(async (req, res) => {
-  const bookings = adminService.listBookings();
+  const bookings = await adminService.listBookings();
   return successResponse(res, 200, 'Bookings fetched', bookings);
 });
 

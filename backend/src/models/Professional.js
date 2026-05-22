@@ -1,42 +1,101 @@
-// Future DB schema (MongoDB/PostgreSQL):
+// Sequelize model: Professional
 //   id, name, email, phone, professionType, specialization, city, experience,
-//   languages[], rating, reviewsCount, perMinuteRate, availableNow, profileImage,
-//   bio, registrationNumber, firmId, servicesOffered[], availabilitySlots[],
-//   verified, status, createdAt
+//   languages[], rating, reviewsCount, perMinuteRate, availableNow,
+//   profileImage, bio, registrationNumber, firmId, servicesOffered[],
+//   availabilitySlots[], verified, status + timestamps
 // status: 'approved' | 'pending'
 
-let seq = 0;
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-function createProfessional(data = {}) {
-  return {
-    id: data.id || `prof-${Date.now()}-${++seq}`,
-    name: data.name || '',
-    email: (data.email || '').toLowerCase(),
-    phone: data.phone || '',
-    professionType: data.professionType || '',
-    specialization: data.specialization || '',
-    city: data.city || '',
-    experience: typeof data.experience === 'number' ? data.experience : 0,
-    languages: Array.isArray(data.languages) ? data.languages : [],
-    rating: typeof data.rating === 'number' ? data.rating : 0,
-    reviewsCount: typeof data.reviewsCount === 'number' ? data.reviewsCount : 0,
-    perMinuteRate:
-      typeof data.perMinuteRate === 'number' ? data.perMinuteRate : 0,
-    availableNow: Boolean(data.availableNow),
-    profileImage: data.profileImage || null,
-    bio: data.bio || '',
-    registrationNumber: data.registrationNumber || '',
-    firmId: data.firmId || null,
-    servicesOffered: Array.isArray(data.servicesOffered)
-      ? data.servicesOffered
-      : [],
-    availabilitySlots: Array.isArray(data.availabilitySlots)
-      ? data.availabilitySlots
-      : [],
-    verified: Boolean(data.verified),
-    status: data.status || 'pending',
-    createdAt: data.createdAt || new Date().toISOString(),
-  };
-}
+const genId = () =>
+  `prof-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-module.exports = { createProfessional };
+const Professional = sequelize.define(
+  'Professional',
+  {
+    id: {
+      type: DataTypes.STRING(64),
+      primaryKey: true,
+      allowNull: false,
+      defaultValue: genId,
+    },
+    name: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    email: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    phone: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    professionType: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: '',
+    },
+    specialization: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: '',
+    },
+    city: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    experience: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    languages: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
+    rating: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
+    reviewsCount: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    perMinuteRate: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    availableNow: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    profileImage: { type: DataTypes.STRING, allowNull: true },
+    bio: { type: DataTypes.TEXT, allowNull: true },
+    registrationNumber: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: '',
+    },
+    firmId: { type: DataTypes.STRING(64), allowNull: true },
+    servicesOffered: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: [],
+    },
+    availabilitySlots: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: [],
+    },
+    verified: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'pending',
+    },
+  },
+  {
+    tableName: 'professionals',
+    timestamps: true,
+    indexes: [
+      { fields: ['email'] },
+      { fields: ['city'] },
+      { fields: ['professionType'] },
+      { fields: ['firmId'] },
+      { fields: ['status'] },
+    ],
+  }
+);
+
+module.exports = Professional;

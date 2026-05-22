@@ -1,20 +1,37 @@
-// Future DB schema (MongoDB/PostgreSQL):
-//   id, name, size, type, caseId, uploadedBy, uploadedAt, url
-// Represents an attachment, typically embedded inside a Case's files[] array.
+// Sequelize model: File
+//   id, caseId, name, size, type, uploadedAt + timestamps
+// Represents an attachment belonging to a Case.
 
-let seq = 0;
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-function createFile(data = {}) {
-  return {
-    id: data.id || `file-${Date.now()}-${++seq}`,
-    name: data.name || '',
-    size: typeof data.size === 'number' ? data.size : 0,
-    type: data.type || 'application/octet-stream',
-    caseId: data.caseId || null,
-    uploadedBy: data.uploadedBy || null,
-    url: data.url || null,
-    uploadedAt: data.uploadedAt || new Date().toISOString(),
-  };
-}
+const genId = () =>
+  `file-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-module.exports = { createFile };
+const File = sequelize.define(
+  'File',
+  {
+    id: {
+      type: DataTypes.STRING(64),
+      primaryKey: true,
+      allowNull: false,
+      defaultValue: genId,
+    },
+    caseId: { type: DataTypes.STRING(64), allowNull: true },
+    name: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    size: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    type: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'application/octet-stream',
+    },
+    uploadedAt: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+  },
+  {
+    tableName: 'files',
+    timestamps: true,
+    indexes: [{ fields: ['caseId'] }],
+  }
+);
+
+module.exports = File;

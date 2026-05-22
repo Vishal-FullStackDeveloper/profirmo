@@ -5,43 +5,54 @@ const {
   paginatedResponse,
 } = require('../utils/responseHandler');
 
+const notFound = (id) => ({
+  statusCode: 404,
+  message: `Booking not found: ${id}`,
+});
+
 // GET /api/bookings
 const listBookings = asyncHandler(async (req, res) => {
   const { page, limit, ...filters } = req.query;
-  const { items, ...meta } = bookingService.list({ filters, page, limit });
+  const { items, ...meta } = await bookingService.list({
+    filters,
+    page,
+    limit,
+  });
   return paginatedResponse(res, 'Bookings fetched', items, meta);
 });
 
 // GET /api/bookings/:id
 const getBooking = asyncHandler(async (req, res) => {
-  const booking = bookingService.getById(req.params.id);
+  const booking = await bookingService.getById(req.params.id);
+  if (!booking) throw notFound(req.params.id);
   return successResponse(res, 200, 'Booking fetched', booking);
 });
 
 // POST /api/bookings
 const createBooking = asyncHandler(async (req, res) => {
-  const booking = bookingService.create(req.body);
+  const booking = await bookingService.create(req.body);
   return successResponse(res, 201, 'Booking created', booking);
 });
 
 // PATCH /api/bookings/:id/status
 const updateBookingStatus = asyncHandler(async (req, res) => {
-  const booking = bookingService.updateStatus(
+  const booking = await bookingService.updateStatus(
     req.params.id,
     req.body.status
   );
+  if (!booking) throw notFound(req.params.id);
   return successResponse(res, 200, 'Booking status updated', booking);
 });
 
 // GET /api/bookings/client/:clientId
 const getBookingsByClient = asyncHandler(async (req, res) => {
-  const bookings = bookingService.getByClient(req.params.clientId);
+  const bookings = await bookingService.getByClient(req.params.clientId);
   return successResponse(res, 200, 'Client bookings fetched', bookings);
 });
 
 // GET /api/bookings/professional/:professionalId
 const getBookingsByProfessional = asyncHandler(async (req, res) => {
-  const bookings = bookingService.getByProfessional(
+  const bookings = await bookingService.getByProfessional(
     req.params.professionalId
   );
   return successResponse(res, 200, 'Professional bookings fetched', bookings);

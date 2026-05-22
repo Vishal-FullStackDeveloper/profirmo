@@ -9,4 +9,13 @@ module.exports = {
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   jwtSecret: process.env.JWT_SECRET || 'dev_insecure_secret',
   jwtExpiresIn: '7d',
+  db: {
+    host: process.env.DB_HOST || 'localhost',
+    port: Number(process.env.DB_PORT) || 3306,
+    name: process.env.DB_NAME || 'demo_project_db',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    dialect: process.env.DB_DIALECT || 'mysql',
+    ssl: process.env.DB_SSL === 'true',
+  },
 };

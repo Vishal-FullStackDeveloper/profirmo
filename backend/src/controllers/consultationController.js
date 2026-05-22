@@ -5,10 +5,15 @@ const {
   paginatedResponse,
 } = require('../utils/responseHandler');
 
+const notFound = (id) => ({
+  statusCode: 404,
+  message: `Consultation not found: ${id}`,
+});
+
 // GET /api/consultations
 const listConsultations = asyncHandler(async (req, res) => {
   const { page, limit, ...filters } = req.query;
-  const { items, ...meta } = consultationService.list({
+  const { items, ...meta } = await consultationService.list({
     filters,
     page,
     limit,
@@ -18,31 +23,36 @@ const listConsultations = asyncHandler(async (req, res) => {
 
 // GET /api/consultations/:id
 const getConsultation = asyncHandler(async (req, res) => {
-  const consultation = consultationService.getById(req.params.id);
+  const consultation = await consultationService.getById(req.params.id);
+  if (!consultation) throw notFound(req.params.id);
   return successResponse(res, 200, 'Consultation fetched', consultation);
 });
 
 // POST /api/consultations/:id/start
 const startConsultation = asyncHandler(async (req, res) => {
-  const consultation = consultationService.start(req.params.id);
+  const consultation = await consultationService.start(req.params.id);
+  if (!consultation) throw notFound(req.params.id);
   return successResponse(res, 200, 'Consultation started', consultation);
 });
 
 // POST /api/consultations/:id/end
 const endConsultation = asyncHandler(async (req, res) => {
-  const consultation = consultationService.end(req.params.id);
+  const consultation = await consultationService.end(req.params.id);
+  if (!consultation) throw notFound(req.params.id);
   return successResponse(res, 200, 'Consultation ended', consultation);
 });
 
 // GET /api/consultations/:id/recording
 const getRecording = asyncHandler(async (req, res) => {
-  const recording = consultationService.getRecording(req.params.id);
+  const recording = await consultationService.getRecording(req.params.id);
+  if (!recording) throw notFound(req.params.id);
   return successResponse(res, 200, 'Consultation recording fetched', recording);
 });
 
 // GET /api/consultations/:id/transcript
 const getTranscript = asyncHandler(async (req, res) => {
-  const transcript = consultationService.getTranscript(req.params.id);
+  const transcript = await consultationService.getTranscript(req.params.id);
+  if (!transcript) throw notFound(req.params.id);
   return successResponse(
     res,
     200,
@@ -53,10 +63,11 @@ const getTranscript = asyncHandler(async (req, res) => {
 
 // POST /api/consultations/:id/notes
 const addNotes = asyncHandler(async (req, res) => {
-  const consultation = consultationService.addNotes(
+  const consultation = await consultationService.addNotes(
     req.params.id,
     req.body.notes
   );
+  if (!consultation) throw notFound(req.params.id);
   return successResponse(res, 200, 'Consultation notes saved', consultation);
 });
 

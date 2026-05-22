@@ -8,7 +8,7 @@ const {
 // GET /api/professionals
 const listProfessionals = asyncHandler(async (req, res) => {
   const { page, limit, ...filters } = req.query;
-  const { items, ...meta } = professionalService.list({
+  const { items, ...meta } = await professionalService.list({
     filters,
     page,
     limit,
@@ -18,25 +18,47 @@ const listProfessionals = asyncHandler(async (req, res) => {
 
 // GET /api/professionals/search
 const searchProfessionals = asyncHandler(async (req, res) => {
-  const results = professionalService.search(req.query.q || req.query.query);
+  const results = await professionalService.search(
+    req.query.q || req.query.query
+  );
   return successResponse(res, 200, 'Search results', results);
 });
 
 // GET /api/professionals/:id
 const getProfessional = asyncHandler(async (req, res) => {
-  const professional = professionalService.getById(req.params.id);
+  const professional = await professionalService.getById(req.params.id);
+  if (!professional) {
+    throw {
+      statusCode: 404,
+      message: `Professional not found: ${req.params.id}`,
+    };
+  }
   return successResponse(res, 200, 'Professional fetched', professional);
 });
 
 // GET /api/professionals/:id/reviews
 const getProfessionalReviews = asyncHandler(async (req, res) => {
-  const reviews = professionalService.getReviews(req.params.id);
+  const reviews = await professionalService.getReviews(req.params.id);
+  if (reviews === null) {
+    throw {
+      statusCode: 404,
+      message: `Professional not found: ${req.params.id}`,
+    };
+  }
   return successResponse(res, 200, 'Professional reviews fetched', reviews);
 });
 
 // GET /api/professionals/:id/availability
 const getProfessionalAvailability = asyncHandler(async (req, res) => {
-  const availability = professionalService.getAvailability(req.params.id);
+  const availability = await professionalService.getAvailability(
+    req.params.id
+  );
+  if (!availability) {
+    throw {
+      statusCode: 404,
+      message: `Professional not found: ${req.params.id}`,
+    };
+  }
   return successResponse(
     res,
     200,
@@ -47,19 +69,31 @@ const getProfessionalAvailability = asyncHandler(async (req, res) => {
 
 // PATCH /api/professionals/:id/availability
 const updateAvailability = asyncHandler(async (req, res) => {
-  const professional = professionalService.updateAvailability(
+  const professional = await professionalService.updateAvailability(
     req.params.id,
     req.body.availableNow
   );
+  if (!professional) {
+    throw {
+      statusCode: 404,
+      message: `Professional not found: ${req.params.id}`,
+    };
+  }
   return successResponse(res, 200, 'Availability updated', professional);
 });
 
 // PATCH /api/professionals/:id/rate
 const updateRate = asyncHandler(async (req, res) => {
-  const professional = professionalService.updateRate(
+  const professional = await professionalService.updateRate(
     req.params.id,
     req.body.perMinuteRate
   );
+  if (!professional) {
+    throw {
+      statusCode: 404,
+      message: `Professional not found: ${req.params.id}`,
+    };
+  }
   return successResponse(res, 200, 'Per-minute rate updated', professional);
 });
 

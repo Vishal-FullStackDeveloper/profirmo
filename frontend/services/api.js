@@ -1,9 +1,25 @@
 // Core HTTP client for the Profirmo backend.
 // All service modules build on top of `apiRequest`.
 
-import { API_BASE_URL } from '@/utils/constants';
+import { API_BASE_URL as CONFIGURED_API_BASE_URL } from '@/utils/constants';
 
-export { API_BASE_URL };
+// Production routing: when the app is served from the profirmo.com domain,
+// send API requests to the hosted backend. Everywhere else (local dev,
+// previews) use the configured NEXT_PUBLIC_API_URL or the localhost default.
+const PRODUCTION_HOSTS = ['profirmo.com', 'www.profirmo.com'];
+const PRODUCTION_API_URL = 'https://profirmo.onrender.com';
+
+export function getApiBaseUrl() {
+  if (
+    typeof window !== 'undefined' &&
+    PRODUCTION_HOSTS.includes(window.location.hostname)
+  ) {
+    return PRODUCTION_API_URL;
+  }
+  return CONFIGURED_API_BASE_URL;
+}
+
+export const API_BASE_URL = CONFIGURED_API_BASE_URL;
 
 /**
  * Build a query string from a params object. Skips null/undefined/'' values.
@@ -41,7 +57,7 @@ export async function apiRequest(
   path,
   { method = 'GET', body, token, params } = {}
 ) {
-  const url = `${API_BASE_URL}${path}${buildQuery(params)}`;
+  const url = `${getApiBaseUrl()}${path}${buildQuery(params)}`;
 
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -104,4 +120,4 @@ export function del(path, options = {}) {
   return apiRequest(path, { ...options, method: 'DELETE' });
 }
 
-export default { apiRequest, get, post, patch, del, API_BASE_URL };
+export default { apiRequest, get, post, patch, del, API_BASE_URL, getApiBaseUrl };

@@ -1,19 +1,43 @@
-// Future DB schema (MongoDB/PostgreSQL):
+// Sequelize model: Review
 //   id, clientId, clientName, professionalId, firmId, rating, comment, date
+//   + timestamps
 
-let seq = 0;
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-function createReview(data = {}) {
-  return {
-    id: data.id || `review-${Date.now()}-${++seq}`,
-    clientId: data.clientId || null,
-    clientName: data.clientName || '',
-    professionalId: data.professionalId || null,
-    firmId: data.firmId || null,
-    rating: typeof data.rating === 'number' ? data.rating : 0,
-    comment: data.comment || '',
-    date: data.date || new Date().toISOString().slice(0, 10),
-  };
-}
+const genId = () =>
+  `review-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-module.exports = { createReview };
+const Review = sequelize.define(
+  'Review',
+  {
+    id: {
+      type: DataTypes.STRING(64),
+      primaryKey: true,
+      allowNull: false,
+      defaultValue: genId,
+    },
+    clientId: { type: DataTypes.STRING(64), allowNull: true },
+    clientName: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: '',
+    },
+    professionalId: { type: DataTypes.STRING(64), allowNull: true },
+    firmId: { type: DataTypes.STRING(64), allowNull: true },
+    rating: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
+    comment: { type: DataTypes.TEXT, allowNull: true },
+    date: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+  },
+  {
+    tableName: 'reviews',
+    timestamps: true,
+    indexes: [
+      { fields: ['clientId'] },
+      { fields: ['professionalId'] },
+      { fields: ['firmId'] },
+    ],
+  }
+);
+
+module.exports = Review;
