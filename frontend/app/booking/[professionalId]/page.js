@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
   Zap,
@@ -9,6 +9,8 @@ import {
   Star,
   MapPin,
   CheckCircle2,
+  UserX,
+  AlertCircle,
 } from 'lucide-react';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
@@ -16,48 +18,82 @@ import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
 import Modal from '@/components/common/Modal';
+import Avatar from '@/components/common/Avatar';
+import EmptyState from '@/components/common/EmptyState';
 import BookingCalendar from '@/components/booking/BookingCalendar';
 import TimeSlotSelector from '@/components/booking/TimeSlotSelector';
 import ConsultationSummary from '@/components/booking/ConsultationSummary';
 import PaymentPlaceholder from '@/components/booking/PaymentPlaceholder';
 import { useLanguage } from '@/components/LanguageProvider';
-import { professionals, getProfessionalById, consultations } from '@/data/mockData';
+import professionalService from '@/services/professionalService';
 import { BOOKING_TYPES } from '@/utils/constants';
-import { formatCurrency, formatDate, formatTime, getInitials } from '@/utils/formatters';
+import { formatCurrency, formatDate, formatTime } from '@/utils/formatters';
 
 const DURATIONS = [15, 30, 45, 60];
+
+// The consultation room is a placeholder flow until booking persistence lands.
+const PLACEHOLDER_CONSULTATION_ID = 'con-1';
 
 export default function BookingPage() {
   const { t } = useLanguage();
   const { professionalId } = useParams();
-  const professional =
-    getProfessionalById(professionalId) || professionals[0];
 
-  const [bookingType, setBookingType] = useState(
-    professional.availableNow ? BOOKING_TYPES.INSTANT : BOOKING_TYPES.SCHEDULED
-  );
+  const [professional, setProfessional] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [bookingType, setBookingType] = useState(BOOKING_TYPES.SCHEDULED);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [duration, setDuration] = useState(30);
   const [processing, setProcessing] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
+  // Load the professional from the database via the API.
+  useEffect(() => {
+    if (!professionalId) return;
+    let active = true;
+    setLoading(true);
+    setError(null);
+    setProfessional(null);
+    (async () => {
+      try {
+        const data = await professionalService.getById(professionalId);
+        if (!active) return;
+        if (!data || !data.id) {
+          setProfessional(null);
+        } else {
+          setProfessional(data);
+          if (data.availableNow) setBookingType(BOOKING_TYPES.INSTANT);
+        }
+      } catch (err) {
+        if (!active) return;
+        if (err && err.status === 404) setProfessional(null);
+        else setError(err.message || 'Failed to load this professional.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [professionalId]);
+
   const isInstant = bookingType === BOOKING_TYPES.INSTANT;
-  const rate = Number(professional.perMinuteRate) || 0;
+  const rate = professional ? Number(professional.consultationFee) || 0 : 0;
   const estimatedCost = duration * rate;
-  const consultationId = (consultations[0] && consultations[0].id) || 'con-1';
 
   // Seed time slots from the professional's availability for the selected day.
   const slotsForDay = useMemo(() => {
-    if (!selectedDate) return undefined;
+    if (!selectedDate || !professional) return undefined;
     const weekday = new Date(`${selectedDate}T00:00:00`).toLocaleDateString(
       'en-IN',
       { weekday: 'long' }
     );
-    const entry = (professional.availabilitySlots || []).find(
-      (s) => s.day === weekday
+    const entry = (professional.availability || []).find(
+      (s) => s && s.day === weekday
     );
-    return entry && entry.slots && entry.slots.length > 0
+    return entry && Array.isArray(entry.slots) && entry.slots.length > 0
       ? entry.slots
       : undefined;
   }, [selectedDate, professional]);
@@ -77,6 +113,70 @@ export default function BookingPage() {
       setProcessing(false);
       setConfirmed(true);
     }, 900);
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="flex-1 bg-slate-50">
+          <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+            <div className="h-28 animate-pulse rounded-xl border border-slate-200 bg-slate-100" />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className="h-96 animate-pulse rounded-xl border border-slate-200 bg-slate-100 lg:col-span-2" />
+              <div className="h-96 animate-pulse rounded-xl border border-slate-200 bg-slate-100" />
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="flex-1 bg-slate-50">
+          <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+            <EmptyState
+              icon={<AlertCircle size={24} />}
+              title="Something went wrong"
+              description={error}
+              action={
+                <Button href="/professionals" variant="primary">
+                  {t('profDetail.browseAll')}
+                </Button>
+              }
+            />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!professional) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="flex-1 bg-slate-50">
+          <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+            <EmptyState
+              icon={<UserX size={24} />}
+              title={t('profDetail.notFoundTitle')}
+              description={t('profDetail.notFoundDesc')}
+              action={
+                <Button href="/professionals" variant="primary">
+                  {t('profDetail.browseAll')}
+                </Button>
+              }
+            />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
   }
 
   return (
@@ -101,9 +201,11 @@ export default function BookingPage() {
               {/* Professional banner */}
               <Card>
                 <div className="flex flex-wrap items-center gap-4">
-                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-100 text-lg font-semibold text-blue-700">
-                    {getInitials(professional.name)}
-                  </span>
+                  <Avatar
+                    src={professional.profilePhoto}
+                    name={professional.name}
+                    size="lg"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-base font-semibold text-slate-900">
@@ -116,8 +218,10 @@ export default function BookingPage() {
                       )}
                     </div>
                     <p className="mt-0.5 text-sm text-slate-500">
-                      {professional.professionType} ·{' '}
-                      {professional.specialization}
+                      {professional.professionalType}
+                      {professional.specialization
+                        ? ` · ${professional.specialization}`
+                        : ''}
                     </p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
                       <span className="flex items-center gap-1">
@@ -125,16 +229,18 @@ export default function BookingPage() {
                           size={13}
                           className="fill-amber-400 text-amber-400"
                         />
-                        {professional.rating} (
+                        {professional.rating || 0} (
                         {t('bookingPage.reviews', {
-                          count: professional.reviewsCount,
+                          count: professional.reviewsCount || 0,
                         })}
                         )
                       </span>
-                      <span className="flex items-center gap-1">
-                        <MapPin size={13} />
-                        {professional.city}
-                      </span>
+                      {professional.city && (
+                        <span className="flex items-center gap-1">
+                          <MapPin size={13} />
+                          {professional.city}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -317,7 +423,7 @@ export default function BookingPage() {
             <Button variant="ghost" onClick={() => setConfirmed(false)}>
               {t('bookingPage.close')}
             </Button>
-            <Button href={`/consultation/${consultationId}`}>
+            <Button href={`/consultation/${PLACEHOLDER_CONSULTATION_ID}`}>
               {t('bookingPage.joinRoom')}
             </Button>
           </>

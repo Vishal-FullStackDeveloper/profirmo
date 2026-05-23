@@ -1,52 +1,18 @@
 'use client';
 
-import {
-  CalendarClock,
-  Briefcase,
-  CheckCircle2,
-  Wallet,
-  Star,
-  Video,
-  FileText,
-} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { CalendarClock, CheckCircle2, Wallet, Star } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import StatsCard from '@/components/dashboard/StatsCard';
 import AvailabilityManager from '@/components/dashboard/AvailabilityManager';
-import ConsultationTable from '@/components/dashboard/ConsultationTable';
-import ClientTable from '@/components/dashboard/ClientTable';
-import CaseTable from '@/components/dashboard/CaseTable';
-import FileManager from '@/components/dashboard/FileManager';
-import ReviewManager from '@/components/dashboard/ReviewManager';
 import Card from '@/components/common/Card';
 import { useLanguage } from '@/components/LanguageProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboard } from '@/hooks/useDashboard';
+import reviewService from '@/services/reviewService';
 import { ROLES } from '@/utils/constants';
 import { formatCurrency } from '@/utils/formatters';
-import { professionals, clients } from '@/data/mockData';
-
-function SectionTitle({ title, description }) {
-  return (
-    <div className="mb-3">
-      <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-      {description && <p className="text-sm text-slate-500">{description}</p>}
-    </div>
-  );
-}
-
-function PlaceholderCard({ icon, title, description }) {
-  return (
-    <Card>
-      <div className="flex flex-col items-center justify-center py-8 text-center">
-        <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-          {icon}
-        </span>
-        <p className="text-sm font-medium text-slate-700">{title}</p>
-        <p className="mt-1 max-w-xs text-xs text-slate-500">{description}</p>
-      </div>
-    </Card>
-  );
-}
+import { professionals } from '@/data/mockData';
 
 export default function ProfessionalDashboardPage() {
   const { t } = useLanguage();
@@ -55,22 +21,39 @@ export default function ProfessionalDashboardPage() {
   const dashboard = useDashboard(ROLES.PROFESSIONAL, linkedId);
 
   const stats = dashboard.stats || {};
-  const consultations = dashboard.consultations || [];
-  const cases = dashboard.cases || [];
-  const reviews = dashboard.reviews || [];
+
+  // Real reviews for this professional, fetched from the API — used purely
+  // to derive the public "Average rating" stat.
+  const [myReviews, setMyReviews] = useState([]);
+
+  const loadMyReviews = useCallback(async () => {
+    try {
+      const data = await reviewService.getMine();
+      setMyReviews(Array.isArray(data) ? data : []);
+    } catch {
+      setMyReviews([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMyReviews();
+  }, [loadMyReviews]);
+
+  // Public rating / count derived from real, published reviews.
+  const publishedReviews = myReviews.filter(
+    (r) => r.status !== 'UNDER_APPEAL'
+  );
+  const realReviewCount = publishedReviews.length;
+  const realAvgRating =
+    realReviewCount > 0
+      ? publishedReviews.reduce(
+          (sum, r) => sum + (Number(r.rating) || 0),
+          0
+        ) / realReviewCount
+      : 0;
 
   const professional =
     professionals.find((p) => p.id === linkedId) || professionals[0];
-
-  const upcoming = consultations.filter(
-    (c) => c.callStatus === 'scheduled' || c.callStatus === 'ongoing'
-  );
-  const ended = consultations.filter((c) => c.callStatus === 'ended');
-
-  const clientIds = Array.from(new Set(cases.map((c) => c.clientId)));
-  const myClients = clients.filter((c) => clientIds.includes(c.id));
-
-  const caseFiles = cases.flatMap((c) => c.files || []);
 
   // Profile completion estimate.
   const fields = [
@@ -121,25 +104,16 @@ export default function ProfessionalDashboardPage() {
         {/* Availability */}
         <AvailabilityManager professional={professional} />
 
-        {/* Today's & upcoming consultations */}
+        {/* Earnings & performance */}
         <section>
-          <SectionTitle
-            title={t('dashPro.upcoming.title')}
-            description={t('dashPro.upcoming.desc')}
-          />
-          <ConsultationTable
-            consultations={upcoming}
-            emptyTitle={t('dashPro.upcoming.emptyTitle')}
-            emptyDescription={t('dashPro.upcoming.emptyDesc')}
-          />
-        </section>
-
-        {/* Earnings */}
-        <section>
-          <SectionTitle
-            title={t('dashPro.earnings.title')}
-            description={t('dashPro.earnings.desc')}
-          />
+          <div className="mb-3">
+            <h2 className="text-base font-semibold text-slate-900">
+              {t('dashPro.earnings.title')}
+            </h2>
+            <p className="text-sm text-slate-500">
+              {t('dashPro.earnings.desc')}
+            </p>
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatsCard
               label={t('dashPro.stat.totalEarnings')}
@@ -162,83 +136,14 @@ export default function ProfessionalDashboardPage() {
             />
             <StatsCard
               label={t('dashPro.stat.averageRating')}
-              value={(stats.averageRating || 0).toFixed(1)}
+              value={realAvgRating.toFixed(1)}
               icon={<Star size={20} />}
               variant="amber"
               hint={t('dashPro.stat.reviewsCount', {
-                count: stats.reviewsCount || 0,
+                count: realReviewCount,
               })}
             />
           </div>
-        </section>
-
-        {/* Clients */}
-        <section>
-          <SectionTitle
-            title={t('dashPro.clients.title')}
-            description={t('dashPro.clients.desc')}
-          />
-          <ClientTable clients={myClients} />
-        </section>
-
-        {/* Cases */}
-        <section>
-          <SectionTitle
-            title={t('dashPro.cases.title')}
-            description={t('dashPro.cases.desc')}
-          />
-          <CaseTable cases={cases} />
-        </section>
-
-        {/* Past consultations */}
-        <section>
-          <SectionTitle
-            title={t('dashPro.history.title')}
-            description={t('dashPro.history.desc')}
-          />
-          <ConsultationTable
-            consultations={ended}
-            emptyTitle={t('dashPro.history.emptyTitle')}
-            emptyDescription={t('dashPro.history.emptyDesc')}
-          />
-        </section>
-
-        {/* Documents */}
-        <section>
-          <SectionTitle
-            title={t('dashPro.documents.title')}
-            description={t('dashPro.documents.desc')}
-          />
-          <FileManager files={caseFiles} />
-        </section>
-
-        {/* Recordings & transcripts */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div>
-            <SectionTitle title={t('dashPro.recordings.title')} />
-            <PlaceholderCard
-              icon={<Video size={22} />}
-              title={t('dashPro.recordings.heading')}
-              description={t('dashPro.recordings.desc')}
-            />
-          </div>
-          <div>
-            <SectionTitle title={t('dashPro.transcripts.title')} />
-            <PlaceholderCard
-              icon={<FileText size={22} />}
-              title={t('dashPro.transcripts.heading')}
-              description={t('dashPro.transcripts.desc')}
-            />
-          </div>
-        </div>
-
-        {/* Reviews */}
-        <section>
-          <SectionTitle
-            title={t('dashPro.reviews.title')}
-            description={t('dashPro.reviews.desc')}
-          />
-          <ReviewManager reviews={reviews} />
         </section>
       </div>
     </DashboardLayout>

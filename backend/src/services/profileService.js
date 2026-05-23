@@ -1,0 +1,286 @@
+// Profile service for the Profirmo backend (Phase 3).
+//
+// Holds the database logic behind the /api/profile endpoints: loading the
+// current user's complete profile (user + address + professional details +
+// type-specific details + owned law firm) and upserting personal info,
+// address and professional details.
+
+const {
+  User,
+  Address,
+  ProfessionalDetail,
+  LawyerDetail,
+  TechConsultantDetail,
+  LawFirm,
+} = require('../models');
+const { sanitizeUser } = require('./authService');
+const { computeProfileCompletion } = require('../utils/profileCompletion');
+
+// Personal-info columns on the users row that PUT /api/profile may update.
+const USER_UPDATABLE_FIELDS = [
+  'firstName',
+  'lastName',
+  'mobileNumber',
+  'profilePhoto',
+  'coverPhoto',
+];
+
+// Address columns owned by a single user, upserted by userId.
+const ADDRESS_FIELDS = [
+  'country',
+  'state',
+  'city',
+  'addressLine',
+  'postalCode',
+];
+
+// professional_details columns that PUT /api/profile/professional may set.
+const PROFESSIONAL_DETAIL_FIELDS = [
+  'professionalType',
+  'designation',
+  'organization',
+  'yearsOfExperience',
+  'bio',
+  'about',
+  'skills',
+  'expertise',
+  'languages',
+  'website',
+  'linkedin',
+  'certifications',
+  'education',
+  'achievements',
+  'profileResume',
+  'licenseDocument',
+  'identityDocument',
+  'certificationsDocuments',
+];
+
+// lawyer_specific_details columns settable via the body's `lawyer` object.
+const LAWYER_DETAIL_FIELDS = [
+  'barRegistrationNumber',
+  'enrollmentNumber',
+  'licenseNumber',
+  'practiceAreas',
+  'courtPractice',
+  'jurisdiction',
+  'lawDegree',
+  'chamberAddress',
+  'consultationFee',
+  'availability',
+  'barCertificate',
+  'advocateLicense',
+  'practiceCertificate',
+];
+
+// tech_consultant_specific_details columns settable via the body's `tech` object.
+const TECH_DETAIL_FIELDS = [
+  'technologies',
+  'specialization',
+  'githubProfile',
+  'portfolioUrl',
+  'certifications',
+  'experienceProjects',
+  'consultationFee',
+];
+
+// Build an object of only the keys present in `source` that are in `allowed`.
+const pick = (source = {}, allowed = []) => {
+  const out = {};
+  for (const key of allowed) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      out[key] = source[key];
+    }
+  }
+  return out;
+};
+
+// Convert a Sequelize instance (or null) to a plain object (or null).
+const plain = (record) =>
+  record && typeof record.get === 'function'
+    ? record.get({ plain: true })
+    : record || null;
+
+/**
+ * Load every profile-related record for a user and assemble the complete
+ * profile payload returned by GET / PUT /api/profile.
+ *
+ * @param {string} userId
+ * @returns {Promise<object>} { user, address, professionalDetail,
+ *   lawyerDetail, techDetail, lawFirm, profileCompletion }
+ */
+const getCompleteProfile = async (userId) => {
+  const user = await User.findByPk(userId);
+  if (!user) {
+    throw { statusCode: 404, message: 'User not found' };
+  }
+
+  const address = await Address.findOne({ where: { userId } });
+  const professionalDetail = await ProfessionalDetail.findOne({
+    where: { userId },
+  });
+
+  let lawyerDetail = null;
+  let techDetail = null;
+  if (professionalDetail) {
+    lawyerDetail = await LawyerDetail.findOne({
+      where: { professionalId: professionalDetail.id },
+    });
+    techDetail = await TechConsultantDetail.findOne({
+      where: { professionalId: professionalDetail.id },
+    });
+  }
+
+  const lawFirm = await LawFirm.findOne({
+    where: { ownerUserId: userId },
+  });
+
+  const profileCompletion = computeProfileCompletion({
+    role: user.role,
+    user: plain(user),
+    address: plain(address),
+    professionalDetail: plain(professionalDetail),
+    lawFirm: plain(lawFirm),
+  });
+
+  return {
+    user: sanitizeUser(user),
+    address: plain(address),
+    professionalDetail: plain(professionalDetail),
+    lawyerDetail: plain(lawyerDetail),
+    techDetail: plain(techDetail),
+    lawFirm: plain(lawFirm),
+    profileCompletion,
+  };
+};
+
+// Derive a fullName from first/last names, falling back to the existing name.
+const deriveFullName = (firstName, lastName, fallback) => {
+  const combined = [firstName, lastName].filter(Boolean).join(' ').trim();
+  return combined || fallback || null;
+};
+
+/**
+ * Update the signed-in user's personal info and (upsert) their address, then
+ * return the refreshed complete profile.
+ *
+ * @param {string} userId
+ * @param {object} body - may contain personal fields + an `address` object
+ * @returns {Promise<object>} complete profile (same shape as getCompleteProfile)
+ */
+const updateProfile = async (userId, body = {}) => {
+  const user = await User.findByPk(userId);
+  if (!user) {
+    throw { statusCode: 404, message: 'User not found' };
+  }
+
+  // --- Update the users row ------------------------------------------------
+  const userUpdates = pick(body, USER_UPDATABLE_FIELDS);
+  if (Object.keys(userUpdates).length > 0) {
+    Object.assign(user, userUpdates);
+    // Recompute the denormalized fullName / name from first + last name.
+    const newFullName = deriveFullName(
+      user.firstName,
+      user.lastName,
+      user.fullName || user.name
+    );
+    if (newFullName) {
+      user.fullName = newFullName;
+      user.name = newFullName;
+    }
+    await user.save();
+  }
+
+  // --- Upsert the addresses row by userId ----------------------------------
+  if (body.address && typeof body.address === 'object') {
+    const addressUpdates = pick(body.address, ADDRESS_FIELDS);
+    const existing = await Address.findOne({ where: { userId } });
+    if (existing) {
+      await existing.update(addressUpdates);
+    } else {
+      await Address.create({ userId, ...addressUpdates });
+    }
+  }
+
+  return getCompleteProfile(userId);
+};
+
+/**
+ * Upsert the caller's professional_details row and, when applicable, the
+ * lawyer- or tech-consultant-specific detail row. Returns the refreshed
+ * complete profile.
+ *
+ * @param {string} userId
+ * @param {object} body - professional detail fields + optional `lawyer`/`tech`
+ * @returns {Promise<object>} complete profile (same shape as getCompleteProfile)
+ */
+const updateProfessionalProfile = async (userId, body = {}) => {
+  const user = await User.findByPk(userId);
+  if (!user) {
+    throw { statusCode: 404, message: 'User not found' };
+  }
+
+  // --- Upsert professional_details by userId -------------------------------
+  const detailUpdates = pick(body, PROFESSIONAL_DETAIL_FIELDS);
+  let professionalDetail = await ProfessionalDetail.findOne({
+    where: { userId },
+  });
+  if (professionalDetail) {
+    await professionalDetail.update(detailUpdates);
+  } else {
+    professionalDetail = await ProfessionalDetail.create({
+      userId,
+      ...detailUpdates,
+    });
+  }
+
+  const professionalType =
+    detailUpdates.professionalType || professionalDetail.professionalType;
+
+  // --- Upsert the type-specific detail row ---------------------------------
+  if (
+    professionalType === 'Lawyer' &&
+    body.lawyer &&
+    typeof body.lawyer === 'object'
+  ) {
+    const lawyerUpdates = pick(body.lawyer, LAWYER_DETAIL_FIELDS);
+    const existingLawyer = await LawyerDetail.findOne({
+      where: { professionalId: professionalDetail.id },
+    });
+    if (existingLawyer) {
+      await existingLawyer.update(lawyerUpdates);
+    } else {
+      await LawyerDetail.create({
+        professionalId: professionalDetail.id,
+        ...lawyerUpdates,
+      });
+    }
+  }
+
+  if (
+    professionalType === 'Tech Consultant' &&
+    body.tech &&
+    typeof body.tech === 'object'
+  ) {
+    const techUpdates = pick(body.tech, TECH_DETAIL_FIELDS);
+    const existingTech = await TechConsultantDetail.findOne({
+      where: { professionalId: professionalDetail.id },
+    });
+    if (existingTech) {
+      await existingTech.update(techUpdates);
+    } else {
+      await TechConsultantDetail.create({
+        professionalId: professionalDetail.id,
+        ...techUpdates,
+      });
+    }
+  }
+
+  return getCompleteProfile(userId);
+};
+
+module.exports = {
+  getCompleteProfile,
+  updateProfile,
+  updateProfessionalProfile,
+};

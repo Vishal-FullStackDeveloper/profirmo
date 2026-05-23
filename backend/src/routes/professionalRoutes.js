@@ -12,6 +12,19 @@ router.get('/', professionalController.listProfessionals);
 // NOTE: /search must be declared before /:id so it is not shadowed.
 router.get('/search', professionalController.searchProfessionals);
 
+// Distinct filter values (cities, types, specializations, languages) drawn
+// from live data. Declared before /:id so the literal path is not shadowed.
+router.get('/filter-options', professionalController.getFilterOptions);
+
+// Phase 7: resubmit a rejected / info-requested professional application.
+// Declared before /:id so the literal path is not shadowed by the param.
+router.post(
+  '/resubmit',
+  authenticate,
+  authorize('professional'),
+  professionalController.resubmitApplication
+);
+
 router.get('/:id', professionalController.getProfessional);
 router.get('/:id/reviews', professionalController.getProfessionalReviews);
 router.get(

@@ -6,7 +6,10 @@ import { usePathname } from 'next/navigation';
 import { Menu, X, ArrowRight, Languages } from 'lucide-react';
 import { NAV_LINKS } from '@/utils/constants';
 import { useLanguage } from '@/components/LanguageProvider';
+import { useAuth } from '@/components/AuthProvider';
 import BrandLogo from '@/components/common/BrandLogo';
+import ProfileDropdown from '@/components/common/ProfileDropdown';
+import NotificationBell from '@/components/common/NotificationBell';
 
 const NAV_KEYS = {
   '/professionals': 'nav.professionals',
@@ -51,6 +54,7 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const { lang, setLang, t } = useLanguage();
+  const { isAuthenticated, loading: authLoading } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -100,19 +104,33 @@ export default function Header() {
 
         <div className="hidden items-center gap-2 lg:flex">
           <LangSwitch lang={lang} setLang={setLang} />
-          <Link
-            href="/auth/login"
-            className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
-          >
-            {t('nav.signIn')}
-          </Link>
-          <Link
-            href="/auth/register-client"
-            className="group inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-glow-sm transition hover:-translate-y-0.5 hover:shadow-glow"
-          >
-            {t('nav.getStarted')}
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
+          {authLoading ? (
+            <div
+              className="h-9 w-28 animate-pulse rounded-xl bg-slate-100"
+              aria-hidden="true"
+            />
+          ) : isAuthenticated ? (
+            <>
+              <NotificationBell />
+              <ProfileDropdown />
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+              >
+                {t('nav.signIn')}
+              </Link>
+              <Link
+                href="/signup"
+                className="group inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-glow-sm transition hover:-translate-y-0.5 hover:shadow-glow"
+              >
+                {t('nav.getStarted')}
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-2 lg:hidden">
@@ -145,19 +163,40 @@ export default function Header() {
             </Link>
           ))}
           <div className="mt-3 flex flex-col gap-2 border-t border-slate-200 pt-4">
-            <Link
-              href="/auth/login"
-              className="rounded-xl border border-slate-200 px-4 py-2.5 text-center text-sm font-semibold text-slate-700 transition hover:border-teal-300 hover:bg-slate-50"
-            >
-              {t('nav.signIn')}
-            </Link>
-            <Link
-              href="/auth/register-client"
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-sm transition hover:shadow-glow"
-            >
-              {t('nav.getStarted')}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            {authLoading ? (
+              <div
+                className="h-11 w-full animate-pulse rounded-xl bg-slate-100"
+                aria-hidden="true"
+              />
+            ) : isAuthenticated ? (
+              <>
+                <Link
+                  href="/dashboard"
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-center text-sm font-semibold text-slate-700 transition hover:border-teal-300 hover:bg-slate-50"
+                >
+                  {t('nav.dashboard') || 'Dashboard'}
+                </Link>
+                <div className="flex justify-start">
+                  <ProfileDropdown />
+                </div>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-center text-sm font-semibold text-slate-700 transition hover:border-teal-300 hover:bg-slate-50"
+                >
+                  {t('nav.signIn')}
+                </Link>
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-sm transition hover:shadow-glow"
+                >
+                  {t('nav.getStarted')}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </>
+            )}
           </div>
         </nav>
       </div>

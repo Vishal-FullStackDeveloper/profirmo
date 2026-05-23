@@ -1,28 +1,19 @@
 const reviewService = require('../services/reviewService');
 const asyncHandler = require('../utils/asyncHandler');
-const {
-  successResponse,
-  paginatedResponse,
-} = require('../utils/responseHandler');
+const { successResponse } = require('../utils/responseHandler');
 
-// GET /api/reviews
-const listReviews = asyncHandler(async (req, res) => {
-  const { page, limit, ...filters } = req.query;
-  const { items, ...meta } = await reviewService.list({
-    filters,
-    page,
-    limit,
-  });
-  return paginatedResponse(res, 'Reviews fetched', items, meta);
-});
-
-// POST /api/reviews
+// POST /api/reviews  (authenticated — any signed-in user)
 const createReview = asyncHandler(async (req, res) => {
-  const review = await reviewService.create(req.body);
-  return successResponse(res, 201, 'Review created', review);
+  const review = await reviewService.create({
+    user: req.user,
+    professionalId: req.body.professionalId,
+    rating: req.body.rating,
+    comment: req.body.comment,
+  });
+  return successResponse(res, 201, 'Review submitted', review);
 });
 
-// GET /api/reviews/professional/:professionalId
+// GET /api/reviews/professional/:professionalId  (public)
 const getReviewsByProfessional = asyncHandler(async (req, res) => {
   const reviews = await reviewService.getByProfessional(
     req.params.professionalId
@@ -30,15 +21,32 @@ const getReviewsByProfessional = asyncHandler(async (req, res) => {
   return successResponse(res, 200, 'Professional reviews fetched', reviews);
 });
 
-// GET /api/reviews/firm/:firmId
+// GET /api/reviews/firm/:firmId  (public — collective professional reviews)
 const getReviewsByFirm = asyncHandler(async (req, res) => {
   const reviews = await reviewService.getByFirm(req.params.firmId);
   return successResponse(res, 200, 'Firm reviews fetched', reviews);
 });
 
+// GET /api/reviews/mine  (authenticated professional)
+const getMyReviews = asyncHandler(async (req, res) => {
+  const reviews = await reviewService.getMineForProfessional(req.user);
+  return successResponse(res, 200, 'Your reviews fetched', reviews);
+});
+
+// POST /api/reviews/:id/appeal  (authenticated professional)
+const appealReview = asyncHandler(async (req, res) => {
+  const appeal = await reviewService.createAppeal({
+    user: req.user,
+    reviewId: req.params.id,
+    reason: req.body.reason,
+  });
+  return successResponse(res, 201, 'Appeal submitted', appeal);
+});
+
 module.exports = {
-  listReviews,
   createReview,
   getReviewsByProfessional,
   getReviewsByFirm,
+  getMyReviews,
+  appealReview,
 };

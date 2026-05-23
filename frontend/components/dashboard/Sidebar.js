@@ -7,11 +7,52 @@ import {
   Search,
   Building2,
   Users,
+  ShieldCheck,
+  ScrollText,
+  Star,
+  Flag,
+  Briefcase,
+  FolderKanban,
+  UserPlus,
   ArrowLeft,
 } from 'lucide-react';
 import BrandLogo from '@/components/common/BrandLogo';
 import { useLanguage } from '@/components/LanguageProvider';
 import { ROLES } from '@/utils/constants';
+
+// Professional + firm-professional share the same dashboard modules.
+const PROFESSIONAL_NAV = [
+  {
+    labelKey: 'dash.nav.overview',
+    href: '/dashboard/professional',
+    icon: LayoutDashboard,
+  },
+  {
+    labelKey: 'dash.nav.clients',
+    href: '/dashboard/professional/clients',
+    icon: Briefcase,
+  },
+  {
+    labelKey: 'dash.nav.cases',
+    href: '/dashboard/professional/cases',
+    icon: FolderKanban,
+  },
+  {
+    labelKey: 'dash.nav.myReviews',
+    href: '/dashboard/professional/reviews',
+    icon: Star,
+  },
+  {
+    labelKey: 'dash.nav.myFirm',
+    href: '/dashboard/professional/firm',
+    icon: Building2,
+  },
+  {
+    labelKey: 'dash.nav.findProfessionals',
+    href: '/professionals',
+    icon: Search,
+  },
+];
 
 const NAV_BY_ROLE = {
   [ROLES.CLIENT]: [
@@ -27,32 +68,8 @@ const NAV_BY_ROLE = {
     },
     { labelKey: 'dash.nav.browseFirms', href: '/firms', icon: Building2 },
   ],
-  [ROLES.PROFESSIONAL]: [
-    {
-      labelKey: 'dash.nav.overview',
-      href: '/dashboard/professional',
-      icon: LayoutDashboard,
-    },
-    {
-      labelKey: 'dash.nav.findProfessionals',
-      href: '/professionals',
-      icon: Search,
-    },
-    { labelKey: 'dash.nav.browseFirms', href: '/firms', icon: Building2 },
-  ],
-  [ROLES.FIRM_PROFESSIONAL]: [
-    {
-      labelKey: 'dash.nav.overview',
-      href: '/dashboard/professional',
-      icon: LayoutDashboard,
-    },
-    {
-      labelKey: 'dash.nav.findProfessionals',
-      href: '/professionals',
-      icon: Search,
-    },
-    { labelKey: 'dash.nav.browseFirms', href: '/firms', icon: Building2 },
-  ],
+  [ROLES.PROFESSIONAL]: PROFESSIONAL_NAV,
+  [ROLES.FIRM_PROFESSIONAL]: PROFESSIONAL_NAV,
   [ROLES.FIRM_ADMIN]: [
     {
       labelKey: 'dash.nav.overview',
@@ -60,11 +77,35 @@ const NAV_BY_ROLE = {
       icon: LayoutDashboard,
     },
     {
-      labelKey: 'dash.nav.findProfessionals',
-      href: '/professionals',
-      icon: Search,
+      labelKey: 'dash.nav.firmProfessionals',
+      href: '/dashboard/firm/professionals',
+      icon: Users,
     },
-    { labelKey: 'dash.nav.browseFirms', href: '/firms', icon: Building2 },
+    {
+      labelKey: 'dash.nav.joinRequests',
+      href: '/dashboard/firm/join-requests',
+      icon: UserPlus,
+    },
+    {
+      labelKey: 'dash.nav.clients',
+      href: '/dashboard/firm/clients',
+      icon: Briefcase,
+    },
+    {
+      labelKey: 'dash.nav.cases',
+      href: '/dashboard/firm/cases',
+      icon: FolderKanban,
+    },
+    {
+      labelKey: 'dash.nav.reviews',
+      href: '/dashboard/firm/reviews',
+      icon: Star,
+    },
+    {
+      labelKey: 'dash.nav.firmProfile',
+      href: '/dashboard/firm/profile',
+      icon: Building2,
+    },
   ],
   [ROLES.PLATFORM_ADMIN]: [
     {
@@ -72,14 +113,38 @@ const NAV_BY_ROLE = {
       href: '/dashboard/admin',
       icon: LayoutDashboard,
     },
-    { labelKey: 'dash.nav.professionals', href: '/professionals', icon: Users },
-    { labelKey: 'dash.nav.firms', href: '/firms', icon: Building2 },
+    {
+      labelKey: 'dash.nav.professionalApprovals',
+      href: '/admin/professionals',
+      icon: ShieldCheck,
+    },
+    {
+      labelKey: 'dash.nav.firmApprovals',
+      href: '/admin/firms',
+      icon: Building2,
+    },
+    { labelKey: 'dash.nav.users', href: '/admin/users', icon: Users },
+    {
+      labelKey: 'dash.nav.reviews',
+      href: '/admin/reviews',
+      icon: Star,
+    },
+    {
+      labelKey: 'dash.nav.reviewAppeals',
+      href: '/admin/review-appeals',
+      icon: Flag,
+    },
+    {
+      labelKey: 'dash.nav.auditLogs',
+      href: '/admin/audit-logs',
+      icon: ScrollText,
+    },
   ],
 };
 
 /**
  * Sidebar — Pro Firmo logo + role-specific navigation.
- * Props: { role, active }
+ * Props: { role }
  */
 export default function Sidebar({ role }) {
   const pathname = usePathname();

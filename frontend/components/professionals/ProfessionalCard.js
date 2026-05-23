@@ -4,12 +4,16 @@ import { MapPin, BadgeCheck, Briefcase } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
+import Avatar from '@/components/common/Avatar';
 import RatingStars from '@/components/common/RatingStars';
 import { useLanguage } from '@/components/LanguageProvider';
-import { formatRate, getInitials } from '@/utils/formatters';
+import { formatCurrency } from '@/utils/formatters';
 
 /**
  * ProfessionalCard — summary card for a single professional.
+ * Renders the API shape: name, professionalType, specialization, city,
+ * profilePhoto, yearsOfExperience, consultationFee, rating, reviewsCount,
+ * availableNow, verified.
  *
  * Props: { professional }
  */
@@ -20,13 +24,14 @@ export default function ProfessionalCard({ professional }) {
   const {
     id,
     name,
-    professionType,
+    professionalType,
     specialization,
     city,
-    experience,
+    profilePhoto,
+    yearsOfExperience,
     rating,
     reviewsCount,
-    perMinuteRate,
+    consultationFee,
     availableNow,
     verified,
   } = professional;
@@ -34,9 +39,7 @@ export default function ProfessionalCard({ professional }) {
   return (
     <Card hover className="flex h-full flex-col">
       <div className="flex items-start gap-4">
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-100 text-lg font-semibold text-blue-700">
-          {getInitials(name)}
-        </span>
+        <Avatar src={profilePhoto} name={name} size="lg" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <h3 className="truncate text-base font-semibold text-slate-900">
@@ -51,31 +54,35 @@ export default function ProfessionalCard({ professional }) {
             )}
           </div>
           <p className="mt-0.5 truncate text-sm font-medium text-blue-700">
-            {professionType}
+            {professionalType}
           </p>
-          <p className="truncate text-xs text-slate-500">{specialization}</p>
+          {specialization && (
+            <p className="truncate text-xs text-slate-500">{specialization}</p>
+          )}
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500">
-        <span className="inline-flex items-center gap-1">
-          <MapPin size={14} className="text-slate-400" />
-          {city}
-        </span>
+        {city && (
+          <span className="inline-flex items-center gap-1">
+            <MapPin size={14} className="text-slate-400" />
+            {city}
+          </span>
+        )}
         <span className="inline-flex items-center gap-1">
           <Briefcase size={14} className="text-slate-400" />
-          {t('profCmp.yrsExp', { count: experience })}
+          {t('profCmp.yrsExp', { count: yearsOfExperience || 0 })}
         </span>
       </div>
 
       <div className="mt-3">
-        <RatingStars rating={rating} count={reviewsCount} size="sm" />
+        <RatingStars rating={rating || 0} count={reviewsCount || 0} size="sm" />
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
         <div>
           <p className="text-base font-semibold text-slate-900">
-            {formatRate(perMinuteRate)}
+            {formatCurrency(consultationFee)}
           </p>
           <p className="text-xs text-slate-400">
             {t('profCmp.consultationRate')}

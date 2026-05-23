@@ -1,32 +1,69 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Menu, X, Bell, LogOut } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import Sidebar from '@/components/dashboard/Sidebar';
-import Button from '@/components/common/Button';
+import BrandLogo from '@/components/common/BrandLogo';
+import ProfileDropdown from '@/components/common/ProfileDropdown';
+import NotificationBell from '@/components/common/NotificationBell';
 import { useLanguage } from '@/components/LanguageProvider';
 import { useAuth } from '@/hooks/useAuth';
-import { getInitials } from '@/utils/formatters';
 
 /**
  * DashboardLayout — app shell with sticky sidebar, top bar and content area.
+ * Guards the route: unauthenticated visitors are redirected to /login.
  * Props: { children, role, title, subtitle }
  */
 export default function DashboardLayout({ children, role, title, subtitle }) {
   const router = useRouter();
   const { t } = useLanguage();
-  const { user, logout } = useAuth();
+  const { loading, isAuthenticated } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  function handleLogout() {
-    logout();
-    router.push('/');
-  }
+  // Route guard — once auth has resolved, bounce guests to the login page.
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [loading, isAuthenticated, router]);
 
-  const displayName =
-    user && user.name ? user.name : t('dash.layout.guestUser');
-  const displayEmail = user && user.email ? user.email : '';
+  // While auth is resolving (or while redirecting), show a skeleton shell.
+  if (loading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-slate-200 bg-white lg:block">
+          <div className="flex h-16 items-center px-5">
+            <BrandLogo size="sm" />
+          </div>
+          <div className="space-y-3 px-5 py-4">
+            {[...Array(6)].map((_, i) => (
+              <div
+                key={i}
+                className="h-9 w-full animate-pulse rounded-lg bg-slate-100"
+              />
+            ))}
+          </div>
+        </aside>
+        <div className="lg:pl-64">
+          <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
+            <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
+              <div className="h-6 w-40 animate-pulse rounded bg-slate-100" />
+              <div className="h-9 w-28 animate-pulse rounded-full bg-slate-100" />
+            </div>
+          </header>
+          <main className="space-y-4 px-4 py-6 sm:px-6 lg:px-8">
+            {[...Array(3)].map((_, i) => (
+              <div
+                key={i}
+                className="h-32 w-full animate-pulse rounded-xl bg-slate-100"
+              />
+            ))}
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -81,39 +118,8 @@ export default function DashboardLayout({ children, role, title, subtitle }) {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <button
-                type="button"
-                aria-label={t('dash.layout.notifications')}
-                className="relative rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100"
-              >
-                <Bell size={19} />
-                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-blue-600" />
-              </button>
-
-              <div className="hidden items-center gap-2.5 sm:flex">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
-                  {getInitials(displayName)}
-                </span>
-                <div className="leading-tight">
-                  <p className="text-sm font-medium text-slate-800">
-                    {displayName}
-                  </p>
-                  {displayEmail && (
-                    <p className="text-xs text-slate-500">{displayEmail}</p>
-                  )}
-                </div>
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-              >
-                <LogOut size={15} />
-                <span className="hidden sm:inline">
-                  {t('dash.layout.logout')}
-                </span>
-              </Button>
+              <NotificationBell />
+              <ProfileDropdown />
             </div>
           </div>
         </header>

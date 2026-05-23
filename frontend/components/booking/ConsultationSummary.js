@@ -3,6 +3,7 @@
 import { CalendarDays, Clock, Tag, Wallet } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
+import Avatar from '@/components/common/Avatar';
 import { useLanguage } from '@/components/LanguageProvider';
 import { BOOKING_TYPES } from '@/utils/constants';
 import {
@@ -11,7 +12,6 @@ import {
   formatDuration,
   formatRate,
   formatTime,
-  getInitials,
 } from '@/utils/formatters';
 
 /**
@@ -27,7 +27,9 @@ export default function ConsultationSummary({
   duration,
 }) {
   const { t } = useLanguage();
-  const rate = professional ? Number(professional.perMinuteRate) || 0 : 0;
+  const rate = professional
+    ? Number(professional.consultationFee ?? professional.perMinuteRate) || 0
+    : 0;
   const mins = Number(duration) || 0;
   const estimatedCost = mins * rate;
   const isInstant = type === BOOKING_TYPES.INSTANT;
@@ -74,9 +76,11 @@ export default function ConsultationSummary({
       </h3>
 
       <div className="mt-4 flex items-center gap-3 border-b border-slate-100 pb-4">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
-          {getInitials(professional ? professional.name : '')}
-        </span>
+        <Avatar
+          src={professional ? professional.profilePhoto : ''}
+          name={professional ? professional.name : ''}
+          size="md"
+        />
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-800">
             {professional
@@ -84,7 +88,9 @@ export default function ConsultationSummary({
               : t('bookCmp.professionalFallback')}
           </p>
           <p className="truncate text-xs text-slate-500">
-            {professional ? professional.professionType : '—'}
+            {professional
+              ? professional.professionalType || professional.professionType
+              : '—'}
           </p>
         </div>
       </div>

@@ -14,7 +14,7 @@ import {
   Briefcase,
   Layers,
 } from 'lucide-react';
-import { categories } from '@/data/mockData';
+import { CATEGORIES } from '@/utils/constants';
 import { useLanguage } from '@/components/LanguageProvider';
 
 const ICONS = {
@@ -29,6 +29,22 @@ const ICONS = {
   'income-tax-consultant': FileText,
   'company-registration-consultant': Briefcase,
 };
+
+// The 10 canonical consultation categories, derived from the shared constant.
+// `type` is 'legal' for the lawyer categories and 'tax' for the rest.
+const TAX_CATEGORIES = new Set([
+  'Tax Consultant',
+  'GST Consultant',
+  'Income Tax Consultant',
+  'Company Registration Consultant',
+]);
+
+const categories = CATEGORIES.map((name) => ({
+  id: name,
+  name,
+  slug: name.toLowerCase().replace(/\s+/g, '-'),
+  type: TAX_CATEGORIES.has(name) ? 'tax' : 'legal',
+}));
 
 export default function CategorySection() {
   const { t } = useLanguage();

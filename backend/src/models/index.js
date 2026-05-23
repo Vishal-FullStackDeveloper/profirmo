@@ -8,6 +8,7 @@
 const sequelize = require('../config/database');
 
 const User = require('./User');
+const Session = require('./Session');
 const Professional = require('./Professional');
 const Firm = require('./Firm');
 const Client = require('./Client');
@@ -15,7 +16,38 @@ const Case = require('./Case');
 const Booking = require('./Booking');
 const Consultation = require('./Consultation');
 const Review = require('./Review');
+const ReviewAppeal = require('./ReviewAppeal');
 const File = require('./File');
+const Upload = require('./Upload');
+
+// --- Phase-5 security models -----------------------------------------------
+const AuditLog = require('./AuditLog');
+
+// --- Phase-6 jobs / notifications models -----------------------------------
+const Job = require('./Job');
+const Notification = require('./Notification');
+
+// --- Phase-2 profile / firm models ----------------------------------------
+const Address = require('./Address');
+const ProfessionalDetail = require('./ProfessionalDetail');
+const LawyerDetail = require('./LawyerDetail');
+const TechConsultantDetail = require('./TechConsultantDetail');
+const LawFirm = require('./LawFirm');
+const FirmMember = require('./FirmMember');
+
+// --- Phase-7 dynamic professional registration / approval models ----------
+const TaxConsultantDetail = require('./TaxConsultantDetail');
+const ProfessionalApproval = require('./ProfessionalApproval');
+
+// --- Phase-8 firm approval workflow + invitation models -------------------
+const FirmApproval = require('./FirmApproval');
+const FirmInvitation = require('./FirmInvitation');
+const FirmJoinRequest = require('./FirmJoinRequest');
+
+// --- Password-reset OTP model ----------------------------------------------
+// Stores email-OTP rows for the forgot-password / reset flow. userId and
+// email are plain indexed columns — no association / FK is declared.
+const PasswordResetOtp = require('./PasswordResetOtp');
 
 // Optional relationship — clearing the parent nulls the foreign key.
 const fkSetNull = (foreignKey) => ({
@@ -67,6 +99,11 @@ Consultation.belongsTo(Professional, fkCascade('professionalId'));
 Professional.hasMany(Review, fkSetNull('professionalId'));
 Review.belongsTo(Professional, fkSetNull('professionalId'));
 
+// --- Review appeals --------------------------------------------------------
+// A review can be appealed; removing the review removes its appeal records.
+Review.hasMany(ReviewAppeal, fkCascade('reviewId'));
+ReviewAppeal.belongsTo(Review, fkCascade('reviewId'));
+
 // --- Booking <-> Consultation ---------------------------------------------
 Booking.hasOne(Consultation, fkSetNull('bookingId'));
 Consultation.belongsTo(Booking, fkSetNull('bookingId'));
@@ -75,13 +112,155 @@ Consultation.belongsTo(Booking, fkSetNull('bookingId'));
 Case.hasMany(File, fkCascade('caseId'));
 File.belongsTo(Case, fkCascade('caseId'));
 
+// --- User <-> Session ------------------------------------------------------
+// A user owns many persistent refresh-token sessions. Deleting the user
+// removes their sessions.
+User.hasMany(Session, fkCascade('userId'));
+Session.belongsTo(User, fkCascade('userId'));
+
+// --- User <-> Upload (Phase 4) ---------------------------------------------
+// A user owns many uploaded files. Deleting the user removes the rows
+// (the on-disk files are cleaned up explicitly via the file service).
+User.hasMany(Upload, fkCascade('userId'));
+Upload.belongsTo(User, fkCascade('userId'));
+
+// --- User <-> Notification (Phase 6) ---------------------------------------
+// A user receives many in-app notifications. Deleting the user removes them.
+User.hasMany(Notification, fkCascade('userId'));
+Notification.belongsTo(User, fkCascade('userId'));
+
 // NOTE: User keeps linkedId / firmId as plain columns. linkedId is
 // polymorphic (points to a client, professional or firm depending on role),
 // so no association / constraint is declared for it.
 
+// --- Phase-2 profile / firm relationships ---------------------------------
+// One postal address per user.
+User.hasOne(Address, fkCascade('userId'));
+Address.belongsTo(User, fkCascade('userId'));
+
+// One extended professional profile per user.
+User.hasOne(ProfessionalDetail, fkCascade('userId'));
+ProfessionalDetail.belongsTo(User, fkCascade('userId'));
+
+// Type-specific detail tables hang off the shared professional profile.
+ProfessionalDetail.hasOne(LawyerDetail, fkCascade('professionalId'));
+LawyerDetail.belongsTo(ProfessionalDetail, fkCascade('professionalId'));
+
+ProfessionalDetail.hasOne(TechConsultantDetail, fkCascade('professionalId'));
+TechConsultantDetail.belongsTo(
+  ProfessionalDetail,
+  fkCascade('professionalId')
+);
+
+// Phase-7: tax-consultant-specific detail hangs off the shared profile.
+ProfessionalDetail.hasOne(TaxConsultantDetail, fkCascade('professionalId'));
+TaxConsultantDetail.belongsTo(
+  ProfessionalDetail,
+  fkCascade('professionalId')
+);
+
+// Phase-7: one approval-workflow record per professional user.
+User.hasOne(ProfessionalApproval, fkCascade('userId'));
+ProfessionalApproval.belongsTo(User, fkCascade('userId'));
+
+// A user owns many law firms.
+User.hasMany(LawFirm, fkCascade('ownerUserId'));
+LawFirm.belongsTo(User, {
+  foreignKey: 'ownerUserId',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+// Firm membership join: a firm has many members; a professional has many
+// memberships.
+LawFirm.hasMany(FirmMember, fkCascade('firmId'));
+FirmMember.belongsTo(LawFirm, fkCascade('firmId'));
+
+ProfessionalDetail.hasMany(FirmMember, fkCascade('professionalId'));
+FirmMember.belongsTo(ProfessionalDetail, fkCascade('professionalId'));
+
+// --- Phase-8 firm approval workflow ----------------------------------------
+// One approval-workflow record per law firm. Removing the firm removes it.
+LawFirm.hasOne(FirmApproval, fkCascade('firmId'));
+FirmApproval.belongsTo(LawFirm, fkCascade('firmId'));
+
+// --- Phase-8 firm invitations ----------------------------------------------
+// A firm sends many invitations. Removing the firm removes its invitations.
+LawFirm.hasMany(FirmInvitation, fkCascade('firmId'));
+FirmInvitation.belongsTo(LawFirm, fkCascade('firmId'));
+
+// A firm receives many join requests. Removing the firm removes them.
+LawFirm.hasMany(FirmJoinRequest, fkCascade('firmId'));
+FirmJoinRequest.belongsTo(LawFirm, fkCascade('firmId'));
+
+// --- JSON normalization ----------------------------------------------------
+// MariaDB exposes JSON columns as LONGTEXT, so the driver returns them as raw
+// strings; `raw: true` queries also bypass model getters. This afterFind hook
+// guarantees JSON fields are always parsed to arrays/objects in query results.
+function jsonParser(fields) {
+  return (result, options) => {
+    if (!result || !options || !options.raw) return;
+    const rows = Array.isArray(result) ? result : [result];
+    for (const row of rows) {
+      if (!row) continue;
+      for (const field of fields) {
+        if (typeof row[field] === 'string') {
+          try {
+            row[field] = JSON.parse(row[field]);
+          } catch (err) {
+            row[field] = [];
+          }
+        }
+      }
+    }
+  };
+}
+
+Professional.addHook(
+  'afterFind',
+  jsonParser(['languages', 'servicesOffered', 'availabilitySlots'])
+);
+Firm.addHook('afterFind', jsonParser(['services', 'professionalIds']));
+
+ProfessionalDetail.addHook(
+  'afterFind',
+  jsonParser([
+    'skills',
+    'expertise',
+    'languages',
+    'certifications',
+    'education',
+    'achievements',
+    'certificationsDocuments',
+    'availability',
+  ])
+);
+LawyerDetail.addHook(
+  'afterFind',
+  jsonParser([
+    'practiceAreas',
+    'courtPractice',
+    'availability',
+    'supportingCertificates',
+  ])
+);
+TechConsultantDetail.addHook(
+  'afterFind',
+  jsonParser(['technologies', 'certifications', 'experienceProjects'])
+);
+TaxConsultantDetail.addHook(
+  'afterFind',
+  jsonParser(['specializationAreas', 'supportingCertifications'])
+);
+LawFirm.addHook(
+  'afterFind',
+  jsonParser(['practiceAreas', 'socialLinks', 'taxDocuments'])
+);
+
 module.exports = {
   sequelize,
   User,
+  Session,
   Professional,
   Firm,
   Client,
@@ -89,5 +268,22 @@ module.exports = {
   Booking,
   Consultation,
   Review,
+  ReviewAppeal,
   File,
+  Upload,
+  Address,
+  ProfessionalDetail,
+  LawyerDetail,
+  TechConsultantDetail,
+  LawFirm,
+  FirmMember,
+  AuditLog,
+  Job,
+  Notification,
+  TaxConsultantDetail,
+  ProfessionalApproval,
+  FirmApproval,
+  FirmInvitation,
+  FirmJoinRequest,
+  PasswordResetOtp,
 };

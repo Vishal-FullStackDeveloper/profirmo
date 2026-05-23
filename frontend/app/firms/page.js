@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2 } from 'lucide-react';
+import { Building2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 import Card from '@/components/common/Card';
@@ -16,8 +16,9 @@ const toOptions = (arr) => arr.map((v) => ({ value: v, label: v }));
 
 export default function FirmsPage() {
   const { t } = useLanguage();
-  const { firms, loading, params, setParams } = useFirms();
-  const update = (patch) => setParams((prev) => ({ ...prev, ...patch }));
+  const { items, meta, loading, error, params, setParams } = useFirms();
+  const update = (patch) =>
+    setParams((prev) => ({ ...prev, ...patch, page: 1 }));
 
   const RATING_OPTIONS = [
     { value: '', label: t('firmList.anyRating') },
@@ -25,6 +26,18 @@ export default function FirmsPage() {
     { value: '4', label: t('firmList.rating4') },
     { value: '4.5', label: t('firmList.rating45') },
   ];
+
+  const totalCount =
+    meta && Number.isFinite(meta.total) ? meta.total : items.length;
+  const currentPage = meta && meta.page ? meta.page : 1;
+  const totalPages = meta && meta.totalPages ? meta.totalPages : 1;
+
+  const goToPage = (page) => {
+    setParams((prev) => ({ ...prev, page }));
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -91,14 +104,21 @@ export default function FirmsPage() {
             ) : (
               <>
                 <span className="font-semibold text-slate-900">
-                  {firms.length}
+                  {totalCount}
                 </span>{' '}
-                {firms.length === 1
+                {totalCount === 1
                   ? t('firmList.countOne')
                   : t('firmList.countOther')}
               </>
             )}
           </p>
+
+          {error && !loading && (
+            <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <AlertCircle size={18} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
           {loading ? (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -109,18 +129,50 @@ export default function FirmsPage() {
                 />
               ))}
             </div>
-          ) : firms.length === 0 ? (
+          ) : items.length === 0 ? (
             <EmptyState
               icon={<Building2 size={24} />}
               title={t('firmList.emptyTitle')}
               description={t('firmList.emptyDesc')}
             />
           ) : (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {firms.map((firm) => (
-                <FirmCard key={firm.id} firm={firm} />
-              ))}
-            </div>
+            <>
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {items.map((firm) => (
+                  <FirmCard key={firm.id} firm={firm} />
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-teal-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronLeft size={16} />
+                    Prev
+                  </button>
+                  <span className="px-3 text-sm text-slate-600">
+                    Page{' '}
+                    <span className="font-semibold text-slate-900">
+                      {currentPage}
+                    </span>{' '}
+                    of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-teal-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>

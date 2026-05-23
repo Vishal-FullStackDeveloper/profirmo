@@ -1,87 +1,67 @@
 'use client';
 
-// Firms listing hook with offline mock fallback and client-side
-// filtering/sorting.
+// Firms listing hook — fetches ONLY from the backend API.
+// Filtering/sorting/pagination is server-side; there is no mock-data fallback.
+// On an API error the list is empty and the error message is surfaced.
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import firmService from '@/services/firmService';
-import { firms as mockFirms } from '@/data/mockData';
 
-/**
- * Apply filtering + sorting to a list of firms.
- * Recognised params: search, firmType, city, minRating, sort.
- */
-function applyFilters(list, params = {}) {
-  let result = Array.isArray(list) ? [...list] : [];
-  const { search, firmType, city, minRating, sort } = params;
-
-  if (search) {
-    const q = String(search).toLowerCase();
-    result = result.filter((f) =>
-      [f.name, f.firmType, f.city, f.description]
-        .filter(Boolean)
-        .some((field) => String(field).toLowerCase().includes(q))
-    );
-  }
-
-  if (firmType) {
-    result = result.filter((f) => f.firmType === firmType);
-  }
-
-  if (city) {
-    result = result.filter((f) => f.city === city);
-  }
-
-  if (minRating !== undefined && minRating !== null) {
-    result = result.filter((f) => f.rating >= Number(minRating));
-  }
-
-  switch (sort) {
-    case 'rating':
-      result.sort((a, b) => b.rating - a.rating);
-      break;
-    case 'professionals':
-      result.sort((a, b) => b.professionalCount - a.professionalCount);
-      break;
-    case 'reviews':
-      result.sort((a, b) => b.reviewsCount - a.reviewsCount);
-      break;
-    default:
-      break;
-  }
-
-  return result;
+/** Map the UI filter params to the backend query params. */
+function toQuery(params = {}) {
+  const { search, city, location, firmType, minRating, sort, page, limit } =
+    params;
+  return {
+    search: search || undefined,
+    city: city || location || undefined,
+    firmType: firmType || undefined,
+    minRating: minRating || undefined,
+    sort: sort || undefined,
+    page: page || undefined,
+    limit: limit || undefined,
+  };
 }
 
 export function useFirms(initialParams = {}) {
-  const [rawData, setRawData] = useState([]);
+  const [items, setItems] = useState([]);
+  const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [params, setParams] = useState(initialParams);
 
+  const query = toQuery(params);
+  const queryKey = JSON.stringify(query);
+  const requestId = useRef(0);
+
   const fetchData = useCallback(async () => {
+    const myRequest = ++requestId.current;
     setLoading(true);
     setError(null);
     try {
-      const res = await firmService.getAll();
-      const data = (res && res.data) || [];
-      setRawData(Array.isArray(data) && data.length ? data : mockFirms);
+      const res = await firmService.getAll(query);
+      if (myRequest !== requestId.current) return;
+      setItems(Array.isArray(res && res.data) ? res.data : []);
+      setMeta((res && res.meta) || null);
     } catch (err) {
+      if (myRequest !== requestId.current) return;
       setError(err.message || 'Failed to load firms.');
-      setRawData(mockFirms);
+      setItems([]);
+      setMeta(null);
     } finally {
-      setLoading(false);
+      if (myRequest === requestId.current) setLoading(false);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryKey]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const firms = useMemo(() => applyFilters(rawData, params), [rawData, params]);
-
   return {
-    firms,
+    items,
+    // Backward-compatible alias for pages that still read `firms`.
+    firms: items,
+    meta,
     loading,
     error,
     params,

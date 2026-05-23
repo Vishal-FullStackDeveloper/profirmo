@@ -4,12 +4,14 @@ import { MapPin, Users } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
+import Avatar from '@/components/common/Avatar';
 import RatingStars from '@/components/common/RatingStars';
 import { useLanguage } from '@/components/LanguageProvider';
-import { getInitials } from '@/utils/formatters';
 
 /**
  * FirmCard — summary card for a single firm.
+ * Renders the API shape: firmName, logo, firmType, city, practiceAreas,
+ * rating, reviewsCount, professionalCount.
  *
  * Props: { firm }
  */
@@ -19,65 +21,70 @@ export default function FirmCard({ firm }) {
 
   const {
     id,
-    name,
+    firmName,
+    logo,
     firmType,
     city,
     rating,
     reviewsCount,
     professionalCount,
-    services = [],
+    practiceAreas = [],
   } = firm;
 
   return (
     <Card hover className="flex h-full flex-col">
       <div className="flex items-start gap-4">
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-lg font-semibold text-white">
-          {getInitials(name)}
-        </span>
+        <Avatar src={logo} name={firmName} size="lg" className="rounded-xl" />
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-base font-semibold text-slate-900">
-            {name}
+            {firmName}
           </h3>
-          <div className="mt-1">
-            <Badge variant={firmType === 'Tax Firm' ? 'amber' : 'blue'}>
-              {firmType}
-            </Badge>
-          </div>
+          {firmType && (
+            <div className="mt-1">
+              <Badge variant={firmType === 'Tax Firm' ? 'amber' : 'blue'}>
+                {firmType}
+              </Badge>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500">
-        <span className="inline-flex items-center gap-1">
-          <MapPin size={14} className="text-slate-400" />
-          {city}
-        </span>
+        {city && (
+          <span className="inline-flex items-center gap-1">
+            <MapPin size={14} className="text-slate-400" />
+            {city}
+          </span>
+        )}
         <span className="inline-flex items-center gap-1">
           <Users size={14} className="text-slate-400" />
-          {professionalCount === 1
-            ? t('firmCmp.professionalCountOne', { count: professionalCount })
+          {(professionalCount || 0) === 1
+            ? t('firmCmp.professionalCountOne', {
+                count: professionalCount || 0,
+              })
             : t('firmCmp.professionalCountOther', {
-                count: professionalCount,
+                count: professionalCount || 0,
               })}
         </span>
       </div>
 
       <div className="mt-3">
-        <RatingStars rating={rating} count={reviewsCount} size="sm" />
+        <RatingStars rating={rating || 0} count={reviewsCount || 0} size="sm" />
       </div>
 
-      {services.length > 0 && (
+      {practiceAreas.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-1.5">
-          {services.slice(0, 3).map((service) => (
+          {practiceAreas.slice(0, 3).map((area) => (
             <span
-              key={service}
+              key={area}
               className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600"
             >
-              {service}
+              {area}
             </span>
           ))}
-          {services.length > 3 && (
+          {practiceAreas.length > 3 && (
             <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
-              {t('firmCmp.moreServices', { count: services.length - 3 })}
+              {t('firmCmp.moreServices', { count: practiceAreas.length - 3 })}
             </span>
           )}
         </div>

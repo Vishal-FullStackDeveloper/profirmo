@@ -1,5 +1,12 @@
-const { verifyToken } = require('../utils/tokenHelper');
+const { verifyAccessToken } = require('../utils/tokenHelper');
 const { errorResponse } = require('../utils/responseHandler');
+
+// Normalize a decoded JWT payload so downstream code can rely on `.id`.
+// Access tokens carry the user id in the `sub` claim.
+const normalizeUser = (decoded) => {
+  if (!decoded) return decoded;
+  return { ...decoded, id: decoded.id || decoded.sub };
+};
 
 /**
  * Extract a Bearer token from the Authorization header.
@@ -24,8 +31,8 @@ const authenticate = (req, res, next) => {
     return errorResponse(res, 401, 'Authentication required: missing token');
   }
   try {
-    const decoded = verifyToken(token);
-    req.user = decoded;
+    const decoded = verifyAccessToken(token);
+    req.user = normalizeUser(decoded);
     return next();
   } catch (err) {
     return errorResponse(res, 401, 'Authentication failed: invalid or expired token');
@@ -40,7 +47,7 @@ const optionalAuth = (req, res, next) => {
   const token = extractToken(req);
   if (token) {
     try {
-      req.user = verifyToken(token);
+      req.user = normalizeUser(verifyAccessToken(token));
     } catch (err) {
       // Ignore invalid tokens for optional auth.
       req.user = undefined;

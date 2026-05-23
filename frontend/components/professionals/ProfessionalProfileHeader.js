@@ -1,15 +1,18 @@
 'use client';
 
-import { MapPin, BadgeCheck, Briefcase, ShieldCheck } from 'lucide-react';
+import { MapPin, BadgeCheck, Briefcase, ShieldCheck, Building2 } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
+import Avatar from '@/components/common/Avatar';
 import RatingStars from '@/components/common/RatingStars';
 import { useLanguage } from '@/components/LanguageProvider';
-import { formatRate, getInitials } from '@/utils/formatters';
+import { formatCurrency } from '@/utils/formatters';
 
 /**
  * ProfessionalProfileHeader — large header panel on a professional profile.
+ * Uses the API detail shape (professionalType, yearsOfExperience,
+ * consultationFee, profilePhoto, languages, designation, organization).
  *
  * Props: { professional }
  */
@@ -20,32 +23,41 @@ export default function ProfessionalProfileHeader({ professional }) {
   const {
     id,
     name,
-    professionType,
+    professionalType,
     specialization,
+    designation,
+    organization,
     city,
-    experience,
+    profilePhoto,
+    yearsOfExperience,
     languages = [],
     rating,
     reviewsCount,
-    perMinuteRate,
+    consultationFee,
     availableNow,
     verified,
-    registrationNumber,
+    lawyer,
+    tax,
   } = professional;
 
-  const isLegal =
-    /lawyer|advocate/i.test(professionType || '');
-  const regLabel = isLegal
-    ? t('profCmp.regBar')
-    : t('profCmp.regTax');
+  const isLegal = /lawyer|advocate/i.test(professionalType || '');
+  const regLabel = isLegal ? t('profCmp.regBar') : t('profCmp.regTax');
+  // Registration number lives in the lawyer/tax sub-objects on the detail shape.
+  const registrationNumber =
+    (lawyer && (lawyer.barRegistrationNumber || lawyer.registrationNumber)) ||
+    (tax && (tax.registrationNumber || tax.membershipNumber)) ||
+    null;
 
   return (
     <Card>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-          <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-2xl font-bold text-blue-700">
-            {getInitials(name)}
-          </span>
+          <Avatar
+            src={profilePhoto}
+            name={name}
+            size="xl"
+            className="rounded-2xl"
+          />
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold text-slate-900">{name}</h1>
@@ -62,20 +74,38 @@ export default function ProfessionalProfileHeader({ professional }) {
               )}
             </div>
             <p className="mt-1 text-base font-semibold text-blue-700">
-              {professionType}
+              {professionalType}
             </p>
-            <p className="text-sm text-slate-500">{specialization}</p>
+            {(designation || specialization) && (
+              <p className="text-sm text-slate-500">
+                {designation || specialization}
+              </p>
+            )}
 
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600">
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin size={15} className="text-slate-400" />
-                {city}
-              </span>
+              {city && (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin size={15} className="text-slate-400" />
+                  {city}
+                </span>
+              )}
               <span className="inline-flex items-center gap-1.5">
                 <Briefcase size={15} className="text-slate-400" />
-                {t('profCmp.yearsExperience', { count: experience })}
+                {t('profCmp.yearsExperience', {
+                  count: yearsOfExperience || 0,
+                })}
               </span>
-              <RatingStars rating={rating} count={reviewsCount} size="sm" />
+              {organization && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Building2 size={15} className="text-slate-400" />
+                  {organization}
+                </span>
+              )}
+              <RatingStars
+                rating={rating || 0}
+                count={reviewsCount || 0}
+                size="sm"
+              />
             </div>
 
             {languages.length > 0 && (
@@ -108,7 +138,7 @@ export default function ProfessionalProfileHeader({ professional }) {
             {t('profCmp.consultationRate')}
           </p>
           <p className="mt-1 text-2xl font-bold text-slate-900">
-            {formatRate(perMinuteRate)}
+            {formatCurrency(consultationFee)}
           </p>
           <Button
             href={`/booking/${id}`}

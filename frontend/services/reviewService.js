@@ -5,19 +5,45 @@ import { API_ENDPOINTS } from '@/utils/constants';
 
 const BASE = API_ENDPOINTS.reviews;
 
-/** Fetch all reviews for a given professional. */
-export function getByProfessional(professionalId) {
-  return get(BASE, { params: { professionalId } });
+/** Unwrap the API envelope and return its `data` payload. */
+function unwrap(res) {
+  if (res && Object.prototype.hasOwnProperty.call(res, 'data')) {
+    return res.data;
+  }
+  return res;
 }
 
-/** Fetch all reviews for a given firm. */
-export function getByFirm(firmId) {
-  return get(BASE, { params: { firmId } });
+/** Published reviews for a professional (newest first). */
+export async function getByProfessional(professionalId) {
+  const res = await get(`${BASE}/professional/${professionalId}`);
+  return unwrap(res) || [];
 }
 
-/** Create a new review (auth required). */
-export function create(data, token) {
-  return post(BASE, data, { token });
+/** Published reviews for a firm — the collective reviews of its professionals. */
+export async function getByFirm(firmId) {
+  const res = await get(`${BASE}/firm/${firmId}`);
+  return unwrap(res) || [];
 }
 
-export default { getByProfessional, getByFirm, create };
+/**
+ * Create a review for a professional. Requires an authenticated user.
+ * @param {{ professionalId:string, rating:number, comment?:string }} data
+ */
+export async function create({ professionalId, rating, comment }) {
+  const res = await post(BASE, { professionalId, rating, comment });
+  return unwrap(res);
+}
+
+/** The logged-in professional's own reviews, each with its appeal (if any). */
+export async function getMine() {
+  const res = await get(`${BASE}/mine`);
+  return unwrap(res) || [];
+}
+
+/** Appeal a review the logged-in professional believes is wrong. */
+export async function appeal(reviewId, reason) {
+  const res = await post(`${BASE}/${reviewId}/appeal`, { reason });
+  return unwrap(res);
+}
+
+export default { getByProfessional, getByFirm, create, getMine, appeal };

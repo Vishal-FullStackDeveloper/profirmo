@@ -1,48 +1,229 @@
 // Authentication service — wraps the /api/auth endpoints.
+// Every call returns the parsed `data` object from the API envelope
+// `{ success, message, data }`.
 
 import { get, post } from '@/services/api';
-import { API_ENDPOINTS } from '@/utils/constants';
+
+const ENDPOINTS = {
+  login: '/api/auth/login',
+  signup: '/api/auth/signup',
+  refresh: '/api/auth/refresh',
+  logout: '/api/auth/logout',
+  me: '/api/auth/me',
+  verifyEmail: '/api/auth/verify-email',
+  resendVerification: '/api/auth/resend-verification',
+  forgotPassword: '/api/auth/forgot-password',
+  resendOtp: '/api/auth/resend-otp',
+  verifyPasswordOtp: '/api/auth/verify-password-otp',
+  resetPassword: '/api/auth/reset-password',
+  // Legacy register endpoints still exist on the backend.
+  registerClient: '/api/auth/register-client',
+  registerProfessional: '/api/auth/register-professional',
+  registerFirm: '/api/auth/register-firm',
+};
+
+/** Unwrap the API envelope and return its `data` payload. */
+function unwrap(response) {
+  if (response && Object.prototype.hasOwnProperty.call(response, 'data')) {
+    return response.data;
+  }
+  return response;
+}
 
 /**
  * Log in with email + password.
- * @returns {Promise<{success,data:{token,user}}>}
+ * Sets the httpOnly pf_refresh cookie server-side.
+ * @returns {Promise<{accessToken,token,user}>}
  */
-export function login(email, password) {
-  return post(API_ENDPOINTS.auth.login, { email, password });
+export async function login(email, password) {
+  const res = await post(ENDPOINTS.login, { email, password });
+  return unwrap(res);
 }
 
 /**
- * Register a new client account.
+ * Create a new account.
+ * As of the email-verification flow, signup does NOT return a token and does
+ * NOT log the user in — verification is required first.
+ * @param {Object} data - { firstName, lastName, email, mobileNumber, password, role }
+ *   role is one of 'client' | 'professional' | 'law_firm'.
+ * @returns {Promise<{user, emailVerificationRequired}>}
  */
-export function registerClient(data) {
-  return post(API_ENDPOINTS.auth.registerClient, data);
+export async function signup(data) {
+  const res = await post(ENDPOINTS.signup, data);
+  return unwrap(res);
 }
 
 /**
- * Register a new independent professional account.
+ * Verify an email address with the token from the verification link.
+ * On success the backend sets the httpOnly refresh cookie and returns an
+ * access token — i.e. it auto-logs the user in.
+ * @param {string} token - the verification token from the email link
+ * @returns {Promise<{accessToken,token,user}>}
  */
-export function registerProfessional(data) {
-  return post(API_ENDPOINTS.auth.registerProfessional, data);
+export async function verifyEmail(token) {
+  const res = await post(ENDPOINTS.verifyEmail, { token });
+  return unwrap(res);
 }
 
 /**
- * Register a new firm (creates the firm admin account).
+ * Request a fresh verification email. Always resolves with a generic message
+ * regardless of whether the email exists.
+ * @param {string} email
+ * @returns {Promise<{success,message}>}
  */
-export function registerFirm(data) {
-  return post(API_ENDPOINTS.auth.registerFirm, data);
+export async function resendVerification(email) {
+  return post(ENDPOINTS.resendVerification, { email });
 }
 
 /**
- * Fetch the currently authenticated user using a bearer token.
+ * Silently restore the session using the httpOnly refresh cookie.
+ * Throws if there is no/expired session (HTTP 401).
+ * @returns {Promise<{accessToken,token,user}>}
  */
-export function getMe(token) {
-  return get(API_ENDPOINTS.auth.me, { token });
+export async function refresh() {
+  const res = await post(ENDPOINTS.refresh);
+  return unwrap(res);
+}
+
+/**
+ * Log out — clears the refresh cookie server-side.
+ * @returns {Promise<{success,message}>}
+ */
+export async function logout() {
+  return post(ENDPOINTS.logout);
+}
+
+/**
+ * Fetch the currently authenticated user.
+ * Uses the held access token unless an explicit one is given.
+ * @returns {Promise<{user}>}
+ */
+export async function getMe(token) {
+  const res = await get(ENDPOINTS.me, token !== undefined ? { token } : {});
+  return unwrap(res);
+}
+
+// ---------------------------------------------------------------------------
+// Password-reset flow (email OTP).
+// ---------------------------------------------------------------------------
+
+/**
+ * Request a password-reset OTP for the given email. The backend always
+ * resolves with a generic message regardless of whether the account exists.
+ * @param {string} email
+ * @returns {Promise<*>} the parsed `data` payload (may be null)
+ */
+export async function forgotPassword(email) {
+  const res = await post(ENDPOINTS.forgotPassword, { email });
+  return unwrap(res);
+}
+
+/**
+ * Request a fresh password-reset OTP. Throws HTTP 429 if within the
+ * 60-second cooldown or once the 5-resend cap is reached.
+ * @param {string} email
+ * @returns {Promise<*>} the parsed `data` payload (may be null)
+ */
+export async function resendOtp(email) {
+  const res = await post(ENDPOINTS.resendOtp, { email });
+  return unwrap(res);
+}
+
+/**
+ * Verify a 6-digit password-reset OTP.
+ * On success returns `{ resetToken }`. On failure throws — inspect
+ * `err.payload.code` ('OTP_INVALID' | 'OTP_INCORRECT' | 'OTP_ATTEMPTS_EXCEEDED')
+ * and `err.payload.data.attemptsRemaining`.
+ * @param {string} email
+ * @param {string} otp - 6-digit code
+ * @returns {Promise<{resetToken:string}>}
+ */
+export async function verifyPasswordOtp(email, otp) {
+  const res = await post(ENDPOINTS.verifyPasswordOtp, { email, otp });
+  return unwrap(res);
+}
+
+/**
+ * Complete a password reset with the token from verifyPasswordOtp.
+ * On failure throws — `422` carries `err.payload.errors.newPassword`,
+ * `401`/`400` mean the reset session is stale/expired.
+ * @param {Object} payload - { resetToken, newPassword, confirmPassword }
+ * @returns {Promise<*>} the parsed `data` payload (may be null)
+ */
+export async function resetPassword({ resetToken, newPassword, confirmPassword }) {
+  const res = await post(ENDPOINTS.resetPassword, {
+    resetToken,
+    newPassword,
+    confirmPassword,
+  });
+  return unwrap(res);
+}
+
+// ---------------------------------------------------------------------------
+// Backward-compatible legacy exports.
+// Older pages call registerClient/registerProfessional/registerFirm — map them
+// onto the unified signup flow so they keep working against the new contract.
+// ---------------------------------------------------------------------------
+
+const LEGACY_ROLE = {
+  client: 'client',
+  professional: 'professional',
+  firm: 'law_firm',
+};
+
+/** Normalise a legacy register payload into the signup contract. */
+function toSignupPayload(data = {}, role) {
+  // Already in the new shape — pass straight through.
+  if (data.firstName || data.lastName || data.mobileNumber) {
+    return { role, ...data };
+  }
+  // Map a legacy { name, phone, ... } payload.
+  const name = (data.name || data.adminName || '').trim();
+  const parts = name.split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0] || name || '',
+    lastName: parts.slice(1).join(' ') || '',
+    email: data.email || '',
+    mobileNumber: data.mobileNumber || data.phone || '',
+    password: data.password || '',
+    role,
+  };
+}
+
+export async function registerClient(data) {
+  return signup(toSignupPayload(data, LEGACY_ROLE.client));
+}
+
+/**
+ * Register a professional with the full Phase-7 payload.
+ * Hits POST /api/auth/register-professional. This does NOT return a token and
+ * does NOT log the user in — email verification + admin approval are required.
+ * @param {Object} payload - the full professional registration payload
+ *   (personal + professional details, nested `legal` or `tax`, file URLs).
+ * @returns {Promise<{user, emailVerificationRequired, approvalStatus}>}
+ */
+export async function registerProfessional(payload) {
+  const res = await post(ENDPOINTS.registerProfessional, payload);
+  return unwrap(res);
+}
+
+export async function registerFirm(data) {
+  return signup(toSignupPayload(data, LEGACY_ROLE.firm));
 }
 
 export default {
   login,
+  signup,
+  verifyEmail,
+  resendVerification,
+  forgotPassword,
+  resendOtp,
+  verifyPasswordOtp,
+  resetPassword,
+  refresh,
+  logout,
+  getMe,
   registerClient,
   registerProfessional,
   registerFirm,
-  getMe,
 };

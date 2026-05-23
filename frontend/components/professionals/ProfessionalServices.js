@@ -5,16 +5,25 @@ import Card from '@/components/common/Card';
 import { useLanguage } from '@/components/LanguageProvider';
 
 /**
- * ProfessionalServices — checklist of services offered.
+ * ProfessionalServices — skills & areas of expertise offered.
+ * Uses the API detail shape: `expertise[]` and `skills[]`.
  *
  * Props: { professional }
  */
 export default function ProfessionalServices({ professional }) {
   const { t } = useLanguage();
-  const services =
-    (professional && Array.isArray(professional.servicesOffered)
-      ? professional.servicesOffered
-      : []) || [];
+  const expertise =
+    professional && Array.isArray(professional.expertise)
+      ? professional.expertise
+      : [];
+  const skills =
+    professional && Array.isArray(professional.skills)
+      ? professional.skills
+      : [];
+  // Merge expertise + skills into one de-duplicated checklist.
+  const services = Array.from(new Set([...expertise, ...skills])).filter(
+    Boolean
+  );
 
   return (
     <Card>

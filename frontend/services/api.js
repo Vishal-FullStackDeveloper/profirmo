@@ -21,6 +21,43 @@ export function getApiBaseUrl() {
 
 export const API_BASE_URL = CONFIGURED_API_BASE_URL;
 
+// ---------------------------------------------------------------------------
+// In-memory access-token holder.
+// The 15-minute access token never touches localStorage — it lives only here
+// (and in React state). The persistent session is the httpOnly pf_refresh
+// cookie, which the browser sends automatically when `credentials: 'include'`.
+// ---------------------------------------------------------------------------
+let accessToken = null;
+
+/** Store the current access token (pass null to clear). */
+export function setAccessToken(token) {
+  accessToken = token || null;
+}
+
+/** Read the currently held access token. */
+export function getAccessToken() {
+  return accessToken;
+}
+
+// Callbacks the AuthProvider registers so api.js can push refreshed tokens
+// back into React context and trigger a logout when the session expires.
+let onTokenRefreshed = null;
+let onAuthExpired = null;
+
+/**
+ * Register auth lifecycle callbacks.
+ * @param {Object} cbs
+ * @param {Function} [cbs.onTokenRefreshed] - (newToken, user) => void
+ * @param {Function} [cbs.onAuthExpired]    - () => void
+ */
+export function registerAuthCallbacks({
+  onTokenRefreshed: refreshed,
+  onAuthExpired: expired,
+} = {}) {
+  if (refreshed !== undefined) onTokenRefreshed = refreshed;
+  if (expired !== undefined) onAuthExpired = expired;
+}
+
 /**
  * Build a query string from a params object. Skips null/undefined/'' values.
  */
@@ -43,29 +80,37 @@ function buildQuery(params) {
   return str ? `?${str}` : '';
 }
 
+// Endpoints that must never trigger the refresh-on-401 retry loop.
+const AUTH_NO_RETRY = [
+  '/api/auth/refresh',
+  '/api/auth/login',
+  '/api/auth/signup',
+  '/api/auth/register-client',
+  '/api/auth/register-professional',
+  '/api/auth/register-firm',
+];
+
+function isNoRetryPath(path) {
+  return AUTH_NO_RETRY.some((p) => path.startsWith(p));
+}
+
 /**
- * Perform an HTTP request against the API.
- * @param {string} path - endpoint path, e.g. '/api/professionals'
- * @param {Object} [options]
- * @param {string} [options.method='GET']
- * @param {*}      [options.body]   - JSON-serialisable request body
- * @param {string} [options.token] - bearer token
- * @param {Object} [options.params]- query string params
- * @returns {Promise<{success:boolean,message?:string,data?:*,meta?:*}>}
+ * Perform a single raw HTTP request (no refresh logic).
  */
-export async function apiRequest(
-  path,
-  { method = 'GET', body, token, params } = {}
-) {
+async function rawRequest(path, { method = 'GET', body, token, params } = {}) {
   const url = `${getApiBaseUrl()}${path}${buildQuery(params)}`;
 
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  // Use the explicit token if given, otherwise fall back to the held token.
+  const bearer = token !== undefined ? token : accessToken;
+  if (bearer) headers.Authorization = `Bearer ${bearer}`;
 
   const init = {
     method,
     headers,
     cache: 'no-store',
+    // Always send/receive cookies so the httpOnly pf_refresh cookie works.
+    credentials: 'include',
   };
   if (body !== undefined && body !== null) {
     init.body = JSON.stringify(body);
@@ -75,9 +120,11 @@ export async function apiRequest(
   try {
     response = await fetch(url, init);
   } catch (networkError) {
-    throw new Error(
+    const err = new Error(
       'Unable to reach the server. Please check your connection.'
     );
+    err.isNetworkError = true;
+    throw err;
   }
 
   let payload = null;
@@ -94,10 +141,92 @@ export async function apiRequest(
     const message =
       (payload && (payload.message || payload.error)) ||
       `Request failed with status ${response.status}`;
-    throw new Error(message);
+    const err = new Error(message);
+    err.status = response.status;
+    err.payload = payload;
+    throw err;
   }
 
   return payload || { success: true, data: null };
+}
+
+/**
+ * Perform an HTTP request against the API.
+ *
+ * If a request returns HTTP 401 (and it is not itself an auth endpoint, and it
+ * has not already been retried), this calls POST /api/auth/refresh once. On a
+ * successful refresh the new access token is stored, `onTokenRefreshed` is
+ * notified, and the original request is retried once with the new token. If
+ * the refresh fails, `onAuthExpired` is invoked and the original error surfaces.
+ *
+ * @param {string} path - endpoint path, e.g. '/api/professionals'
+ * @param {Object} [options]
+ * @param {string} [options.method='GET']
+ * @param {*}      [options.body]   - JSON-serialisable request body
+ * @param {string} [options.token] - explicit bearer token (overrides held token)
+ * @param {Object} [options.params]- query string params
+ * @param {boolean}[options._retried] - internal: marks an already-retried call
+ * @returns {Promise<{success:boolean,message?:string,data?:*,meta?:*}>}
+ */
+export async function apiRequest(path, options = {}) {
+  try {
+    return await rawRequest(path, options);
+  } catch (error) {
+    const canRetry =
+      error &&
+      error.status === 401 &&
+      !options._retried &&
+      !isNoRetryPath(path);
+
+    if (!canRetry) throw error;
+
+    // Attempt a single silent refresh.
+    let refreshData;
+    try {
+      const refreshRes = await rawRequest('/api/auth/refresh', {
+        method: 'POST',
+      });
+      refreshData = (refreshRes && refreshRes.data) || refreshRes || {};
+    } catch (refreshError) {
+      // Refresh failed — the session is gone.
+      if (typeof onAuthExpired === 'function') {
+        try {
+          onAuthExpired();
+        } catch {
+          /* ignore callback errors */
+        }
+      }
+      throw error;
+    }
+
+    const newToken = refreshData.accessToken || refreshData.token || null;
+    if (!newToken) {
+      if (typeof onAuthExpired === 'function') {
+        try {
+          onAuthExpired();
+        } catch {
+          /* ignore */
+        }
+      }
+      throw error;
+    }
+
+    setAccessToken(newToken);
+    if (typeof onTokenRefreshed === 'function') {
+      try {
+        onTokenRefreshed(newToken, refreshData.user || null);
+      } catch {
+        /* ignore callback errors */
+      }
+    }
+
+    // Retry the original request once with the fresh token.
+    return rawRequest(path, {
+      ...options,
+      token: newToken,
+      _retried: true,
+    });
+  }
 }
 
 /** GET convenience wrapper. */
@@ -120,4 +249,15 @@ export function del(path, options = {}) {
   return apiRequest(path, { ...options, method: 'DELETE' });
 }
 
-export default { apiRequest, get, post, patch, del, API_BASE_URL, getApiBaseUrl };
+export default {
+  apiRequest,
+  get,
+  post,
+  patch,
+  del,
+  API_BASE_URL,
+  getApiBaseUrl,
+  setAccessToken,
+  getAccessToken,
+  registerAuthCallbacks,
+};

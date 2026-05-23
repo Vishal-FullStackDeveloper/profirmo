@@ -132,9 +132,21 @@ export const translations = {
     'profCmp.clientReviews': 'Client reviews',
     'profCmp.reviewCountOne': '({count} review)',
     'profCmp.reviewCountOther': '({count} reviews)',
+    'profCmp.noReviewYet': 'No review yet',
     'profCmp.noReviewsTitle': 'No reviews yet',
     'profCmp.noReviewsDesc':
       'This professional has not received any client reviews so far.',
+    'profCmp.writeReview': 'Write a review',
+    'profCmp.yourRating': 'Your rating',
+    'profCmp.yourReview': 'Your review',
+    'profCmp.reviewPlaceholder': 'Share your experience with this professional…',
+    'profCmp.submitReview': 'Submit review',
+    'profCmp.submitting': 'Submitting…',
+    'profCmp.cancel': 'Cancel',
+    'profCmp.ratingRequired': 'Please select a star rating.',
+    'profCmp.reviewThanks': 'Thank you! Your review has been posted.',
+    'profCmp.alreadyReviewed': 'You have already reviewed this professional.',
+    'profCmp.loginToReview': 'Sign in to write a review',
 
     // Firm components
     'firmCmp.professionalCountOne': '{count} professional',
@@ -285,9 +297,21 @@ export const translations = {
     'profCmp.clientReviews': 'ग्राहक समीक्षाएँ',
     'profCmp.reviewCountOne': '({count} समीक्षा)',
     'profCmp.reviewCountOther': '({count} समीक्षाएँ)',
+    'profCmp.noReviewYet': 'अभी तक कोई रिव्यू नहीं',
     'profCmp.noReviewsTitle': 'अभी तक कोई समीक्षा नहीं',
     'profCmp.noReviewsDesc':
       'इस प्रोफेशनल को अब तक कोई ग्राहक समीक्षा प्राप्त नहीं हुई है।',
+    'profCmp.writeReview': 'रिव्यू लिखें',
+    'profCmp.yourRating': 'आपकी रेटिंग',
+    'profCmp.yourReview': 'आपका रिव्यू',
+    'profCmp.reviewPlaceholder': 'इस प्रोफेशनल के साथ अपना अनुभव साझा करें…',
+    'profCmp.submitReview': 'रिव्यू सबमिट करें',
+    'profCmp.submitting': 'सबमिट हो रहा है…',
+    'profCmp.cancel': 'रद्द करें',
+    'profCmp.ratingRequired': 'कृपया एक स्टार रेटिंग चुनें।',
+    'profCmp.reviewThanks': 'धन्यवाद! आपका रिव्यू पोस्ट कर दिया गया है।',
+    'profCmp.alreadyReviewed': 'आपने इस प्रोफेशनल को पहले ही रिव्यू कर दिया है।',
+    'profCmp.loginToReview': 'रिव्यू लिखने के लिए साइन इन करें',
 
     // Firm components
     'firmCmp.professionalCountOne': '{count} प्रोफेशनल',

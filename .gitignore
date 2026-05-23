@@ -17,6 +17,14 @@ dist
 build
 .swc/
 
+# Uploaded files (local disk storage)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Captured dev emails
+backend/sent-emails/*
+!backend/sent-emails/.gitkeep
+
 # Deployment
 .vercel
 

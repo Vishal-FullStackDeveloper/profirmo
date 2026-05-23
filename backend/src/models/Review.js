@@ -1,6 +1,10 @@
 // Sequelize model: Review
-//   id, clientId, clientName, professionalId, firmId, rating, comment, date
-//   + timestamps
+//   id, userId, clientId, clientName, professionalId, firmId, rating,
+//   comment, date, status + timestamps
+//
+// status: 'PUBLISHED'    — visible everywhere (default)
+//         'UNDER_APPEAL' — the professional has appealed; hidden from public
+//                          listings/profiles until an admin resolves it.
 
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
@@ -17,6 +21,8 @@ const Review = sequelize.define(
       allowNull: false,
       defaultValue: genId,
     },
+    // The authenticated user (users.id) who wrote the review.
+    userId: { type: DataTypes.STRING(64), allowNull: true },
     clientId: { type: DataTypes.STRING(64), allowNull: true },
     clientName: {
       type: DataTypes.STRING,
@@ -28,14 +34,21 @@ const Review = sequelize.define(
     rating: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
     comment: { type: DataTypes.TEXT, allowNull: true },
     date: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    status: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'PUBLISHED',
+    },
   },
   {
     tableName: 'reviews',
     timestamps: true,
     indexes: [
+      { fields: ['userId'] },
       { fields: ['clientId'] },
       { fields: ['professionalId'] },
       { fields: ['firmId'] },
+      { fields: ['status'] },
     ],
   }
 );

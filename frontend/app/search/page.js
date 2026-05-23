@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Search, Users, Building2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Search, Users, Building2, AlertCircle } from 'lucide-react';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 import Card from '@/components/common/Card';
@@ -11,7 +11,8 @@ import EmptyState from '@/components/common/EmptyState';
 import ProfessionalCard from '@/components/professionals/ProfessionalCard';
 import FirmCard from '@/components/firms/FirmCard';
 import { useLanguage } from '@/components/LanguageProvider';
-import { professionals, firms } from '@/data/mockData';
+import { useProfessionals } from '@/hooks/useProfessionals';
+import { useFirms } from '@/hooks/useFirms';
 import {
   PROFESSION_TYPES,
   CITIES,
@@ -46,64 +47,69 @@ export default function SearchPage() {
   const update = (patch) => setFilters((prev) => ({ ...prev, ...patch }));
   const resetFilters = () => setFilters(INITIAL_FILTERS);
 
-  const filteredProfessionals = useMemo(() => {
-    const q = filters.keyword.trim().toLowerCase();
-    const expRange = EXPERIENCE_RANGES.find((r) => r.value === filters.experience);
+  // Translate the UI filter state into API query params for each hook.
+  const proParams = useMemo(() => {
+    const expRange = EXPERIENCE_RANGES.find(
+      (r) => r.value === filters.experience
+    );
     const rateRange = RATE_RANGES.find((r) => r.value === filters.rateRange);
-    const minRating = filters.rating ? Number(filters.rating) : 0;
-
-    return professionals.filter((p) => {
-      if (
-        q &&
-        ![p.name, p.professionType, p.specialization, p.city, p.bio]
-          .filter(Boolean)
-          .some((f) => String(f).toLowerCase().includes(q))
-      ) {
-        return false;
-      }
-      if (filters.category && p.professionType !== filters.category)
-        return false;
-      if (filters.location && p.city !== filters.location) return false;
-      if (
-        expRange &&
-        expRange.value !== 'any' &&
-        (p.experience < expRange.min || p.experience > expRange.max)
-      ) {
-        return false;
-      }
-      if (
-        rateRange &&
-        rateRange.value !== 'any' &&
-        (p.perMinuteRate < rateRange.min || p.perMinuteRate > rateRange.max)
-      ) {
-        return false;
-      }
-      if (p.rating < minRating) return false;
-      if (filters.availableNow && !p.availableNow) return false;
-      return true;
-    });
+    return {
+      search: filters.keyword || undefined,
+      professionType: filters.category || undefined,
+      city: filters.location || undefined,
+      minRating: filters.rating || undefined,
+      availableNow: filters.availableNow || undefined,
+      experience:
+        expRange && expRange.value !== 'any' ? expRange.value : undefined,
+      minExperience:
+        expRange && expRange.value !== 'any' ? expRange.min : undefined,
+      maxExperience:
+        expRange && expRange.value !== 'any' && Number.isFinite(expRange.max)
+          ? expRange.max
+          : undefined,
+      minFee: rateRange && rateRange.value !== 'any' ? rateRange.min : undefined,
+      maxFee:
+        rateRange && rateRange.value !== 'any' && Number.isFinite(rateRange.max)
+          ? rateRange.max
+          : undefined,
+    };
   }, [filters]);
 
-  const filteredFirms = useMemo(() => {
-    const q = filters.keyword.trim().toLowerCase();
-    const minRating = filters.rating ? Number(filters.rating) : 0;
+  const firmParams = useMemo(
+    () => ({
+      search: filters.keyword || undefined,
+      city: filters.location || undefined,
+      minRating: filters.rating || undefined,
+    }),
+    [filters]
+  );
 
-    return firms.filter((f) => {
-      if (
-        q &&
-        ![f.name, f.firmType, f.city, f.description]
-          .filter(Boolean)
-          .some((field) => String(field).toLowerCase().includes(q))
-      ) {
-        return false;
-      }
-      if (filters.location && f.city !== filters.location) return false;
-      if (f.rating < minRating) return false;
-      return true;
-    });
-  }, [filters]);
+  const {
+    items: professionals,
+    loading: proLoading,
+    error: proError,
+    setParams: setProParams,
+  } = useProfessionals(proParams);
+  const {
+    items: firms,
+    loading: firmLoading,
+    error: firmError,
+    setParams: setFirmParams,
+  } = useFirms(firmParams);
 
-  const results = mode === 'individual' ? filteredProfessionals : filteredFirms;
+  // Push the latest filter-derived params into whichever hook is active.
+  // (The hooks re-fetch whenever their params change.)
+  useEffect(() => {
+    if (mode === 'individual') setProParams(proParams);
+  }, [mode, proParams, setProParams]);
+  useEffect(() => {
+    if (mode === 'firm') setFirmParams(firmParams);
+  }, [mode, firmParams, setFirmParams]);
+
+  const isIndividual = mode === 'individual';
+  const loading = isIndividual ? proLoading : firmLoading;
+  const error = isIndividual ? proError : firmError;
+  const results = isIndividual ? professionals : firms;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -235,33 +241,55 @@ export default function SearchPage() {
           </Card>
 
           <p className="mb-4 text-sm text-slate-600">
-            <span className="font-semibold text-slate-900">
-              {results.length}
-            </span>{' '}
-            {mode === 'individual'
-              ? results.length === 1
-                ? t('searchPage.profCountOne')
-                : t('searchPage.profCountOther')
-              : results.length === 1
-                ? t('searchPage.firmCountOne')
-                : t('searchPage.firmCountOther')}
+            {loading ? (
+              t('profList.loadingShort')
+            ) : (
+              <>
+                <span className="font-semibold text-slate-900">
+                  {results.length}
+                </span>{' '}
+                {isIndividual
+                  ? results.length === 1
+                    ? t('searchPage.profCountOne')
+                    : t('searchPage.profCountOther')
+                  : results.length === 1
+                    ? t('searchPage.firmCountOne')
+                    : t('searchPage.firmCountOther')}
+              </>
+            )}
           </p>
 
-          {results.length === 0 ? (
+          {error && !loading && (
+            <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <AlertCircle size={18} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="h-64 animate-pulse rounded-xl border border-slate-200 bg-slate-100"
+                />
+              ))}
+            </div>
+          ) : results.length === 0 ? (
             <EmptyState
               icon={<Search size={24} />}
               title={t('searchPage.emptyTitle')}
               description={t('searchPage.emptyDesc')}
             />
-          ) : mode === 'individual' ? (
+          ) : isIndividual ? (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredProfessionals.map((pro) => (
+              {professionals.map((pro) => (
                 <ProfessionalCard key={pro.id} professional={pro} />
               ))}
             </div>
           ) : (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredFirms.map((firm) => (
+              {firms.map((firm) => (
                 <FirmCard key={firm.id} firm={firm} />
               ))}
             </div>

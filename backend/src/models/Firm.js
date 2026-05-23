@@ -6,6 +6,7 @@
 
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
+const jsonField = require('./jsonField');
 
 const genId = () =>
   `firm-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -40,13 +41,9 @@ const Firm = sequelize.define(
       allowNull: false,
       defaultValue: 0,
     },
-    services: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
+    services: jsonField('services', []),
     description: { type: DataTypes.TEXT, allowNull: true },
-    professionalIds: {
-      type: DataTypes.JSON,
-      allowNull: false,
-      defaultValue: [],
-    },
+    professionalIds: jsonField('professionalIds', []),
     adminName: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
   },
   {

@@ -1,9 +1,45 @@
 const { Op } = require('sequelize');
-const { Professional, Review } = require('../models');
+const {
+  Professional,
+  Review,
+  User,
+  Address,
+  ProfessionalDetail,
+  ProfessionalApproval,
+  LawyerDetail,
+  TaxConsultantDetail,
+} = require('../models');
+const reviewStats = require('./reviewStats');
+
+/**
+ * Overwrite `rating` / `reviewsCount` on each item with the exact values
+ * aggregated from the `reviews` table, so listings never show stale counts.
+ */
+const applyReviewStats = async (items) => {
+  if (!Array.isArray(items) || items.length === 0) return items;
+  const stats = await reviewStats.getProfessionalStats(
+    items.map((p) => p.id)
+  );
+  for (const item of items) {
+    const s = stats.get(item.id);
+    item.reviewsCount = s ? s.count : 0;
+    item.rating = s ? s.average : 0;
+  }
+  return items;
+};
+
+/** Apply exact review stats to a single professional detail object. */
+const applyOneReviewStats = async (item) => {
+  if (item && item.id) await applyReviewStats([item]);
+  return item;
+};
 
 // Default pagination settings shared across list endpoints.
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
+
+// Default pagination for the unified listing endpoints (page 1, 12 per page).
+const LISTING_DEFAULT_LIMIT = 12;
 
 /**
  * Normalize page/limit into safe values plus the SQL offset.
@@ -20,96 +56,494 @@ const paginate = (page, limit) => {
   };
 };
 
+// --- Normalization helpers -------------------------------------------------
+
+const toArray = (v) => (Array.isArray(v) ? v : []);
+const toNum = (v) => {
+  const n = Number(v);
+  return Number.isNaN(n) ? 0 : n;
+};
+
+// Pick the live value when it is meaningfully present, else the legacy value.
+const pickLive = (liveVal, legacyVal) =>
+  liveVal !== undefined && liveVal !== null && liveVal !== ''
+    ? liveVal
+    : legacyVal;
+
+// Derive a display name from a live User row.
+const userDisplayName = (user) => {
+  if (!user) return '';
+  return (
+    user.fullName ||
+    [user.firstName, user.lastName].filter(Boolean).join(' ').trim() ||
+    user.name ||
+    ''
+  );
+};
+
 /**
- * List professionals with optional filters, sorting and pagination.
- * Supported filters: name, city, professionType, specialization,
- * minExperience, maxRate, availableNow, minRating, language, status.
- * Supported sort values: rating | experience | price | availability.
- * @returns {Promise<{ items, page, limit, total }>}
+ * Map a legacy `professionals` row into the unified listing shape.
+ * When `overlay` ({ user, detail, address }) is supplied — the live account
+ * linked to this legacy row — its uploaded photo and edited fields take
+ * precedence, so profile changes surface in listings immediately.
  */
-const list = async ({ filters = {}, page, limit } = {}) => {
-  const { page: p, limit: l, offset } = paginate(page, limit);
-  const where = {};
+const normalizeLegacyProfessional = (p, overlay = null) => {
+  const user = overlay && overlay.user;
+  const detail = overlay && overlay.detail;
+  const address = overlay && overlay.address;
+  return {
+    id: p.id,
+    source: 'legacy',
+    name: pickLive(userDisplayName(user), p.name) || '',
+    professionalType:
+      pickLive(detail && detail.professionalType, p.professionType) || '',
+    specialization:
+      pickLive(detail && detail.designation, p.specialization) || '',
+    designation: (detail && detail.designation) || '',
+    organization: (detail && detail.organization) || '',
+    city: pickLive(address && address.city, p.city) || '',
+    profilePhoto: pickLive(user && user.profilePhoto, p.profileImage) || null,
+    yearsOfExperience: toNum(
+      pickLive(detail && detail.yearsOfExperience, p.experience)
+    ),
+    bio: pickLive(detail && detail.bio, p.bio) || '',
+    skills: detail ? toArray(detail.skills) : [],
+    expertise: detail ? toArray(detail.expertise) : [],
+    languages:
+      detail && toArray(detail.languages).length
+        ? toArray(detail.languages)
+        : toArray(p.languages),
+    consultationFee: toNum(
+      pickLive(detail && detail.consultationFee, p.perMinuteRate)
+    ),
+    rating: toNum(p.rating),
+    reviewsCount: toNum(p.reviewsCount),
+    verified: Boolean(p.verified),
+    availableNow: Boolean(p.availableNow),
+  };
+};
 
-  if (filters.name) {
-    where.name = { [Op.like]: `%${String(filters.name)}%` };
-  }
-  if (filters.city) {
-    where.city = String(filters.city);
-  }
-  if (filters.professionType) {
-    where.professionType = String(filters.professionType);
-  }
-  if (filters.specialization) {
-    where.specialization = {
-      [Op.like]: `%${String(filters.specialization)}%`,
-    };
-  }
-  if (filters.minExperience !== undefined) {
-    where.experience = { [Op.gte]: Number(filters.minExperience) || 0 };
-  }
-  if (filters.maxRate !== undefined) {
-    const max = Number(filters.maxRate);
-    if (!Number.isNaN(max)) {
-      where.perMinuteRate = { [Op.lte]: max };
-    }
-  }
-  if (filters.availableNow !== undefined) {
-    where.availableNow =
-      filters.availableNow === true || filters.availableNow === 'true';
-  }
-  if (filters.minRating !== undefined) {
-    where.rating = { [Op.gte]: Number(filters.minRating) || 0 };
-  }
-  if (filters.status) {
-    where.status = String(filters.status);
-  }
+/**
+ * Map a new-model professional (User + Address + ProfessionalDetail) into the
+ * unified listing shape. `id` is the ProfessionalDetail.id.
+ */
+const normalizeProfileProfessional = ({ user, address, detail }) => {
+  const name =
+    (user && user.fullName) ||
+    [user && user.firstName, user && user.lastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    (user && user.name) ||
+    '';
+  return {
+    id: detail.id,
+    source: 'profile',
+    name,
+    professionalType: detail.professionalType || '',
+    specialization: detail.designation || '',
+    designation: detail.designation || '',
+    organization: detail.organization || '',
+    city: (address && address.city) || '',
+    profilePhoto: (user && user.profilePhoto) || null,
+    yearsOfExperience: toNum(detail.yearsOfExperience),
+    bio: detail.bio || '',
+    skills: toArray(detail.skills),
+    expertise: toArray(detail.expertise),
+    languages: toArray(detail.languages),
+    consultationFee: toNum(detail.consultationFee),
+    rating: toNum(detail.rating),
+    reviewsCount: toNum(detail.reviewsCount),
+    verified: true,
+    availableNow: true,
+  };
+};
 
-  let order;
-  switch (filters.sort) {
-    case 'rating':
-      order = [['rating', 'DESC']];
-      break;
-    case 'experience':
-      order = [['experience', 'DESC']];
-      break;
-    case 'price':
-      order = [['perMinuteRate', 'ASC']];
-      break;
-    case 'availability':
-      order = [['availableNow', 'DESC']];
-      break;
-    default:
-      order = undefined;
-      break;
+/**
+ * Load every new-model professional that has an APPROVED ProfessionalApproval
+ * and a ProfessionalDetail, normalized into the unified listing shape.
+ * @returns {Promise<Array>}
+ */
+const loadProfileProfessionals = async (legacyIds = []) => {
+  const approvals = await ProfessionalApproval.findAll({
+    where: { status: 'APPROVED' },
+    raw: true,
+  });
+  if (approvals.length === 0) return [];
+
+  const userIds = [...new Set(approvals.map((a) => a.userId).filter(Boolean))];
+
+  const [details, users, addresses] = await Promise.all([
+    ProfessionalDetail.findAll({
+      where: { userId: { [Op.in]: userIds } },
+      raw: true,
+    }),
+    User.findAll({ where: { id: { [Op.in]: userIds } }, raw: true }),
+    Address.findAll({
+      where: { userId: { [Op.in]: userIds } },
+      raw: true,
+    }),
+  ]);
+
+  const userById = new Map(users.map((u) => [u.id, u]));
+  const addressByUserId = new Map(addresses.map((a) => [a.userId, a]));
+  const legacyIdSet = new Set(legacyIds);
+
+  const items = [];
+  for (const detail of details) {
+    const user = userById.get(detail.userId);
+    if (!user) continue;
+    // Skip accounts linked to a legacy professional row — they already appear
+    // in the listing as that legacy row with their live data overlaid.
+    if (user.linkedId && legacyIdSet.has(user.linkedId)) continue;
+    items.push(
+      normalizeProfileProfessional({
+        user,
+        address: addressByUserId.get(detail.userId) || null,
+        detail,
+      })
+    );
   }
+  return items;
+};
 
-  const queryOpts = { where, limit: l, offset, raw: true };
-  if (order) queryOpts.order = order;
+/**
+ * Load the live account linked to each legacy professional row. A `User`
+ * whose `linkedId` equals a legacy professional id is the same person, so
+ * its uploaded photo and edited details override the static seed row.
+ * @param {string[]} legacyIds
+ * @returns {Promise<Map<string,{user,detail,address}>>}
+ */
+const loadLegacyOverlays = async (legacyIds = []) => {
+  const map = new Map();
+  if (legacyIds.length === 0) return map;
 
-  let { rows, count } = await Professional.findAndCountAll(queryOpts);
+  const users = await User.findAll({
+    where: { linkedId: { [Op.in]: legacyIds } },
+    raw: true,
+  });
+  if (users.length === 0) return map;
 
-  // Case-insensitive city/professionType equality + language filter applied
-  // in-memory (DataTypes.JSON arrays cannot be filtered portably in SQL).
-  if (filters.city) {
-    const q = String(filters.city).toLowerCase();
-    rows = rows.filter((p) => (p.city || '').toLowerCase() === q);
+  const userIds = users.map((u) => u.id);
+  const [details, addresses] = await Promise.all([
+    ProfessionalDetail.findAll({
+      where: { userId: { [Op.in]: userIds } },
+      raw: true,
+    }),
+    Address.findAll({ where: { userId: { [Op.in]: userIds } }, raw: true }),
+  ]);
+  const detailByUserId = new Map(details.map((d) => [d.userId, d]));
+  const addressByUserId = new Map(addresses.map((a) => [a.userId, a]));
+
+  for (const user of users) {
+    map.set(user.linkedId, {
+      user,
+      detail: detailByUserId.get(user.id) || null,
+      address: addressByUserId.get(user.id) || null,
+    });
   }
-  if (filters.language) {
-    const q = String(filters.language).toLowerCase();
+  return map;
+};
+
+// Read a numeric query param, returning undefined when absent/invalid.
+const numParam = (v) => {
+  if (v === undefined || v === null || v === '') return undefined;
+  const n = Number(v);
+  return Number.isNaN(n) ? undefined : n;
+};
+
+/**
+ * Apply the in-memory listing filters to a normalized professional array.
+ */
+const filterProfessionals = (items, filters = {}) => {
+  let rows = items;
+
+  const search = filters.search ? String(filters.search).toLowerCase() : '';
+  if (search) {
     rows = rows.filter((p) =>
-      Array.isArray(p.languages) &&
-      p.languages.some((lang) => String(lang).toLowerCase() === q)
+      [p.name, p.specialization, p.bio]
+        .map((s) => String(s || '').toLowerCase())
+        .some((s) => s.includes(search))
     );
   }
 
-  return { items: rows, page: p, limit: l, total: count };
+  const type = filters.professionalType || filters.category;
+  if (type) {
+    const q = String(type).toLowerCase();
+    rows = rows.filter(
+      (p) => String(p.professionalType || '').toLowerCase() === q
+    );
+  }
+
+  if (filters.specialization) {
+    const q = String(filters.specialization).toLowerCase();
+    rows = rows.filter(
+      (p) => String(p.specialization || '').toLowerCase() === q
+    );
+  }
+
+  if (filters.expertise) {
+    const q = String(filters.expertise).toLowerCase();
+    rows = rows.filter((p) =>
+      toArray(p.expertise).some((e) => String(e).toLowerCase() === q)
+    );
+  }
+
+  if (filters.practiceArea) {
+    const q = String(filters.practiceArea).toLowerCase();
+    rows = rows.filter(
+      (p) =>
+        toArray(p.expertise).some((e) => String(e).toLowerCase() === q) ||
+        toArray(p.skills).some((s) => String(s).toLowerCase() === q)
+    );
+  }
+
+  const city = filters.city || filters.location;
+  if (city) {
+    const q = String(city).toLowerCase();
+    rows = rows.filter((p) => String(p.city || '').toLowerCase() === q);
+  }
+
+  const minExp = numParam(filters.minExperience);
+  if (minExp !== undefined) {
+    rows = rows.filter((p) => p.yearsOfExperience >= minExp);
+  }
+  const maxExp = numParam(filters.maxExperience);
+  if (maxExp !== undefined) {
+    rows = rows.filter((p) => p.yearsOfExperience <= maxExp);
+  }
+  // `experience` as a range "min-max" or single minimum value.
+  if (filters.experience !== undefined && filters.experience !== '') {
+    const parts = String(filters.experience).split('-');
+    const lo = numParam(parts[0]);
+    const hi = numParam(parts[1]);
+    if (lo !== undefined) {
+      rows = rows.filter((p) => p.yearsOfExperience >= lo);
+    }
+    if (hi !== undefined) {
+      rows = rows.filter((p) => p.yearsOfExperience <= hi);
+    }
+  }
+
+  const minFee = numParam(filters.minFee);
+  if (minFee !== undefined) {
+    rows = rows.filter((p) => p.consultationFee >= minFee);
+  }
+  const maxFee = numParam(filters.maxFee);
+  if (maxFee !== undefined) {
+    rows = rows.filter((p) => p.consultationFee <= maxFee);
+  }
+
+  const minRating = numParam(filters.minRating);
+  if (minRating !== undefined) {
+    rows = rows.filter((p) => p.rating >= minRating);
+  }
+
+  if (filters.availableNow !== undefined && filters.availableNow !== '') {
+    const want =
+      filters.availableNow === true || filters.availableNow === 'true';
+    rows = rows.filter((p) => Boolean(p.availableNow) === want);
+  }
+
+  if (filters.language) {
+    const q = String(filters.language).toLowerCase();
+    rows = rows.filter((p) =>
+      toArray(p.languages).some((l) => String(l).toLowerCase() === q)
+    );
+  }
+
+  return rows;
 };
 
-/** Find a professional by id, or null when not found. */
+/**
+ * Sort a normalized professional array in place by the `sort` query value.
+ */
+const sortProfessionals = (rows, sort) => {
+  switch (sort) {
+    case 'rating':
+      return rows.sort((a, b) => b.rating - a.rating);
+    case 'experience':
+      return rows.sort(
+        (a, b) => b.yearsOfExperience - a.yearsOfExperience
+      );
+    case 'fee':
+    case 'price':
+      return rows.sort((a, b) => a.consultationFee - b.consultationFee);
+    default:
+      return rows;
+  }
+};
+
+/**
+ * Unified professional listing. Merges every legacy `professionals` row with
+ * every APPROVED new-model professional, normalizes them to one shape, then
+ * applies filters / sort / pagination in memory.
+ * Supported filters: search, professionalType / category, expertise,
+ * practiceArea, city / location, minExperience / maxExperience / experience,
+ * minFee / maxFee, minRating, availableNow, language; sort: rating |
+ * experience | fee.
+ * @returns {Promise<{ items, page, limit, total }>}
+ */
+const list = async ({ filters = {}, page, limit } = {}) => {
+  const safePage = Math.max(Number(page) || DEFAULT_PAGE, 1);
+  const safeLimit = Math.max(
+    Number(limit) || LISTING_DEFAULT_LIMIT,
+    1
+  );
+
+  const legacyRows = await Professional.findAll({ raw: true });
+  const legacyIds = legacyRows.map((p) => p.id);
+
+  const [overlays, profileRows] = await Promise.all([
+    loadLegacyOverlays(legacyIds),
+    loadProfileProfessionals(legacyIds),
+  ]);
+
+  const merged = [
+    ...legacyRows.map((p) =>
+      normalizeLegacyProfessional(p, overlays.get(p.id) || null)
+    ),
+    ...profileRows,
+  ];
+
+  // Replace seed counters with the exact review stats from the database.
+  await applyReviewStats(merged);
+
+  const filtered = filterProfessionals(merged, filters);
+  sortProfessionals(filtered, filters.sort);
+
+  const total = filtered.length;
+  const offset = (safePage - 1) * safeLimit;
+  const items = filtered.slice(offset, offset + safeLimit);
+
+  return { items, page: safePage, limit: safeLimit, total };
+};
+
+/**
+ * Distinct filter values drawn from the live merged professional list, so the
+ * listing-page filter dropdowns always reflect what is actually in the DB.
+ * @returns {Promise<{professionalTypes,cities,specializations,languages}>}
+ */
+const filterOptions = async () => {
+  const { items } = await list({ filters: {}, page: 1, limit: 100000 });
+  const types = new Set();
+  const cities = new Set();
+  const specializations = new Set();
+  const languages = new Set();
+  for (const p of items) {
+    if (p.professionalType) types.add(p.professionalType);
+    if (p.city) cities.add(p.city);
+    if (p.specialization) specializations.add(p.specialization);
+    for (const l of toArray(p.languages)) {
+      if (l) languages.add(String(l));
+    }
+  }
+  const sortArr = (s) => [...s].sort((a, b) => a.localeCompare(b));
+  return {
+    professionalTypes: sortArr(types),
+    cities: sortArr(cities),
+    specializations: sortArr(specializations),
+    languages: sortArr(languages),
+  };
+};
+
+/**
+ * Resolve a professional by id from either source and return the full
+ * normalized detail object. Tries the new-model ProfessionalDetail first,
+ * then falls back to the legacy `professionals` table. Returns null if not
+ * found in either source.
+ */
 const getById = async (id) => {
-  const professional = await Professional.findByPk(id, { raw: true });
-  return professional || null;
+  // 1. New-model: ProfessionalDetail.id.
+  const detail = await ProfessionalDetail.findByPk(id, { raw: true });
+  if (detail) {
+    const [user, address] = await Promise.all([
+      User.findByPk(detail.userId, { raw: true }),
+      Address.findOne({ where: { userId: detail.userId }, raw: true }),
+    ]);
+    const base = normalizeProfileProfessional({
+      user: user || {},
+      address,
+      detail,
+    });
+    const [lawyer, tax] = await Promise.all([
+      LawyerDetail.findOne({
+        where: { professionalId: detail.id },
+        raw: true,
+      }),
+      TaxConsultantDetail.findOne({
+        where: { professionalId: detail.id },
+        raw: true,
+      }),
+    ]);
+    return applyOneReviewStats({
+      ...base,
+      about: detail.about || '',
+      education: toArray(detail.education),
+      certifications: toArray(detail.certifications),
+      achievements: toArray(detail.achievements),
+      website: detail.website || '',
+      linkedin: detail.linkedin || '',
+      availability: toArray(detail.availability),
+      address: {
+        country: (address && address.country) || '',
+        state: (address && address.state) || '',
+        city: (address && address.city) || '',
+      },
+      lawyer: lawyer || null,
+      tax: tax || null,
+    });
+  }
+
+  // 2. Legacy: professionals table — overlay the linked live account if any.
+  const legacy = await Professional.findByPk(id, { raw: true });
+  if (legacy) {
+    const overlayMap = await loadLegacyOverlays([legacy.id]);
+    const overlay = overlayMap.get(legacy.id) || null;
+    const overlayDetail = overlay && overlay.detail;
+    const overlayAddress = overlay && overlay.address;
+    const base = normalizeLegacyProfessional(legacy, overlay);
+
+    let lawyer = null;
+    let tax = null;
+    if (overlayDetail) {
+      [lawyer, tax] = await Promise.all([
+        LawyerDetail.findOne({
+          where: { professionalId: overlayDetail.id },
+          raw: true,
+        }),
+        TaxConsultantDetail.findOne({
+          where: { professionalId: overlayDetail.id },
+          raw: true,
+        }),
+      ]);
+    }
+
+    return applyOneReviewStats({
+      ...base,
+      about: (overlayDetail && overlayDetail.about) || legacy.bio || '',
+      education: overlayDetail ? toArray(overlayDetail.education) : [],
+      certifications: overlayDetail
+        ? toArray(overlayDetail.certifications)
+        : [],
+      achievements: overlayDetail ? toArray(overlayDetail.achievements) : [],
+      website: (overlayDetail && overlayDetail.website) || '',
+      linkedin: (overlayDetail && overlayDetail.linkedin) || '',
+      availability:
+        overlayDetail && toArray(overlayDetail.availability).length
+          ? toArray(overlayDetail.availability)
+          : toArray(legacy.availabilitySlots),
+      address: {
+        country: (overlayAddress && overlayAddress.country) || '',
+        state: (overlayAddress && overlayAddress.state) || '',
+        city: (overlayAddress && overlayAddress.city) || legacy.city || '',
+      },
+      lawyer: lawyer || null,
+      tax: tax || null,
+    });
+  }
+
+  return null;
 };
 
 /**
@@ -154,12 +588,13 @@ const updateRate = async (id, perMinuteRate) => {
   return professional.get({ plain: true });
 };
 
-/** Get all reviews tied to a professional. Returns null if professional missing. */
-const getReviews = async (id) => {
-  const professional = await Professional.findByPk(id);
-  if (!professional) return null;
-  return Review.findAll({ where: { professionalId: id }, raw: true });
-};
+/** Published reviews tied to a professional, newest first (empty when none). */
+const getReviews = async (id) =>
+  Review.findAll({
+    where: { professionalId: id, status: 'PUBLISHED' },
+    order: [['createdAt', 'DESC']],
+    raw: true,
+  });
 
 /** Get a professional's availability slots. Returns null if not found. */
 const getAvailability = async (id) => {
@@ -175,6 +610,7 @@ const getAvailability = async (id) => {
 module.exports = {
   paginate,
   list,
+  filterOptions,
   getById,
   search,
   updateAvailability,

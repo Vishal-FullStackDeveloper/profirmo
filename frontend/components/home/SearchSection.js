@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Search, Briefcase, MapPin, ChevronDown, Sparkles } from 'lucide-react';
-import { PROFESSION_TYPES, CITIES } from '@/utils/constants';
 import { useLanguage } from '@/components/LanguageProvider';
+import { useFilterOptions } from '@/hooks/useFilterOptions';
 
 const POPULAR = [
   'Divorce Lawyer',
@@ -18,6 +18,7 @@ const POPULAR = [
 export default function SearchSection() {
   const router = useRouter();
   const { t } = useLanguage();
+  const options = useFilterOptions();
   const [keyword, setKeyword] = useState('');
   const [profession, setProfession] = useState('');
   const [city, setCity] = useState('');
@@ -84,7 +85,7 @@ export default function SearchSection() {
                 className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-9 text-sm text-slate-800 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
               >
                 <option value="">{t('search.allProfessions')}</option>
-                {PROFESSION_TYPES.map((p) => (
+                {options.professionalTypes.map((p) => (
                   <option key={p} value={p}>
                     {p}
                   </option>
@@ -103,7 +104,7 @@ export default function SearchSection() {
                 className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-9 text-sm text-slate-800 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
               >
                 <option value="">{t('search.allCities')}</option>
-                {CITIES.map((c) => (
+                {options.cities.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>

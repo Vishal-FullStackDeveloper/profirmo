@@ -7,6 +7,7 @@
 
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
+const jsonField = require('./jsonField');
 
 const genId = () =>
   `prof-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -39,7 +40,7 @@ const Professional = sequelize.define(
       allowNull: false,
       defaultValue: 0,
     },
-    languages: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
+    languages: jsonField('languages', []),
     rating: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
     reviewsCount: {
       type: DataTypes.INTEGER,
@@ -64,16 +65,8 @@ const Professional = sequelize.define(
       defaultValue: '',
     },
     firmId: { type: DataTypes.STRING(64), allowNull: true },
-    servicesOffered: {
-      type: DataTypes.JSON,
-      allowNull: false,
-      defaultValue: [],
-    },
-    availabilitySlots: {
-      type: DataTypes.JSON,
-      allowNull: false,
-      defaultValue: [],
-    },
+    servicesOffered: jsonField('servicesOffered', []),
+    availabilitySlots: jsonField('availabilitySlots', []),
     verified: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

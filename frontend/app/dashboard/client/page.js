@@ -23,7 +23,8 @@ import { useLanguage } from '@/components/LanguageProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboard } from '@/hooks/useDashboard';
 import { ROLES } from '@/utils/constants';
-import { formatCurrency, formatRate, getInitials } from '@/utils/formatters';
+import { formatCurrency, formatRate } from '@/utils/formatters';
+import Avatar from '@/components/common/Avatar';
 import { professionals } from '@/data/mockData';
 
 function SectionTitle({ title, description, action }) {
@@ -141,9 +142,11 @@ export default function ClientDashboardPage() {
               {favorites.map((pro) => (
                 <Card key={pro.id} hover>
                   <div className="flex items-start gap-3">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
-                      {getInitials(pro.name)}
-                    </span>
+                    <Avatar
+                      src={pro.profilePhoto || pro.avatar || pro.photo}
+                      name={pro.name}
+                      size="md"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-slate-800">
                         {pro.name}
@@ -221,9 +224,11 @@ export default function ClientDashboardPage() {
           <Card>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-base font-semibold text-white">
-                  {getInitials(user && user.name ? user.name : 'Guest')}
-                </span>
+                <Avatar
+                  src={user && user.profilePhoto}
+                  name={user && user.name ? user.name : 'Guest'}
+                  size="md"
+                />
                 <div>
                   <p className="font-medium text-slate-800">
                     {user && user.name

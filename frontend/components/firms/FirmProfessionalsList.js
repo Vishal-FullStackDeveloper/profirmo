@@ -2,21 +2,21 @@
 
 import { Users, BadgeCheck } from 'lucide-react';
 import Card from '@/components/common/Card';
-import Button from '@/components/common/Button';
-import RatingStars from '@/components/common/RatingStars';
+import Avatar from '@/components/common/Avatar';
 import EmptyState from '@/components/common/EmptyState';
 import { useLanguage } from '@/components/LanguageProvider';
-import { formatRate, getInitials } from '@/utils/formatters';
-import { getProfessionalsByFirm } from '@/data/mockData';
 
 /**
- * FirmProfessionalsList — grid of professionals belonging to a firm.
+ * FirmProfessionalsList — grid of professionals / members belonging to a firm.
+ * Uses the API firm-detail shape: `members:[{ name, role, professionalType,
+ * id?, profilePhoto?, verified? }]`.
  *
  * Props: { firm }
  */
 export default function FirmProfessionalsList({ firm }) {
   const { t } = useLanguage();
-  const professionals = firm ? getProfessionalsByFirm(firm.id) || [] : [];
+  const members =
+    firm && Array.isArray(firm.members) ? firm.members : [];
 
   return (
     <Card>
@@ -27,7 +27,7 @@ export default function FirmProfessionalsList({ firm }) {
         </h2>
       </div>
 
-      {professionals.length === 0 ? (
+      {members.length === 0 ? (
         <EmptyState
           icon={<Users size={24} />}
           title={t('firmCmp.noProfessionalsTitle')}
@@ -35,21 +35,23 @@ export default function FirmProfessionalsList({ firm }) {
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {professionals.map((pro) => (
+          {members.map((member, index) => (
             <div
-              key={pro.id}
+              key={member.id || `${member.name}-${index}`}
               className="flex flex-col rounded-xl border border-slate-200 p-4"
             >
               <div className="flex items-start gap-3">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
-                  {getInitials(pro.name)}
-                </span>
+                <Avatar
+                  src={member.profilePhoto}
+                  name={member.name}
+                  size="md"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <h3 className="truncate text-sm font-semibold text-slate-900">
-                      {pro.name}
+                      {member.name}
                     </h3>
-                    {pro.verified && (
+                    {member.verified && (
                       <BadgeCheck
                         size={14}
                         className="shrink-0 text-blue-600"
@@ -57,40 +59,17 @@ export default function FirmProfessionalsList({ firm }) {
                       />
                     )}
                   </div>
-                  <p className="truncate text-xs font-medium text-blue-700">
-                    {pro.professionType}
-                  </p>
-                  <div className="mt-1">
-                    <RatingStars
-                      rating={pro.rating}
-                      count={pro.reviewsCount}
-                      size="sm"
-                    />
-                  </div>
+                  {member.professionalType && (
+                    <p className="truncate text-xs font-medium text-blue-700">
+                      {member.professionalType}
+                    </p>
+                  )}
+                  {member.role && (
+                    <p className="truncate text-xs capitalize text-slate-500">
+                      {String(member.role).replace(/_/g, ' ')}
+                    </p>
+                  )}
                 </div>
-              </div>
-
-              <p className="mt-3 text-sm font-semibold text-slate-900">
-                {formatRate(pro.perMinuteRate)}
-              </p>
-
-              <div className="mt-3 flex gap-2">
-                <Button
-                  href={`/professionals/${pro.id}`}
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                >
-                  {t('firmCmp.view')}
-                </Button>
-                <Button
-                  href={`/booking/${pro.id}`}
-                  variant="primary"
-                  size="sm"
-                  className="flex-1"
-                >
-                  {t('firmCmp.book')}
-                </Button>
               </div>
             </div>
           ))}

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { Search, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 import Card from '@/components/common/Card';
@@ -16,17 +16,16 @@ import { useLanguage } from '@/components/LanguageProvider';
 function ProfessionalsContent() {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
-  const { professionals, loading, params, setParams } = useProfessionals();
+  const { items, meta, loading, error, params, setParams } = useProfessionals();
   const seeded = useRef(false);
 
   const sortOptions = [
     { value: 'rating', label: t('profList.sortRating') },
     { value: 'experience', label: t('profList.sortExperience') },
-    { value: 'price_low', label: t('profList.sortPriceLow') },
-    { value: 'price_high', label: t('profList.sortPriceHigh') },
-    { value: 'availability', label: t('profList.sortAvailability') },
+    { value: 'fee', label: t('profList.sortPriceLow') },
   ];
 
+  // Seed filters from the URL query (?search=&city=&category=) once on mount.
   useEffect(() => {
     if (seeded.current) return;
     seeded.current = true;
@@ -42,6 +41,17 @@ function ProfessionalsContent() {
     }
   }, [searchParams, setParams]);
 
+  const totalCount = meta && Number.isFinite(meta.total) ? meta.total : items.length;
+  const currentPage = meta && meta.page ? meta.page : 1;
+  const totalPages = meta && meta.totalPages ? meta.totalPages : 1;
+
+  const goToPage = (page) => {
+    setParams((prev) => ({ ...prev, page }));
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
@@ -50,16 +60,19 @@ function ProfessionalsContent() {
         </aside>
 
         <section>
-          <Card padding={false} className="mb-6 flex flex-wrap items-center justify-between gap-3 p-4">
+          <Card
+            padding={false}
+            className="mb-6 flex flex-wrap items-center justify-between gap-3 p-4"
+          >
             <p className="text-sm text-slate-600">
               {loading ? (
                 t('profList.loading')
               ) : (
                 <>
                   <span className="font-semibold text-slate-900">
-                    {professionals.length}
+                    {totalCount}
                   </span>{' '}
-                  {professionals.length === 1
+                  {totalCount === 1
                     ? t('profList.countOne')
                     : t('profList.countOther')}
                 </>
@@ -70,12 +83,23 @@ function ProfessionalsContent() {
                 name="sort"
                 value={params.sort || 'rating'}
                 onChange={(e) =>
-                  setParams((prev) => ({ ...prev, sort: e.target.value }))
+                  setParams((prev) => ({
+                    ...prev,
+                    sort: e.target.value,
+                    page: 1,
+                  }))
                 }
                 options={sortOptions}
               />
             </div>
           </Card>
+
+          {error && !loading && (
+            <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <AlertCircle size={18} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
           {loading ? (
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -86,18 +110,50 @@ function ProfessionalsContent() {
                 />
               ))}
             </div>
-          ) : professionals.length === 0 ? (
+          ) : items.length === 0 ? (
             <EmptyState
               icon={<Search size={24} />}
               title={t('profList.emptyTitle')}
               description={t('profList.emptyDesc')}
             />
           ) : (
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-              {professionals.map((pro) => (
-                <ProfessionalCard key={pro.id} professional={pro} />
-              ))}
-            </div>
+            <>
+              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {items.map((pro) => (
+                  <ProfessionalCard key={pro.id} professional={pro} />
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-teal-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronLeft size={16} />
+                    Prev
+                  </button>
+                  <span className="px-3 text-sm text-slate-600">
+                    Page{' '}
+                    <span className="font-semibold text-slate-900">
+                      {currentPage}
+                    </span>{' '}
+                    of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-teal-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </section>
       </div>

@@ -1,153 +1,120 @@
 'use client';
 
-// Professionals listing hook with offline mock fallback and client-side
-// filtering/sorting so filter UIs work even without a backend.
+// Professionals listing hook — fetches ONLY from the backend API.
+// Filtering/sorting/pagination is done server-side; this hook simply forwards
+// the current filter params as query string params and exposes the result.
+// There is no mock-data fallback: on an API error the list is empty and the
+// error message is surfaced.
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import professionalService from '@/services/professionalService';
-import { professionals as mockProfessionals } from '@/data/mockData';
 
 /**
- * Apply filtering + sorting to a list of professionals.
- * Recognised params: search, category, professionType, specialization,
- * city, language, availableNow, minExperience, maxExperience, minRate,
- * maxRate, minRating, sort.
+ * Map the UI filter params to the backend query params.
+ * Unknown / empty values are dropped by api.js when the query string is built.
  */
-function applyFilters(list, params = {}) {
-  let result = Array.isArray(list) ? [...list] : [];
-
+function toQuery(params = {}) {
   const {
     search,
     category,
-    professionType,
+    professionalType,
+    professionType, // legacy alias from older callers
     specialization,
+    expertise,
+    practiceArea,
     city,
+    location,
     language,
     availableNow,
+    experience,
     minExperience,
     maxExperience,
-    minRate,
-    maxRate,
+    minFee,
+    maxFee,
+    minRate, // legacy alias
+    maxRate, // legacy alias
     minRating,
     sort,
+    page,
+    limit,
   } = params;
 
-  if (search) {
-    const q = String(search).toLowerCase();
-    result = result.filter((p) =>
-      [p.name, p.professionType, p.specialization, p.city, p.bio]
-        .filter(Boolean)
-        .some((field) => String(field).toLowerCase().includes(q))
-    );
-  }
+  // Normalise the legacy `price_low` / `price_high` sort values the old UI used
+  // into the values the API understands.
+  let apiSort = sort;
+  if (sort === 'price_low' || sort === 'price_high') apiSort = 'fee';
+  if (sort === 'availability') apiSort = undefined;
 
-  const typeFilter = category || professionType;
-  if (typeFilter) {
-    result = result.filter((p) => p.professionType === typeFilter);
-  }
-
-  if (specialization) {
-    result = result.filter((p) => p.specialization === specialization);
-  }
-
-  if (city) {
-    result = result.filter((p) => p.city === city);
-  }
-
-  if (language) {
-    result = result.filter(
-      (p) => Array.isArray(p.languages) && p.languages.includes(language)
-    );
-  }
-
-  if (availableNow === true || availableNow === 'true') {
-    result = result.filter((p) => p.availableNow === true);
-  }
-
-  if (minExperience !== undefined && minExperience !== null) {
-    result = result.filter((p) => p.experience >= Number(minExperience));
-  }
-  if (
-    maxExperience !== undefined &&
-    maxExperience !== null &&
-    Number.isFinite(Number(maxExperience))
-  ) {
-    result = result.filter((p) => p.experience <= Number(maxExperience));
-  }
-
-  if (minRate !== undefined && minRate !== null) {
-    result = result.filter((p) => p.perMinuteRate >= Number(minRate));
-  }
-  if (
-    maxRate !== undefined &&
-    maxRate !== null &&
-    Number.isFinite(Number(maxRate))
-  ) {
-    result = result.filter((p) => p.perMinuteRate <= Number(maxRate));
-  }
-
-  if (minRating !== undefined && minRating !== null) {
-    result = result.filter((p) => p.rating >= Number(minRating));
-  }
-
-  switch (sort) {
-    case 'rating':
-      result.sort((a, b) => b.rating - a.rating);
-      break;
-    case 'experience':
-      result.sort((a, b) => b.experience - a.experience);
-      break;
-    case 'price_low':
-      result.sort((a, b) => a.perMinuteRate - b.perMinuteRate);
-      break;
-    case 'price_high':
-      result.sort((a, b) => b.perMinuteRate - a.perMinuteRate);
-      break;
-    case 'availability':
-      result.sort(
-        (a, b) => Number(b.availableNow) - Number(a.availableNow)
-      );
-      break;
-    default:
-      break;
-  }
-
-  return result;
+  return {
+    search: search || undefined,
+    professionalType: professionalType || professionType || category || undefined,
+    specialization: specialization || undefined,
+    expertise: expertise || undefined,
+    practiceArea: practiceArea || undefined,
+    city: city || location || undefined,
+    language: language || undefined,
+    availableNow: availableNow === true || availableNow === 'true' ? 'true' : undefined,
+    experience: experience && experience !== 'any' ? experience : undefined,
+    minExperience: minExperience ?? undefined,
+    maxExperience:
+      maxExperience !== undefined && Number.isFinite(Number(maxExperience))
+        ? maxExperience
+        : undefined,
+    minFee: minFee ?? minRate ?? undefined,
+    maxFee:
+      (maxFee ?? maxRate) !== undefined &&
+      Number.isFinite(Number(maxFee ?? maxRate))
+        ? maxFee ?? maxRate
+        : undefined,
+    minRating: minRating || undefined,
+    sort: apiSort || undefined,
+    page: page || undefined,
+    limit: limit || undefined,
+  };
 }
 
 export function useProfessionals(initialParams = {}) {
-  const [rawData, setRawData] = useState([]);
+  const [items, setItems] = useState([]);
+  const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [params, setParams] = useState(initialParams);
 
+  // Serialise the params so the fetch effect only re-runs on a real change.
+  const query = toQuery(params);
+  const queryKey = JSON.stringify(query);
+  const requestId = useRef(0);
+
   const fetchData = useCallback(async () => {
+    const myRequest = ++requestId.current;
     setLoading(true);
     setError(null);
     try {
-      const res = await professionalService.getAll();
-      const data = (res && res.data) || [];
-      setRawData(Array.isArray(data) && data.length ? data : mockProfessionals);
+      const res = await professionalService.getAll(query);
+      // Ignore stale responses if params changed while this was in flight.
+      if (myRequest !== requestId.current) return;
+      setItems(Array.isArray(res && res.data) ? res.data : []);
+      setMeta((res && res.meta) || null);
     } catch (err) {
-      // Backend offline — fall back to mock data.
+      if (myRequest !== requestId.current) return;
       setError(err.message || 'Failed to load professionals.');
-      setRawData(mockProfessionals);
+      setItems([]);
+      setMeta(null);
     } finally {
-      setLoading(false);
+      if (myRequest === requestId.current) setLoading(false);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryKey]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const professionals = useMemo(
-    () => applyFilters(rawData, params),
-    [rawData, params]
-  );
-
   return {
-    professionals,
+    items,
+    // Backward-compatible alias for pages that still read `professionals`.
+    professionals: items,
+    meta,
     loading,
     error,
     params,
