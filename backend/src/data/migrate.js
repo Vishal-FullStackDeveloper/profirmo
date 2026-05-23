@@ -7,6 +7,7 @@
 
 const crypto = require('crypto');
 const sequelize = require('../config/database');
+const { hashPassword } = require('../utils/password');
 
 // New columns to add to the `users` table: [name, SQL type].
 const USER_COLUMNS = [
@@ -266,6 +267,204 @@ async function runMigrations() {
   console.log(
     `[Migrate] Review column check complete (${reviewAdded} processed).`
   );
+
+  // 7b. Allow ownerless firms — admin can create a law firm before assigning
+  //     an owner. Earlier the column was NOT NULL.
+  try {
+    await sequelize.query(
+      'ALTER TABLE law_firms MODIFY COLUMN ownerUserId VARCHAR(64) NULL'
+    );
+  } catch (err) {
+    console.warn(
+      `[Migrate] Could not relax law_firms.ownerUserId NOT NULL: ${err.message}`
+    );
+  }
+
+  // 8. Role consolidation: the system now has only `client`, `professional`,
+  //    `firm`, `platform_admin`. Collapse legacy values:
+  //      firm_admin        -> firm
+  //      firm_professional -> professional   (firm membership is tracked
+  //                                            via firm_members instead)
+  try {
+    const [r1] = await sequelize.query(
+      "UPDATE users SET role = 'firm' WHERE role = 'firm_admin'"
+    );
+    const [r2] = await sequelize.query(
+      "UPDATE users SET role = 'professional' WHERE role = 'firm_professional'"
+    );
+    // Firms cannot sign up or log in: every existing firm-role user becomes a
+    // professional (firm ownership is tracked via LawFirm.ownerUserId, not
+    // via User.role).
+    await sequelize.query(
+      "UPDATE users SET role = 'professional' WHERE role = 'firm'"
+    );
+    console.log(
+      `[Migrate] Role consolidation complete (firm_admin -> firm: ${
+        (r1 && r1.affectedRows) || 0
+      }, firm_professional -> professional: ${(r2 && r2.affectedRows) || 0}).`
+    );
+  } catch (err) {
+    console.warn(`[Migrate] Role consolidation failed: ${err.message}`);
+  }
+
+  // 9. Unify the data source: every legacy professional gets a real user
+  //    record (so /api/admin/users and /api/professionals draw from the
+  //    same table), and every legacy firm gets a law_firms row. Idempotent.
+  try {
+    await sequelize.query(
+      'ALTER TABLE law_firms ADD COLUMN IF NOT EXISTS legacyFirmId VARCHAR(64)'
+    );
+  } catch (err) {
+    console.warn(
+      `[Migrate] Could not add law_firms.legacyFirmId: ${err.message}`
+    );
+  }
+
+  try {
+    const {
+      User,
+      Professional,
+      ProfessionalDetail,
+      ProfessionalApproval,
+      Firm,
+      LawFirm,
+    } = require('../models');
+
+    // --- Professionals backfill --------------------------------------------
+    const legacyPros = await Professional.findAll({ raw: true });
+    let proCreated = 0;
+    let detailCreated = 0;
+    let approvalCreated = 0;
+    const sharedHash = await hashPassword('password123');
+    for (const lp of legacyPros) {
+      let linkedUser = await User.findOne({ where: { linkedId: lp.id } });
+      if (!linkedUser) {
+        const email = `pf-${lp.id}@profirmo.local`;
+        const dup = await User.findOne({ where: { email } });
+        if (dup) {
+          linkedUser = dup;
+        } else {
+          linkedUser = await User.create({
+            email,
+            password: sharedHash,
+            role: 'professional',
+            name: lp.name || '',
+            fullName: lp.name || '',
+            linkedId: lp.id,
+            status: 'active',
+            accountVerified: true,
+            emailVerified: true,
+            memberSince: lp.createdAt || new Date(),
+          });
+          proCreated += 1;
+        }
+      }
+      let detail = await ProfessionalDetail.findOne({
+        where: { userId: linkedUser.id },
+      });
+      if (!detail) {
+        const languages = Array.isArray(lp.languages)
+          ? lp.languages
+          : (() => {
+              try {
+                return JSON.parse(lp.languages || '[]');
+              } catch {
+                return [];
+              }
+            })();
+        await ProfessionalDetail.create({
+          userId: linkedUser.id,
+          professionalType: lp.professionType || '',
+          designation: lp.specialization || '',
+          bio: lp.bio || '',
+          yearsOfExperience: Number(lp.experience) || 0,
+          consultationFee: Number(lp.perMinuteRate) || 0,
+          languages,
+        });
+        detailCreated += 1;
+      }
+      const approval = await ProfessionalApproval.findOne({
+        where: { userId: linkedUser.id },
+      });
+      if (!approval) {
+        await ProfessionalApproval.create({
+          userId: linkedUser.id,
+          status: 'APPROVED',
+        });
+        approvalCreated += 1;
+      } else if (approval.status !== 'APPROVED') {
+        await approval.update({ status: 'APPROVED' });
+      }
+    }
+    console.log(
+      `[Migrate] Professional backfill: users +${proCreated}, details +${detailCreated}, approvals +${approvalCreated}.`
+    );
+
+    // --- Firms backfill (dedup-aware) -------------------------------------
+    // A user with linkedId='firm-N' who already owns a LawFirm IS the
+    // representative for that legacy firm — attach legacyFirmId to it
+    // (and drop any earlier backfill duplicate). Otherwise create a row.
+    const { Op } = require('sequelize');
+    const legacyFirms = await Firm.findAll({ raw: true });
+    let firmCreated = 0;
+    let firmRelinked = 0;
+    let firmDuplicatesRemoved = 0;
+    for (const lf of legacyFirms) {
+      // Is there a user owning a LawFirm whose linkedId matches this legacy firm?
+      const ownerUser = await User.findOne({ where: { linkedId: lf.id } });
+      if (ownerUser) {
+        const ownedFirm = await LawFirm.findOne({
+          where: { ownerUserId: ownerUser.id },
+        });
+        if (ownedFirm) {
+          if (ownedFirm.legacyFirmId !== lf.id) {
+            await ownedFirm.update({ legacyFirmId: lf.id });
+            firmRelinked += 1;
+          }
+          // Remove duplicate backfill rows.
+          const removed = await LawFirm.destroy({
+            where: {
+              legacyFirmId: lf.id,
+              id: { [Op.ne]: ownedFirm.id },
+            },
+          });
+          firmDuplicatesRemoved += removed;
+          continue;
+        }
+      }
+
+      // Otherwise create or skip.
+      const existing = await LawFirm.findOne({
+        where: { legacyFirmId: lf.id },
+      });
+      if (existing) continue;
+      const practiceAreas = Array.isArray(lf.services)
+        ? lf.services
+        : (() => {
+            try {
+              return JSON.parse(lf.services || '[]');
+            } catch {
+              return [];
+            }
+          })();
+      await LawFirm.create({
+        legacyFirmId: lf.id,
+        firmName: lf.name || '',
+        headquarters: lf.city || '',
+        contactEmail: lf.email || null,
+        contactNumber: lf.phone || null,
+        about: lf.description || '',
+        practiceAreas,
+        status: 'ACTIVE',
+      });
+      firmCreated += 1;
+    }
+    console.log(
+      `[Migrate] Firm backfill: law_firms +${firmCreated}, relinked ${firmRelinked}, duplicates removed ${firmDuplicatesRemoved}.`
+    );
+  } catch (err) {
+    console.warn(`[Migrate] Backfill failed: ${err.message}`);
+  }
 
   console.log('[Migrate] Migrations finished successfully.');
 }

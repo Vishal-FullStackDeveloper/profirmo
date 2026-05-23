@@ -212,6 +212,73 @@ export async function updateUserStatus(userId, status) {
   return unwrap(res);
 }
 
+/** Fetch one user by id (sanitized — no password). */
+export async function getUser(id) {
+  const res = await get(`/api/admin/users/${id}`);
+  return unwrap(res);
+}
+
+/** Create a user. Body: { email, password, role, firstName, lastName, mobileNumber? }. */
+export async function createUser(data) {
+  const res = await post('/api/admin/users', data);
+  return unwrap(res);
+}
+
+/** Edit a user. Body may include name fields, email, role, mobileNumber, password. */
+export async function updateUser(id, changes) {
+  const res = await patch(`/api/admin/users/${id}`, changes);
+  return unwrap(res);
+}
+
+/** Delete a user. */
+export async function deleteUser(id) {
+  const res = await del(`/api/admin/users/${id}`);
+  return unwrap(res);
+}
+
+// ---------------------------------------------------------------------------
+// Admin firms (law_firms) — full CRUD, separate from the approval workflow.
+// ---------------------------------------------------------------------------
+
+/**
+ * List every firm with optional filters and pagination.
+ * @param {{ page?, limit?, search?, status? }} [params]
+ * @returns {Promise<{ data: Array, meta: Object }>}
+ */
+export async function listLawFirms({ page, limit, search, status } = {}) {
+  const res = await get('/api/admin/law-firms', {
+    params: { page, limit, search, status },
+  });
+  return {
+    data: (res && res.data) || [],
+    meta: (res && res.meta) || null,
+  };
+}
+
+/** Fetch one firm by id (with owner + member list). */
+export async function getLawFirm(id) {
+  const res = await get(`/api/admin/law-firms/${id}`);
+  return unwrap(res);
+}
+
+/** Create a firm. `ownerUserId` is optional. */
+export async function createLawFirm(data) {
+  const res = await post('/api/admin/law-firms', data);
+  return unwrap(res);
+}
+
+/** Edit a firm. */
+export async function updateLawFirm(id, changes) {
+  const res = await patch(`/api/admin/law-firms/${id}`, changes);
+  return unwrap(res);
+}
+
+/** Delete a firm (cascades members / invitations / join requests). */
+export async function deleteLawFirm(id) {
+  const res = await del(`/api/admin/law-firms/${id}`);
+  return unwrap(res);
+}
+
 // ---------------------------------------------------------------------------
 // Reviews & review appeals (admin-only)
 // ---------------------------------------------------------------------------
@@ -290,9 +357,18 @@ export default {
   listUsers,
   getAuditLogs,
   updateUserStatus,
+  getUser,
+  createUser,
+  updateUser,
+  deleteUser,
   listReviews,
   updateReview,
   deleteReview,
   listReviewAppeals,
   resolveReviewAppeal,
+  listLawFirms,
+  getLawFirm,
+  createLawFirm,
+  updateLawFirm,
+  deleteLawFirm,
 };

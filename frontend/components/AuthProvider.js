@@ -193,10 +193,14 @@ export function AuthProvider({ children }) {
     []
   );
 
-  const registerFirm = useCallback(
-    (data) => signup({ ...data, role: 'law_firm' }),
-    [signup]
-  );
+  // Firms can no longer sign up directly — a professional registers, then
+  // creates the firm from their dashboard. We expose this helper only so
+  // existing imports do not crash; calling it throws a clear error.
+  const registerFirm = useCallback(async () => {
+    throw new Error(
+      'Firms cannot sign up directly. Register as a professional and create your firm from the dashboard.'
+    );
+  }, []);
 
   const value = {
     user,

@@ -25,8 +25,7 @@ import Avatar from '@/components/common/Avatar';
 const ROLE_LABELS = {
   client: 'Client',
   professional: 'Professional',
-  firm_admin: 'Law Firm',
-  firm_professional: 'Firm Professional',
+  firm: 'Law Firm',
   platform_admin: 'Admin',
 };
 
@@ -60,7 +59,7 @@ const FIRM_ACTIONS = [
 ];
 
 // Roles that can own, join or be invited to a firm.
-const FIRM_ROLES = ['professional', 'firm_professional', 'firm_admin'];
+const FIRM_ROLES = ['professional', 'firm'];
 
 export default function ProfileDropdown({ className = '' }) {
   const { user, logout } = useAuth();

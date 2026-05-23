@@ -34,7 +34,6 @@ const COLUMNS = [
     headingKey: 'footer.colProfessionals',
     links: [
       { key: 'footer.linkJoinPro', href: '/auth/register-professional' },
-      { key: 'footer.linkRegisterFirm', href: '/auth/register-firm' },
       { key: 'footer.linkLogin', href: '/auth/login' },
     ],
   },

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -15,6 +16,7 @@ import {
   FolderKanban,
   UserPlus,
   ArrowLeft,
+  ChevronRight,
 } from 'lucide-react';
 import BrandLogo from '@/components/common/BrandLogo';
 import { useLanguage } from '@/components/LanguageProvider';
@@ -118,10 +120,23 @@ const NAV_BY_ROLE = {
       href: '/admin/professionals',
       icon: ShieldCheck,
     },
+    // Firms is a collapsible group — both the CRUD list and the approval
+    // workflow live under it.
     {
-      labelKey: 'dash.nav.firmApprovals',
-      href: '/admin/firms',
+      labelKey: 'dash.nav.firms',
       icon: Building2,
+      children: [
+        {
+          labelKey: 'dash.nav.firms',
+          href: '/admin/law-firms',
+          icon: Building2,
+        },
+        {
+          labelKey: 'dash.nav.firmApprovals',
+          href: '/admin/firms',
+          icon: ShieldCheck,
+        },
+      ],
     },
     { labelKey: 'dash.nav.users', href: '/admin/users', icon: Users },
     {
@@ -143,7 +158,81 @@ const NAV_BY_ROLE = {
 };
 
 /**
- * Sidebar — Pro Firmo logo + role-specific navigation.
+ * SidebarLink — leaf navigation item.
+ */
+function SidebarLink({ item, active }) {
+  const { t } = useLanguage();
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+        active
+          ? 'bg-blue-50 text-blue-700'
+          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+      }`}
+    >
+      {Icon ? <Icon size={18} /> : null}
+      {t(item.labelKey)}
+    </Link>
+  );
+}
+
+/**
+ * SidebarGroup — collapsible nav item with nested children. Auto-opens when
+ * any of its children matches the current pathname.
+ */
+function SidebarGroup({ item, isActive }) {
+  const { t } = useLanguage();
+  const childHrefs = (item.children || []).map((c) => c.href);
+  const containsActive = childHrefs.some((href) => isActive(href));
+  const [open, setOpen] = useState(containsActive);
+
+  // Re-sync expanded state when navigating into a child route.
+  useEffect(() => {
+    if (containsActive) setOpen(true);
+  }, [containsActive]);
+
+  const Icon = item.icon;
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+          containsActive
+            ? 'text-blue-700'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+        }`}
+      >
+        {Icon ? <Icon size={18} /> : null}
+        <span className="flex-1 text-left">{t(item.labelKey)}</span>
+        <ChevronRight
+          size={16}
+          className={`text-slate-400 transition-transform ${
+            open ? 'rotate-90' : ''
+          }`}
+        />
+      </button>
+      {open && (
+        <div className="ml-3 mt-1 space-y-1 border-l border-slate-200 pl-3">
+          {item.children.map((child) => (
+            <SidebarLink
+              key={child.href}
+              item={child}
+              active={isActive(child.href)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Sidebar — Pro Firmo logo + role-specific navigation. Items with a
+ * `children` array render as collapsible groups.
  * Props: { role }
  */
 export default function Sidebar({ role }) {
@@ -166,21 +255,21 @@ export default function Sidebar({ role }) {
           {t('dash.nav.menu')}
         </p>
         {items.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
+          if (Array.isArray(item.children) && item.children.length > 0) {
+            return (
+              <SidebarGroup
+                key={item.labelKey}
+                item={item}
+                isActive={isActive}
+              />
+            );
+          }
           return (
-            <Link
+            <SidebarLink
               key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-            >
-              <Icon size={18} />
-              {t(item.labelKey)}
-            </Link>
+              item={item}
+              active={isActive(item.href)}
+            />
           );
         })}
       </nav>

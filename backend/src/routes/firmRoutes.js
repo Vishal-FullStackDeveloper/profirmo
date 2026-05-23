@@ -14,7 +14,7 @@ router.get('/:id/professionals', firmController.getFirmProfessionals);
 router.post(
   '/:id/professionals',
   authenticate,
-  authorize('firm_admin'),
+  authorize('firm'),
   validateBody({
     name: 'required',
     email: 'required|email',

@@ -1,6 +1,26 @@
 require('dotenv').config();
 const path = require('path');
 
+// --- Frontend origin allow-list --------------------------------------------
+// `FRONTEND_URL` may be a single URL or a comma-separated list. The known
+// production hosts are always included so the backend hosted at
+// profirmo.onrender.com accepts requests from profirmo.com even when the
+// env var is missing on the deployment.
+const PRODUCTION_FRONTEND_ORIGINS = [
+  'https://profirmo.com',
+  'https://www.profirmo.com',
+];
+function parseFrontendUrls(value) {
+  const fromEnv = String(value || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const set = new Set([...fromEnv, ...PRODUCTION_FRONTEND_ORIGINS]);
+  if (set.size === 0) set.add('http://localhost:3000');
+  return [...set];
+}
+const FRONTEND_URLS = parseFrontendUrls(process.env.FRONTEND_URL);
+
 // Centralized environment configuration for the Profirmo backend.
 // All other modules should import config values from here rather than
 // reading process.env directly.
@@ -12,7 +32,13 @@ module.exports = {
   maxUploadBytes:
     Number(process.env.MAX_UPLOAD_BYTES) || 10 * 1024 * 1024,
   nodeEnv: process.env.NODE_ENV || 'development',
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+  // Primary frontend URL (for building email links etc.). First entry in the
+  // allow-list — env-provided value wins, otherwise localhost dev.
+  frontendUrl:
+    String(process.env.FRONTEND_URL || '').split(',')[0].trim() ||
+    'http://localhost:3000',
+  // Full allow-list used by CORS + csrfGuard.
+  frontendUrls: FRONTEND_URLS,
   jwtSecret: process.env.JWT_SECRET || 'dev_insecure_secret',
   jwtExpiresIn: '7d',
   // Short-lived JWT access token lifetime.

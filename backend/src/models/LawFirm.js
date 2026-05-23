@@ -21,7 +21,12 @@ const LawFirm = sequelize.define(
       allowNull: false,
       defaultValue: genId,
     },
-    ownerUserId: { type: DataTypes.STRING(64), allowNull: false },
+    // Admin-created firms may be ownerless until an owner is assigned;
+    // user-initiated `POST /api/law-firm` always supplies an owner.
+    ownerUserId: { type: DataTypes.STRING(64), allowNull: true },
+    // When a row originated from the legacy `firms` table during backfill we
+    // record the original id here so old `/firms/firm-N` URLs keep resolving.
+    legacyFirmId: { type: DataTypes.STRING(64), allowNull: true },
     firmName: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
     registrationNumber: { type: DataTypes.STRING, allowNull: true },
     logo: { type: DataTypes.STRING, allowNull: true },

@@ -36,7 +36,7 @@ router.get(
 router.patch(
   '/:id/availability',
   authenticate,
-  authorize('professional', 'firm_admin', 'firm_professional'),
+  authorize('professional', 'firm'),
   validateBody({ availableNow: 'required' }),
   professionalController.updateAvailability
 );
@@ -44,7 +44,7 @@ router.patch(
 router.patch(
   '/:id/rate',
   authenticate,
-  authorize('professional', 'firm_admin', 'firm_professional'),
+  authorize('professional', 'firm'),
   validateBody({ perMinuteRate: 'required|number' }),
   professionalController.updateRate
 );

@@ -139,10 +139,11 @@ const buildAuthResult = async (user, meta = {}) => {
 };
 
 // Map a public signup role to the internal role stored on the user record.
+// `law_firm` is intentionally absent — firms cannot sign up directly. A
+// professional creates a firm after registering.
 const PUBLIC_ROLE_MAP = {
   client: 'client',
   professional: 'professional',
-  law_firm: 'firm_admin',
 };
 
 // --- Email verification ----------------------------------------------------
@@ -254,7 +255,7 @@ const createUserWithRole = async ({ role, data = {} }) => {
       status: 'pending',
     });
     linkedId = professional.id;
-  } else if (role === 'firm_admin') {
+  } else if (role === 'firm') {
     const firm = await Firm.create({
       name: data.firmName || data.name || derivedName,
       firmType: data.firmType || 'Legal Firm',
@@ -362,10 +363,16 @@ const registerProfessional = async (data = {}) => {
 };
 
 /**
- * Register a firm + firm_admin user (legacy endpoint).
+ * Firms can no longer sign up directly — a professional registers, then
+ * creates a firm from their dashboard. This endpoint is kept for routing
+ * compatibility but always responds with 410 Gone.
  */
-const registerFirm = async (data = {}) => {
-  return finishSignup(await createUserWithRole({ role: 'firm_admin', data }));
+const registerFirm = async () => {
+  throw {
+    statusCode: 410,
+    message:
+      'Firms can no longer sign up directly. Register as a professional, then create your firm from the dashboard.',
+  };
 };
 
 /**

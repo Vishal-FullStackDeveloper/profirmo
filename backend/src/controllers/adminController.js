@@ -288,6 +288,139 @@ const requestFirmModifications = asyncHandler(async (req, res) => {
   });
 });
 
+// --- Admin user CRUD ------------------------------------------------------
+
+// GET /api/admin/users/:id
+const getUser = asyncHandler(async (req, res) => {
+  const user = await adminService.getUserById(req.params.id);
+  return successResponse(res, 200, 'User fetched', user);
+});
+
+// POST /api/admin/users
+const createUser = asyncHandler(async (req, res) => {
+  const adminId = req.user.id || req.user.sub;
+  const result = await adminService.createUser({
+    data: req.body,
+    actingUserId: adminId,
+  });
+  await logAudit({
+    req,
+    userId: adminId,
+    action: 'admin.user_created',
+    entity: 'user',
+    entityId: result.user.id,
+    status: 'success',
+    metadata: { role: result.user.role, email: result.user.email },
+  });
+  return successResponse(res, 201, 'User created', result.user);
+});
+
+// PATCH /api/admin/users/:id
+const updateUser = asyncHandler(async (req, res) => {
+  const adminId = req.user.id || req.user.sub;
+  const result = await adminService.updateUser({
+    targetUserId: req.params.id,
+    changes: req.body,
+    actingUserId: adminId,
+  });
+  await logAudit({
+    req,
+    userId: adminId,
+    action: 'admin.user_updated',
+    entity: 'user',
+    entityId: req.params.id,
+    status: 'success',
+    metadata: { fields: Object.keys(req.body || {}) },
+  });
+  return successResponse(res, 200, 'User updated', result.user);
+});
+
+// DELETE /api/admin/users/:id
+const deleteUser = asyncHandler(async (req, res) => {
+  const adminId = req.user.id || req.user.sub;
+  const result = await adminService.deleteUser({
+    targetUserId: req.params.id,
+    actingUserId: adminId,
+  });
+  await logAudit({
+    req,
+    userId: adminId,
+    action: 'admin.user_deleted',
+    entity: 'user',
+    entityId: req.params.id,
+    status: 'success',
+    metadata: {},
+  });
+  return successResponse(res, 200, 'User deleted', result);
+});
+
+// --- Admin firm (law_firms) CRUD ------------------------------------------
+
+// GET /api/admin/law-firms?page=&limit=&search=&status=
+const listLawFirms = asyncHandler(async (req, res) => {
+  const { items, ...meta } = await adminService.listLawFirms({
+    page: req.query.page,
+    limit: req.query.limit,
+    search: req.query.search,
+    status: req.query.status,
+  });
+  return paginatedResponse(res, 'Firms fetched', items, meta);
+});
+
+// GET /api/admin/law-firms/:id
+const getLawFirmDetail = asyncHandler(async (req, res) => {
+  const firm = await adminService.getLawFirmById(req.params.id);
+  return successResponse(res, 200, 'Firm fetched', firm);
+});
+
+// POST /api/admin/law-firms
+const createLawFirm = asyncHandler(async (req, res) => {
+  const adminId = req.user.id || req.user.sub;
+  const result = await adminService.createLawFirm(req.body, adminId);
+  await logAudit({
+    req,
+    userId: adminId,
+    action: 'admin.firm_created',
+    entity: 'law_firm',
+    entityId: result.firm.id,
+    status: 'success',
+    metadata: { firmName: result.firm.firmName },
+  });
+  return successResponse(res, 201, 'Firm created', result.firm);
+});
+
+// PATCH /api/admin/law-firms/:id
+const updateLawFirm = asyncHandler(async (req, res) => {
+  const adminId = req.user.id || req.user.sub;
+  const firm = await adminService.updateLawFirm(req.params.id, req.body);
+  await logAudit({
+    req,
+    userId: adminId,
+    action: 'admin.firm_updated',
+    entity: 'law_firm',
+    entityId: req.params.id,
+    status: 'success',
+    metadata: { fields: Object.keys(req.body || {}) },
+  });
+  return successResponse(res, 200, 'Firm updated', firm);
+});
+
+// DELETE /api/admin/law-firms/:id
+const deleteLawFirm = asyncHandler(async (req, res) => {
+  const adminId = req.user.id || req.user.sub;
+  const result = await adminService.deleteLawFirm(req.params.id);
+  await logAudit({
+    req,
+    userId: adminId,
+    action: 'admin.firm_deleted',
+    entity: 'law_firm',
+    entityId: req.params.id,
+    status: 'success',
+    metadata: {},
+  });
+  return successResponse(res, 200, 'Firm deleted', result);
+});
+
 // --- Reviews & review appeals ---------------------------------------------
 
 // GET /api/admin/reviews?page=&limit=&status=&minRating=&professionalId=
@@ -394,4 +527,13 @@ module.exports = {
   deleteReview,
   listReviewAppeals,
   resolveReviewAppeal,
+  getUser,
+  createUser,
+  updateUser,
+  deleteUser,
+  listLawFirms,
+  getLawFirmDetail,
+  createLawFirm,
+  updateLawFirm,
+  deleteLawFirm,
 };

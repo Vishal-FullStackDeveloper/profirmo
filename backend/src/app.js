@@ -48,10 +48,20 @@ app.use(
 );
 
 // 2. cors — credentials:true is required so the browser sends/receives the
-//    httpOnly refresh-token cookie on cross-origin requests.
+//    httpOnly refresh-token cookie on cross-origin requests. The allow-list
+//    covers local dev, configured FRONTEND_URL(s) and the known production
+//    origins (profirmo.com / www.profirmo.com).
+const allowedOrigins = new Set(env.frontendUrls);
 app.use(
   cors({
-    origin: env.frontendUrl,
+    origin: (origin, callback) => {
+      // Non-browser callers (curl, server-to-server) send no Origin header.
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.has(origin)) return callback(null, true);
+      // Disallowed origin — pass `false` so cors omits the headers and the
+      // browser blocks the response; csrfGuard rejects state-changing calls.
+      return callback(null, false);
+    },
     credentials: true,
   })
 );

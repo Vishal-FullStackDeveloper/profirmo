@@ -1,15 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Building2, LogOut } from 'lucide-react';
+import { Building2, LogOut, Plus } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import Modal from '@/components/common/Modal';
 import Badge from '@/components/common/Badge';
+import Input from '@/components/common/Input';
 import Avatar from '@/components/common/Avatar';
 import EmptyState from '@/components/common/EmptyState';
 import firmJoinService from '@/services/firmJoinService';
+import { createLawFirm } from '@/services/profileService';
 import { ROLES } from '@/utils/constants';
 import { formatDate } from '@/utils/formatters';
 
@@ -45,6 +47,18 @@ export default function ProfessionalFirmPage() {
   const [joinError, setJoinError] = useState('');
 
   const [cancellingId, setCancellingId] = useState(null);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    firmName: '',
+    headquarters: '',
+    contactEmail: '',
+    contactNumber: '',
+    registrationNumber: '',
+    about: '',
+  });
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,6 +122,45 @@ export default function ProfessionalFirmPage() {
       setJoinError(err.message || 'Could not send your join request.');
     } finally {
       setJoining(false);
+    }
+  }
+
+  function openCreate() {
+    setCreateError('');
+    setCreateForm({
+      firmName: '',
+      headquarters: '',
+      contactEmail: '',
+      contactNumber: '',
+      registrationNumber: '',
+      about: '',
+    });
+    setCreateOpen(true);
+  }
+
+  async function submitCreate(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!createForm.firmName.trim()) {
+      setCreateError('Firm name is required.');
+      return;
+    }
+    setCreating(true);
+    setCreateError('');
+    try {
+      await createLawFirm({
+        firmName: createForm.firmName.trim(),
+        headquarters: createForm.headquarters.trim(),
+        contactEmail: createForm.contactEmail.trim(),
+        contactNumber: createForm.contactNumber.trim(),
+        registrationNumber: createForm.registrationNumber.trim(),
+        about: createForm.about.trim(),
+      });
+      setCreateOpen(false);
+      await load();
+    } catch (err) {
+      setCreateError(err.message || 'Could not create the firm.');
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -189,7 +242,32 @@ export default function ProfessionalFirmPage() {
                 </Card>
               </section>
             ) : (
-              /* Browse firms to join */
+              <>
+                {/* Create your own firm */}
+                <section>
+                  <SectionTitle
+                    title="Create your own firm"
+                    description="Start your own law firm. You will be its owner."
+                  />
+                  <Card>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-slate-600">
+                        Set up your firm to invite other professionals to join.
+                        Your professional profile must be approved first.
+                      </p>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={openCreate}
+                      >
+                        <Plus size={16} />
+                        Create firm
+                      </Button>
+                    </div>
+                  </Card>
+                </section>
+
+              {/* Browse firms to join */}
               <section>
                 <SectionTitle
                   title="Browse firms to join"
@@ -237,6 +315,7 @@ export default function ProfessionalFirmPage() {
                   </div>
                 )}
               </section>
+              </>
             )}
 
             {/* My join requests */}
@@ -386,6 +465,112 @@ export default function ProfessionalFirmPage() {
           </div>
           {joinError && <p className="text-xs text-red-600">{joinError}</p>}
         </div>
+      </Modal>
+
+      {/* Create-firm modal */}
+      <Modal
+        open={createOpen}
+        onClose={() => !creating && setCreateOpen(false)}
+        title="Create your firm"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCreateOpen(false)}
+              disabled={creating}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={submitCreate}
+              disabled={creating || !createForm.firmName.trim()}
+            >
+              {creating ? 'Creating…' : 'Create firm'}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={submitCreate} className="space-y-3">
+          <Input
+            label="Firm name"
+            name="firmName"
+            required
+            value={createForm.firmName}
+            onChange={(e) =>
+              setCreateForm((f) => ({ ...f, firmName: e.target.value }))
+            }
+          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input
+              label="Headquarters"
+              name="headquarters"
+              value={createForm.headquarters}
+              onChange={(e) =>
+                setCreateForm((f) => ({
+                  ...f,
+                  headquarters: e.target.value,
+                }))
+              }
+            />
+            <Input
+              label="Registration number"
+              name="registrationNumber"
+              value={createForm.registrationNumber}
+              onChange={(e) =>
+                setCreateForm((f) => ({
+                  ...f,
+                  registrationNumber: e.target.value,
+                }))
+              }
+            />
+            <Input
+              label="Contact email"
+              name="contactEmail"
+              type="email"
+              value={createForm.contactEmail}
+              onChange={(e) =>
+                setCreateForm((f) => ({
+                  ...f,
+                  contactEmail: e.target.value,
+                }))
+              }
+            />
+            <Input
+              label="Contact number"
+              name="contactNumber"
+              value={createForm.contactNumber}
+              onChange={(e) =>
+                setCreateForm((f) => ({
+                  ...f,
+                  contactNumber: e.target.value,
+                }))
+              }
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="firm-about"
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+            >
+              About (optional)
+            </label>
+            <textarea
+              id="firm-about"
+              rows={3}
+              value={createForm.about}
+              onChange={(e) =>
+                setCreateForm((f) => ({ ...f, about: e.target.value }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 transition-colors focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
+            />
+          </div>
+          {createError && (
+            <p className="text-xs text-red-600">{createError}</p>
+          )}
+        </form>
       </Modal>
     </DashboardLayout>
   );

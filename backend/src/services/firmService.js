@@ -20,53 +20,145 @@ const reviewStats = require('./reviewStats');
  */
 const getFirmProfessionalIds = async (firmId) => {
   if (!firmId) return [];
+
+  // Resolve to the actual law_firms.id (the caller may pass either it or
+  // legacyFirmId from the public listing).
+  let lawFirm = await LawFirm.findByPk(firmId, { raw: true });
+  if (!lawFirm) {
+    lawFirm = await LawFirm.findOne({
+      where: { legacyFirmId: firmId },
+      raw: true,
+    });
+  }
+  const underlyingId = lawFirm ? lawFirm.id : null;
+  // Legacy `professionals.firmId` always uses the legacy/public id.
+  const legacyPublicId = (lawFirm && lawFirm.legacyFirmId) || firmId;
+
   const [legacyPros, members] = await Promise.all([
     Professional.findAll({
-      where: { firmId },
+      where: { firmId: legacyPublicId },
       attributes: ['id'],
       raw: true,
     }),
-    FirmMember.findAll({
-      where: { firmId },
-      attributes: ['professionalId'],
-      raw: true,
-    }),
+    underlyingId
+      ? FirmMember.findAll({
+          where: { firmId: underlyingId },
+          attributes: ['professionalId'],
+          raw: true,
+        })
+      : Promise.resolve([]),
   ]);
+
+  // Translate FirmMember.professionalId (ProfessionalDetail.id) to the public
+  // professional id (user.linkedId || detail.id) used by listings and reviews.
+  const detailIds = [
+    ...new Set(members.map((m) => m.professionalId).filter(Boolean)),
+  ];
+  let publicProfIdByDetail = new Map();
+  if (detailIds.length) {
+    const details = await ProfessionalDetail.findAll({
+      where: { id: { [Op.in]: detailIds } },
+      attributes: ['id', 'userId'],
+      raw: true,
+    });
+    const userIds = details.map((d) => d.userId).filter(Boolean);
+    const users = userIds.length
+      ? await User.findAll({
+          where: { id: { [Op.in]: userIds } },
+          attributes: ['id', 'linkedId'],
+          raw: true,
+        })
+      : [];
+    const linkedByUser = new Map(users.map((u) => [u.id, u.linkedId]));
+    publicProfIdByDetail = new Map(
+      details.map((d) => [d.id, linkedByUser.get(d.userId) || d.id])
+    );
+  }
+  const memberPublicIds = members
+    .map((m) => publicProfIdByDetail.get(m.professionalId) || m.professionalId)
+    .filter(Boolean);
+
   return [
-    ...new Set([
-      ...legacyPros.map((p) => p.id),
-      ...members.map((m) => m.professionalId).filter(Boolean),
-    ]),
+    ...new Set([...legacyPros.map((p) => p.id), ...memberPublicIds]),
   ];
 };
 
-/** Build a Map of firmId -> [professionalId, ...] for a set of firms. */
+/**
+ * Build a Map of publicFirmId -> [publicProfessionalId, ...] for the given
+ * firms. Each input firm must carry `_underlyingId` (the actual law_firms.id);
+ * the public id (legacyFirmId || law_firms.id) is what callers see.
+ *
+ * The professional id we emit is what the listing API uses for each pro:
+ * `user.linkedId || ProfessionalDetail.id`. That keeps it consistent with
+ * how reviews and detail-page links are keyed.
+ */
 const buildFirmProfessionalMap = async (firms) => {
   const map = new Map();
-  for (const f of firms) map.set(f.id, []);
-  const ids = firms.map((f) => f.id);
-  if (ids.length === 0) return map;
+  const publicByUnderlying = new Map();
+  for (const f of firms) {
+    map.set(f.id, []);
+    if (f._underlyingId) publicByUnderlying.set(f._underlyingId, f.id);
+  }
+  const publicIds = [...map.keys()];
+  const underlyingIds = [...publicByUnderlying.keys()];
+  if (publicIds.length === 0) return map;
 
   const [legacyPros, members] = await Promise.all([
     Professional.findAll({
-      where: { firmId: { [Op.in]: ids } },
+      where: { firmId: { [Op.in]: publicIds } },
       attributes: ['id', 'firmId'],
       raw: true,
     }),
-    FirmMember.findAll({
-      where: { firmId: { [Op.in]: ids } },
-      attributes: ['firmId', 'professionalId'],
-      raw: true,
-    }),
+    underlyingIds.length
+      ? FirmMember.findAll({
+          where: { firmId: { [Op.in]: underlyingIds } },
+          attributes: ['firmId', 'professionalId'],
+          raw: true,
+        })
+      : Promise.resolve([]),
   ]);
+
+  // Legacy-table professional rows are keyed by the public firm id.
   for (const p of legacyPros) {
     const arr = map.get(p.firmId);
     if (arr && p.id) arr.push(p.id);
   }
-  for (const m of members) {
-    const arr = map.get(m.firmId);
-    if (arr && m.professionalId) arr.push(m.professionalId);
+
+  // FirmMember rows point to ProfessionalDetail ids — translate each to the
+  // public professional id (user.linkedId || detail.id) so review look-ups
+  // and other downstream joins work.
+  const detailIds = [
+    ...new Set(members.map((m) => m.professionalId).filter(Boolean)),
+  ];
+  let publicProfIdByDetail = new Map();
+  if (detailIds.length) {
+    const details = await ProfessionalDetail.findAll({
+      where: { id: { [Op.in]: detailIds } },
+      attributes: ['id', 'userId'],
+      raw: true,
+    });
+    const userIds = details.map((d) => d.userId).filter(Boolean);
+    const users = userIds.length
+      ? await User.findAll({
+          where: { id: { [Op.in]: userIds } },
+          attributes: ['id', 'linkedId'],
+          raw: true,
+        })
+      : [];
+    const linkedByUser = new Map(users.map((u) => [u.id, u.linkedId]));
+    publicProfIdByDetail = new Map(
+      details.map((d) => [d.id, linkedByUser.get(d.userId) || d.id])
+    );
   }
+
+  for (const m of members) {
+    const pub = publicByUnderlying.get(m.firmId);
+    if (!pub || !m.professionalId) continue;
+    const publicProfId =
+      publicProfIdByDetail.get(m.professionalId) || m.professionalId;
+    map.get(pub).push(publicProfId);
+  }
+
   // De-duplicate each firm's professional list.
   for (const [firmId, arr] of map) {
     map.set(firmId, [...new Set(arr)]);
@@ -141,12 +233,14 @@ const normalizeLegacyFirm = (f, overlay = null) => {
 };
 
 /**
- * Map a new-model `law_firms` row into the unified firm listing shape.
- * `professionalCount` is supplied by the caller (FirmMember row count).
+ * Map a `law_firms` row into the unified firm listing shape. The public id
+ * prefers `legacyFirmId` so old `/firms/firm-N` URLs keep resolving. The raw
+ * `law_firms.id` is exposed internally via `_underlyingId` for joins.
  */
 const normalizeLawFirm = (f, professionalCount = 0) => ({
-  id: f.id,
-  source: 'profile',
+  id: f.legacyFirmId || f.id,
+  _underlyingId: f.id,
+  source: f.legacyFirmId ? 'legacy' : 'profile',
   firmName: f.firmName || '',
   logo: f.logo || null,
   firmType: f.firmType || '',
@@ -163,31 +257,15 @@ const normalizeLawFirm = (f, professionalCount = 0) => ({
  * shape with professionalCount derived from FirmMember rows.
  * @returns {Promise<Array>}
  */
-const loadLawFirms = async (legacyFirmIds = []) => {
+const loadLawFirms = async () => {
   const firms = await LawFirm.findAll({
     where: { status: 'ACTIVE' },
     raw: true,
   });
   if (firms.length === 0) return [];
 
-  // Drop law firms whose owner is linked to a legacy firm — they appear in
-  // the listing as that legacy row with their live data overlaid.
-  const legacyIdSet = new Set(legacyFirmIds);
-  const ownerIds = [
-    ...new Set(firms.map((f) => f.ownerUserId).filter(Boolean)),
-  ];
-  const owners = ownerIds.length
-    ? await User.findAll({ where: { id: { [Op.in]: ownerIds } }, raw: true })
-    : [];
-  const ownerById = new Map(owners.map((u) => [u.id, u]));
-  const visibleFirms = firms.filter((f) => {
-    const owner = ownerById.get(f.ownerUserId);
-    return !(owner && owner.linkedId && legacyIdSet.has(owner.linkedId));
-  });
-  if (visibleFirms.length === 0) return [];
-
   const members = await FirmMember.findAll({
-    where: { firmId: { [Op.in]: visibleFirms.map((f) => f.id) } },
+    where: { firmId: { [Op.in]: firms.map((f) => f.id) } },
     attributes: ['firmId'],
     raw: true,
   });
@@ -196,9 +274,7 @@ const loadLawFirms = async (legacyFirmIds = []) => {
     return acc;
   }, {});
 
-  return visibleFirms.map((f) =>
-    normalizeLawFirm(f, countByFirmId[f.id] || 0)
-  );
+  return firms.map((f) => normalizeLawFirm(f, countByFirmId[f.id] || 0));
 };
 
 /**
@@ -213,7 +289,7 @@ const loadFirmOverlays = async (legacyFirmIds = []) => {
   if (legacyFirmIds.length === 0) return map;
 
   const users = await User.findAll({
-    where: { linkedId: { [Op.in]: legacyFirmIds }, role: 'firm_admin' },
+    where: { linkedId: { [Op.in]: legacyFirmIds }, role: 'firm' },
     raw: true,
   });
   if (users.length === 0) return map;
@@ -296,20 +372,9 @@ const list = async ({ filters = {}, page, limit } = {}) => {
   const safePage = Math.max(Number(page) || 1, 1);
   const safeLimit = Math.max(Number(limit) || LISTING_DEFAULT_LIMIT, 1);
 
-  const legacyRows = await Firm.findAll({ raw: true });
-  const legacyIds = legacyRows.map((f) => f.id);
-
-  const [overlays, lawFirmRows] = await Promise.all([
-    loadFirmOverlays(legacyIds),
-    loadLawFirms(legacyIds),
-  ]);
-
-  let rows = [
-    ...legacyRows.map((f) =>
-      normalizeLegacyFirm(f, overlays.get(f.id) || null)
-    ),
-    ...lawFirmRows,
-  ];
+  // Single source of truth: the `law_firms` table. Legacy `firms` rows were
+  // backfilled into law_firms (see migrate.js).
+  let rows = await loadLawFirms();
 
   // Replace seed counters with the exact review stats from the database.
   await applyReviewStats(rows);
@@ -340,63 +405,50 @@ const list = async ({ filters = {}, page, limit } = {}) => {
 
   const total = rows.length;
   const offset = (safePage - 1) * safeLimit;
-  const items = rows.slice(offset, offset + safeLimit);
+  const items = rows.slice(offset, offset + safeLimit).map((it) => {
+    const out = { ...it };
+    delete out._underlyingId;
+    return out;
+  });
 
   return { items, page: safePage, limit: safeLimit, total };
 };
 
 /**
- * Resolve a firm by id from either source and return the full normalized
- * firm detail object. Tries the new-model `law_firms` table first, then
- * falls back to the legacy `firms` table. Returns null if not found.
+ * Resolve a firm by id from law_firms — accepts either the actual id or the
+ * `legacyFirmId` so /firms/firm-N URLs still work after the data unification.
  */
 const getById = async (id) => {
-  // 1. New-model: law_firms table.
-  const lawFirm = await LawFirm.findByPk(id, { raw: true });
-  if (lawFirm) {
-    const memberRows = await FirmMember.findAll({
-      where: { firmId: lawFirm.id },
-      attributes: ['firmId'],
+  // Resolve by the actual law_firms.id first, then by legacyFirmId.
+  let lawFirm = await LawFirm.findByPk(id, { raw: true });
+  if (!lawFirm) {
+    lawFirm = await LawFirm.findOne({
+      where: { legacyFirmId: id },
       raw: true,
     });
-    const base = normalizeLawFirm(lawFirm, memberRows.length);
-    const members = await loadLawFirmMembers(lawFirm.id);
-
-    return applyOneReviewStats({
-      ...base,
-      website: lawFirm.website || '',
-      contactEmail: lawFirm.contactEmail || '',
-      contactNumber: lawFirm.contactNumber || '',
-      establishedYear: lawFirm.establishedYear || null,
-      socialLinks: lawFirm.socialLinks || {},
-      members,
-    });
   }
+  if (!lawFirm) return null;
 
-  // 2. Legacy: firms table — overlay the linked live firm account if any.
-  const firm = await Firm.findByPk(id, { raw: true });
-  if (firm) {
-    const overlayMap = await loadFirmOverlays([firm.id]);
-    const overlay = overlayMap.get(firm.id) || null;
-    const overlayFirm = overlay && overlay.lawFirm;
-    const base = normalizeLegacyFirm(firm, overlay);
-    const members = overlayFirm
-      ? await loadLawFirmMembers(overlayFirm.id)
-      : [];
+  const memberRows = await FirmMember.findAll({
+    where: { firmId: lawFirm.id },
+    attributes: ['firmId'],
+    raw: true,
+  });
+  const base = normalizeLawFirm(lawFirm, memberRows.length);
+  const members = await loadLawFirmMembers(lawFirm.id);
 
-    return applyOneReviewStats({
-      ...base,
-      website: (overlayFirm && overlayFirm.website) || '',
-      contactEmail: (overlayFirm && overlayFirm.contactEmail) || firm.email || '',
-      contactNumber:
-        (overlayFirm && overlayFirm.contactNumber) || firm.phone || '',
-      establishedYear: (overlayFirm && overlayFirm.establishedYear) || null,
-      socialLinks: (overlayFirm && overlayFirm.socialLinks) || {},
-      members,
-    });
-  }
-
-  return null;
+  const detail = await applyOneReviewStats({
+    ...base,
+    website: lawFirm.website || '',
+    contactEmail: lawFirm.contactEmail || '',
+    contactNumber: lawFirm.contactNumber || '',
+    establishedYear: lawFirm.establishedYear || null,
+    socialLinks: lawFirm.socialLinks || {},
+    members,
+  });
+  // Strip internal-only fields before responding.
+  const { _underlyingId, ...publicDetail } = detail;
+  return publicDetail;
 };
 
 /** Get all professionals belonging to a firm. Returns null if firm missing. */

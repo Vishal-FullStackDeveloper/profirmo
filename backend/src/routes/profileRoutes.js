@@ -17,7 +17,7 @@ router.put('/', profileController.updateProfile);
 // Upsert professional details (professionals + firm professionals only).
 router.put(
   '/professional',
-  authorize('professional', 'firm_professional'),
+  authorize('professional'),
   profileController.updateProfessionalProfile
 );
 

@@ -63,7 +63,7 @@ const PLANS = [
       'pricing.plan.firm.f4',
       'pricing.plan.firm.f5',
     ],
-    cta: { labelKey: 'pricing.plan.firm.cta', href: '/auth/register-firm' },
+    cta: { labelKey: 'pricing.plan.firm.cta', href: '/signup' },
     highlight: false,
   },
 ];

@@ -53,9 +53,40 @@ const canManageFirm = async (userId, firmId) => {
 
 /**
  * The caller's current firm membership, or null when they belong to no firm.
+ * A firm owner is detected even when no FirmMember row exists (the LawFirm
+ * `ownerUserId` column is authoritative for ownership).
  * @returns {Promise<{ firm, member }|null>}
  */
 const getMyMembership = async (userId) => {
+  // 1. Owner check — authoritative.
+  const owned = await LawFirm.findOne({
+    where: { ownerUserId: userId },
+    raw: true,
+  });
+  if (owned) {
+    const detail = await ProfessionalDetail.findOne({
+      where: { userId },
+      raw: true,
+    });
+    let member = null;
+    if (detail) {
+      member = await FirmMember.findOne({
+        where: { firmId: owned.id, professionalId: detail.id },
+        raw: true,
+      });
+    }
+    return {
+      firm: owned,
+      member: member || {
+        id: null,
+        firmId: owned.id,
+        role: 'owner',
+        status: 'active',
+      },
+    };
+  }
+
+  // 2. Otherwise resolve via FirmMember.
   const detail = await ProfessionalDetail.findOne({
     where: { userId },
     raw: true,
@@ -93,7 +124,15 @@ const listJoinableFirms = async (userId) => {
 const requestJoin = async (userId, firmId, message) => {
   if (!firmId) throw { statusCode: 422, message: 'firmId is required' };
 
-  const firm = await LawFirm.findByPk(firmId, { raw: true });
+  // Accept either the actual law_firms.id or its legacyFirmId so the public
+  // listing's firm ids work seamlessly.
+  let firm = await LawFirm.findByPk(firmId, { raw: true });
+  if (!firm) {
+    firm = await LawFirm.findOne({
+      where: { legacyFirmId: firmId },
+      raw: true,
+    });
+  }
   if (!firm) throw { statusCode: 404, message: 'Firm not found.' };
   if (firm.status !== 'ACTIVE') {
     throw { statusCode: 409, message: 'This firm is not accepting members.' };

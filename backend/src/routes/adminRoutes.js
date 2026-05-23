@@ -11,6 +11,10 @@ router.use(authenticate, authorize('platform_admin'));
 router.get('/stats', adminController.getStats);
 router.get('/overview', adminController.getOverview);
 router.get('/users', adminController.listUsers);
+router.post('/users', adminController.createUser);
+router.get('/users/:id', adminController.getUser);
+router.patch('/users/:id', adminController.updateUser);
+router.delete('/users/:id', adminController.deleteUser);
 router.patch('/users/:id/status', adminController.updateUserStatus);
 
 // --- Phase 7: professional approval workflow ------------------------------
@@ -63,6 +67,13 @@ router.get('/firms/:approvalId', adminController.getFirmApproval);
 
 router.get('/bookings', adminController.listBookings);
 router.get('/audit-logs', adminController.listAuditLogs);
+
+// --- Firm CRUD (operates on law_firms — separate from approval workflow) --
+router.get('/law-firms', adminController.listLawFirms);
+router.post('/law-firms', adminController.createLawFirm);
+router.get('/law-firms/:id', adminController.getLawFirmDetail);
+router.patch('/law-firms/:id', adminController.updateLawFirm);
+router.delete('/law-firms/:id', adminController.deleteLawFirm);
 
 // --- Reviews & review appeals ---------------------------------------------
 // Only an admin can change or delete reviews, and resolve appeals.

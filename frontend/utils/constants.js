@@ -26,12 +26,18 @@ export const API_ENDPOINTS = {
   },
 };
 
+// System roles: only three user types (client, professional, firm) plus the
+// platform_admin. `FIRM_ADMIN` / `FIRM_PROFESSIONAL` are kept as legacy
+// aliases so older call sites continue to resolve — firm-membership roles
+// (owner / co-owner / member) live on FirmMember.role, not on User.role.
 export const ROLES = {
   CLIENT: 'client',
   PROFESSIONAL: 'professional',
-  FIRM_ADMIN: 'firm_admin',
-  FIRM_PROFESSIONAL: 'firm_professional',
+  FIRM: 'firm',
   PLATFORM_ADMIN: 'platform_admin',
+  // Legacy aliases — same values as the new roles.
+  FIRM_ADMIN: 'firm',
+  FIRM_PROFESSIONAL: 'professional',
 };
 
 export const SITE = {

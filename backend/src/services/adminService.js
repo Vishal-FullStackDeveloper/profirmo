@@ -14,6 +14,13 @@ const {
   FirmApproval,
   FirmInvitation,
 } = require('../models');
+const { hashPassword } = require('../utils/password');
+
+// Only these roles are accepted at the system level. Firms are not a user
+// role — they are entities owned by professionals (see LawFirm.ownerUserId).
+// `platform_admin` can be created by another admin, but the public signup
+// paths cannot produce one.
+const VALID_ROLES = ['client', 'professional', 'platform_admin'];
 
 // Strip the password before exposing a user record.
 const sanitizeUser = (user) => {
@@ -223,8 +230,8 @@ const getOverview = async () => {
     User.count(),
     User.count({ where: { role: 'client' } }),
     User.count({ where: { role: 'professional' } }),
-    User.count({ where: { role: 'firm_admin' } }),
-    User.count({ where: { role: 'firm_professional' } }),
+    User.count({ where: { role: 'firm' } }),
+    Promise.resolve(0), // firm_professional collapsed into professional
     User.count({ where: { role: 'platform_admin' } }),
     ProfessionalApproval.count(),
     ProfessionalApproval.count({
@@ -261,8 +268,7 @@ const getOverview = async () => {
       byRole: {
         client: clientUsers,
         professional: professionalUsers,
-        firm_admin: firmAdminUsers,
-        firm_professional: firmProfessionalUsers,
+        firm: firmAdminUsers,
         platform_admin: platformAdminUsers,
       },
     },
@@ -338,6 +344,421 @@ const updateUserStatus = async ({ targetUserId, status, actingUserId }) => {
   return { user: sanitizeUser(user), previousStatus };
 };
 
+// ---------------------------------------------------------------------------
+// Admin user CRUD
+// ---------------------------------------------------------------------------
+
+const buildFullName = (firstName, lastName, fallback) =>
+  [firstName, lastName].filter(Boolean).join(' ').trim() || fallback || '';
+
+/** Fetch one user by id (sanitized — never includes the password). */
+const getUserById = async (id) => {
+  const user = await User.findByPk(id);
+  if (!user) throw { statusCode: 404, message: `User not found: ${id}` };
+  return sanitizeUser(user);
+};
+
+/** Create a new user. Email must be unique. */
+const createUser = async ({ data = {}, actingUserId } = {}) => {
+  const email = String(data.email || '').toLowerCase().trim();
+  const role = String(data.role || '').toLowerCase().trim();
+  const password = String(data.password || '');
+  const firstName = String(data.firstName || '').trim();
+  const lastName = String(data.lastName || '').trim();
+  const mobileNumber = String(data.mobileNumber || '').trim();
+  const fullName =
+    String(data.fullName || '').trim() ||
+    buildFullName(firstName, lastName, '') ||
+    String(data.name || '').trim();
+
+  if (!email) throw { statusCode: 422, message: 'email is required' };
+  if (!fullName) {
+    throw { statusCode: 422, message: 'A name is required' };
+  }
+  if (!VALID_ROLES.includes(role)) {
+    throw {
+      statusCode: 422,
+      message: `role must be one of: ${VALID_ROLES.join(', ')}`,
+    };
+  }
+  if (!password || password.length < 6) {
+    throw {
+      statusCode: 422,
+      message: 'password must be at least 6 characters',
+    };
+  }
+
+  const existing = await User.findOne({ where: { email } });
+  if (existing) {
+    throw { statusCode: 409, message: 'A user with that email already exists' };
+  }
+
+  const hashed = await hashPassword(password);
+  const user = await User.create({
+    email,
+    password: hashed,
+    role,
+    name: fullName,
+    fullName,
+    firstName: firstName || null,
+    lastName: lastName || null,
+    mobileNumber: mobileNumber || null,
+    status: 'active',
+    accountVerified: true,
+    emailVerified: true,
+    memberSince: new Date(),
+  });
+
+  return { user: sanitizeUser(user), createdBy: actingUserId || null };
+};
+
+/** Update mutable fields on a user. Email and role changes are validated. */
+const updateUser = async ({ targetUserId, changes = {}, actingUserId } = {}) => {
+  const user = await User.findByPk(targetUserId);
+  if (!user) {
+    throw { statusCode: 404, message: `User not found: ${targetUserId}` };
+  }
+
+  const patch = {};
+  if (changes.firstName !== undefined) {
+    patch.firstName = String(changes.firstName || '').trim() || null;
+  }
+  if (changes.lastName !== undefined) {
+    patch.lastName = String(changes.lastName || '').trim() || null;
+  }
+  if (changes.fullName !== undefined || changes.name !== undefined) {
+    const nm = String(changes.fullName || changes.name || '').trim();
+    if (!nm) throw { statusCode: 422, message: 'Name cannot be empty' };
+    patch.fullName = nm;
+    patch.name = nm;
+  } else if (patch.firstName !== undefined || patch.lastName !== undefined) {
+    // Recompute the display name when only first/last changed.
+    const fn = patch.firstName ?? user.firstName;
+    const ln = patch.lastName ?? user.lastName;
+    const combined = buildFullName(fn, ln, user.fullName || user.name);
+    if (combined) {
+      patch.fullName = combined;
+      patch.name = combined;
+    }
+  }
+  if (changes.mobileNumber !== undefined) {
+    patch.mobileNumber = String(changes.mobileNumber || '').trim() || null;
+  }
+  if (changes.email !== undefined) {
+    const email = String(changes.email || '').toLowerCase().trim();
+    if (!email) throw { statusCode: 422, message: 'email cannot be empty' };
+    if (email !== user.email) {
+      const dup = await User.findOne({
+        where: { email, id: { [Op.ne]: user.id } },
+      });
+      if (dup) {
+        throw {
+          statusCode: 409,
+          message: 'Another user already has that email',
+        };
+      }
+      patch.email = email;
+    }
+  }
+  if (changes.role !== undefined) {
+    const role = String(changes.role || '').toLowerCase().trim();
+    if (!VALID_ROLES.includes(role)) {
+      throw {
+        statusCode: 422,
+        message: `role must be one of: ${VALID_ROLES.join(', ')}`,
+      };
+    }
+    // Demoting the only active platform_admin is unsafe.
+    if (
+      user.role === 'platform_admin' &&
+      role !== 'platform_admin'
+    ) {
+      const others = await User.count({
+        where: {
+          role: 'platform_admin',
+          status: { [Op.ne]: 'suspended' },
+          id: { [Op.ne]: user.id },
+        },
+      });
+      if (others === 0) {
+        throw {
+          statusCode: 400,
+          message: 'Cannot demote the only active platform admin',
+        };
+      }
+    }
+    patch.role = role;
+  }
+  if (changes.password) {
+    const pwd = String(changes.password);
+    if (pwd.length < 6) {
+      throw {
+        statusCode: 422,
+        message: 'password must be at least 6 characters',
+      };
+    }
+    patch.password = await hashPassword(pwd);
+  }
+
+  await user.update(patch);
+  return { user: sanitizeUser(user), updatedBy: actingUserId || null };
+};
+
+// ---------------------------------------------------------------------------
+// Admin firm CRUD (operates on the `law_firms` table)
+// ---------------------------------------------------------------------------
+
+const VALID_FIRM_STATUS = [
+  'ACTIVE',
+  'PENDING_APPROVAL',
+  'MODIFICATIONS_REQUESTED',
+  'REJECTED',
+];
+
+// Build a public-shaped firm row, optionally with owner + member counts.
+const decorateFirm = async (firm) => {
+  if (!firm) return null;
+  const plain = typeof firm.get === 'function' ? firm.get({ plain: true }) : firm;
+  let owner = null;
+  if (plain.ownerUserId) {
+    const u = await User.findByPk(plain.ownerUserId, { raw: true });
+    if (u) {
+      owner = {
+        id: u.id,
+        email: u.email,
+        name:
+          u.fullName ||
+          [u.firstName, u.lastName].filter(Boolean).join(' ').trim() ||
+          u.name ||
+          '',
+      };
+    }
+  }
+  const { FirmMember } = require('../models');
+  const memberCount = await FirmMember.count({
+    where: { firmId: plain.id },
+  });
+  return { ...plain, owner, memberCount };
+};
+
+/** List every law firm with optional filters + pagination. */
+const listLawFirms = async ({ page, limit, search, status } = {}) => {
+  const safePage = Math.max(Number(page) || 1, 1);
+  const safeLimit = Math.max(Number(limit) || 20, 1);
+  const offset = (safePage - 1) * safeLimit;
+
+  const where = {};
+  if (status) where.status = String(status).toUpperCase();
+  if (search) {
+    const term = String(search).trim();
+    if (term) {
+      where[Op.or] = [
+        { firmName: { [Op.like]: `%${term}%` } },
+        { headquarters: { [Op.like]: `%${term}%` } },
+        { contactEmail: { [Op.like]: `%${term}%` } },
+      ];
+    }
+  }
+
+  const { rows, count } = await LawFirm.findAndCountAll({
+    where,
+    order: [['createdAt', 'DESC']],
+    limit: safeLimit,
+    offset,
+  });
+  const items = await Promise.all(rows.map((r) => decorateFirm(r)));
+  return {
+    items,
+    page: safePage,
+    limit: safeLimit,
+    total: count,
+    totalPages: Math.max(1, Math.ceil(count / safeLimit)),
+  };
+};
+
+/** Fetch one law firm by id with owner + members + member count. */
+const getLawFirmById = async (id) => {
+  const firm = await LawFirm.findByPk(id);
+  if (!firm) throw { statusCode: 404, message: 'Firm not found' };
+  const decorated = await decorateFirm(firm);
+  // Member detail (name + role + joined date).
+  const { FirmMember, ProfessionalDetail } = require('../models');
+  const memberRows = await FirmMember.findAll({
+    where: { firmId: id },
+    raw: true,
+  });
+  const detailIds = [
+    ...new Set(memberRows.map((m) => m.professionalId).filter(Boolean)),
+  ];
+  const details = detailIds.length
+    ? await ProfessionalDetail.findAll({
+        where: { id: { [Op.in]: detailIds } },
+        raw: true,
+      })
+    : [];
+  const detailById = new Map(details.map((d) => [d.id, d]));
+  const userIds = details.map((d) => d.userId).filter(Boolean);
+  const users = userIds.length
+    ? await User.findAll({ where: { id: { [Op.in]: userIds } }, raw: true })
+    : [];
+  const userById = new Map(users.map((u) => [u.id, u]));
+  const members = memberRows.map((m) => {
+    const d = detailById.get(m.professionalId);
+    const u = d ? userById.get(d.userId) : null;
+    return {
+      id: m.id,
+      professionalId: m.professionalId,
+      userId: d && d.userId,
+      role: m.role,
+      status: m.status,
+      joiningDate: m.joiningDate,
+      name: u
+        ? u.fullName ||
+          [u.firstName, u.lastName].filter(Boolean).join(' ').trim() ||
+          u.name ||
+          ''
+        : '',
+      email: (u && u.email) || '',
+      professionalType: (d && d.professionalType) || '',
+    };
+  });
+  return { ...decorated, members };
+};
+
+/** Create a new law firm. ownerUserId is optional. */
+const createLawFirm = async (data = {}, actingUserId) => {
+  const firmName = String(data.firmName || '').trim();
+  if (!firmName) {
+    throw { statusCode: 422, message: 'firmName is required' };
+  }
+  const ownerUserId = data.ownerUserId ? String(data.ownerUserId) : null;
+  if (ownerUserId) {
+    const owner = await User.findByPk(ownerUserId);
+    if (!owner) {
+      throw { statusCode: 422, message: 'ownerUserId does not match a user' };
+    }
+    const existing = await LawFirm.findOne({ where: { ownerUserId } });
+    if (existing) {
+      throw {
+        statusCode: 409,
+        message: 'That user already owns a firm',
+      };
+    }
+  }
+  const status = VALID_FIRM_STATUS.includes(String(data.status || '').toUpperCase())
+    ? String(data.status).toUpperCase()
+    : 'ACTIVE';
+
+  const firm = await LawFirm.create({
+    firmName,
+    ownerUserId,
+    registrationNumber: data.registrationNumber || null,
+    headquarters: data.headquarters || null,
+    contactEmail: data.contactEmail || null,
+    contactNumber: data.contactNumber || null,
+    website: data.website || null,
+    establishedYear: data.establishedYear || null,
+    totalEmployees: data.totalEmployees || null,
+    about: data.about || null,
+    practiceAreas: Array.isArray(data.practiceAreas) ? data.practiceAreas : [],
+    socialLinks: data.socialLinks || {},
+    status,
+  });
+
+  return { firm: await decorateFirm(firm), createdBy: actingUserId || null };
+};
+
+/** Edit a law firm. Validates status if provided. */
+const updateLawFirm = async (id, changes = {}) => {
+  const firm = await LawFirm.findByPk(id);
+  if (!firm) throw { statusCode: 404, message: 'Firm not found' };
+
+  const patch = {};
+  const editable = [
+    'firmName',
+    'registrationNumber',
+    'headquarters',
+    'contactEmail',
+    'contactNumber',
+    'website',
+    'establishedYear',
+    'totalEmployees',
+    'about',
+    'practiceAreas',
+    'socialLinks',
+  ];
+  for (const key of editable) {
+    if (changes[key] !== undefined) patch[key] = changes[key];
+  }
+  if (changes.status !== undefined) {
+    const next = String(changes.status).toUpperCase();
+    if (!VALID_FIRM_STATUS.includes(next)) {
+      throw {
+        statusCode: 422,
+        message: `status must be one of: ${VALID_FIRM_STATUS.join(', ')}`,
+      };
+    }
+    patch.status = next;
+  }
+  if (changes.ownerUserId !== undefined) {
+    const next = changes.ownerUserId ? String(changes.ownerUserId) : null;
+    if (next && next !== firm.ownerUserId) {
+      const owner = await User.findByPk(next);
+      if (!owner) {
+        throw { statusCode: 422, message: 'ownerUserId does not match a user' };
+      }
+      const dup = await LawFirm.findOne({
+        where: { ownerUserId: next, id: { [Op.ne]: firm.id } },
+      });
+      if (dup) {
+        throw {
+          statusCode: 409,
+          message: 'That user already owns another firm',
+        };
+      }
+    }
+    patch.ownerUserId = next;
+  }
+  await firm.update(patch);
+  return await decorateFirm(firm);
+};
+
+/** Delete a law firm (cascades members/invitations/join-requests). */
+const deleteLawFirm = async (id) => {
+  const firm = await LawFirm.findByPk(id);
+  if (!firm) throw { statusCode: 404, message: 'Firm not found' };
+  await firm.destroy();
+  return { id };
+};
+
+/** Delete a user. Cannot delete yourself or the only active platform admin. */
+const deleteUser = async ({ targetUserId, actingUserId } = {}) => {
+  if (String(targetUserId) === String(actingUserId)) {
+    throw { statusCode: 400, message: 'You cannot delete your own account.' };
+  }
+  const user = await User.findByPk(targetUserId);
+  if (!user) {
+    throw { statusCode: 404, message: `User not found: ${targetUserId}` };
+  }
+  if (user.role === 'platform_admin') {
+    const others = await User.count({
+      where: {
+        role: 'platform_admin',
+        status: { [Op.ne]: 'suspended' },
+        id: { [Op.ne]: user.id },
+      },
+    });
+    if (others === 0) {
+      throw {
+        statusCode: 400,
+        message: 'Cannot delete the only active platform admin',
+      };
+    }
+  }
+  await user.destroy();
+  return { id: targetUserId };
+};
+
 module.exports = {
   getStats,
   listUsers,
@@ -348,4 +769,13 @@ module.exports = {
   listAuditLogs,
   getOverview,
   updateUserStatus,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+  listLawFirms,
+  getLawFirmById,
+  createLawFirm,
+  updateLawFirm,
+  deleteLawFirm,
 };

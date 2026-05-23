@@ -17,9 +17,11 @@ const env = require('./../config/env');
 const { errorResponse } = require('../utils/responseHandler');
 
 // Origins permitted to perform state-changing requests. The configured
-// frontend URL plus the common local dev ports so dev tooling keeps working.
+// frontend URLs (env.frontendUrls includes profirmo.com / www.profirmo.com
+// and any FRONTEND_URL overrides) plus the common local dev ports so dev
+// tooling keeps working.
 const ALLOWED_ORIGINS = [
-  env.frontendUrl,
+  ...env.frontendUrls,
   'http://localhost:3000',
   'http://localhost:5001',
 ];

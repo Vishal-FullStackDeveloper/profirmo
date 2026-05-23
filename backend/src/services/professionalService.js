@@ -137,7 +137,10 @@ const normalizeProfileProfessional = ({ user, address, detail }) => {
     (user && user.name) ||
     '';
   return {
-    id: detail.id,
+    // Prefer the legacy id when this user was backfilled from a legacy
+    // professional row — keeps existing /professionals/prof-N URLs working
+    // even though the data is sourced from users + professional_details.
+    id: (user && user.linkedId) || detail.id,
     source: 'profile',
     name,
     professionalType: detail.professionalType || '',
@@ -164,7 +167,7 @@ const normalizeProfileProfessional = ({ user, address, detail }) => {
  * and a ProfessionalDetail, normalized into the unified listing shape.
  * @returns {Promise<Array>}
  */
-const loadProfileProfessionals = async (legacyIds = []) => {
+const loadProfileProfessionals = async () => {
   const approvals = await ProfessionalApproval.findAll({
     where: { status: 'APPROVED' },
     raw: true,
@@ -187,15 +190,11 @@ const loadProfileProfessionals = async (legacyIds = []) => {
 
   const userById = new Map(users.map((u) => [u.id, u]));
   const addressByUserId = new Map(addresses.map((a) => [a.userId, a]));
-  const legacyIdSet = new Set(legacyIds);
 
   const items = [];
   for (const detail of details) {
     const user = userById.get(detail.userId);
     if (!user) continue;
-    // Skip accounts linked to a legacy professional row — they already appear
-    // in the listing as that legacy row with their live data overlaid.
-    if (user.linkedId && legacyIdSet.has(user.linkedId)) continue;
     items.push(
       normalizeProfileProfessional({
         user,
@@ -391,32 +390,22 @@ const list = async ({ filters = {}, page, limit } = {}) => {
     1
   );
 
-  const legacyRows = await Professional.findAll({ raw: true });
-  const legacyIds = legacyRows.map((p) => p.id);
+  // Single source of truth: users + professional_details + APPROVED approvals.
+  // Legacy professional rows were backfilled into this model in migrate.js.
+  const all = await loadProfileProfessionals();
+  await applyReviewStats(all);
 
-  const [overlays, profileRows] = await Promise.all([
-    loadLegacyOverlays(legacyIds),
-    loadProfileProfessionals(legacyIds),
-  ]);
-
-  const merged = [
-    ...legacyRows.map((p) =>
-      normalizeLegacyProfessional(p, overlays.get(p.id) || null)
-    ),
-    ...profileRows,
-  ];
-
-  // Replace seed counters with the exact review stats from the database.
-  await applyReviewStats(merged);
-
-  const filtered = filterProfessionals(merged, filters);
+  const filtered = filterProfessionals(all, filters);
   sortProfessionals(filtered, filters.sort);
 
   const total = filtered.length;
   const offset = (safePage - 1) * safeLimit;
-  const items = filtered.slice(offset, offset + safeLimit);
-
-  return { items, page: safePage, limit: safeLimit, total };
+  return {
+    items: filtered.slice(offset, offset + safeLimit),
+    page: safePage,
+    limit: safeLimit,
+    total,
+  };
 };
 
 /**
@@ -454,13 +443,26 @@ const filterOptions = async () => {
  * found in either source.
  */
 const getById = async (id) => {
-  // 1. New-model: ProfessionalDetail.id.
-  const detail = await ProfessionalDetail.findByPk(id, { raw: true });
+  // Resolve by user.linkedId first (preserves /professionals/prof-N URLs),
+  // then by ProfessionalDetail.id.
+  let user = await User.findOne({ where: { linkedId: id }, raw: true });
+  let detail = null;
+  if (user) {
+    detail = await ProfessionalDetail.findOne({
+      where: { userId: user.id },
+      raw: true,
+    });
+  } else {
+    detail = await ProfessionalDetail.findByPk(id, { raw: true });
+    if (detail) {
+      user = await User.findByPk(detail.userId, { raw: true });
+    }
+  }
   if (detail) {
-    const [user, address] = await Promise.all([
-      User.findByPk(detail.userId, { raw: true }),
-      Address.findOne({ where: { userId: detail.userId }, raw: true }),
-    ]);
+    const address = await Address.findOne({
+      where: { userId: detail.userId },
+      raw: true,
+    });
     const base = normalizeProfileProfessional({
       user: user || {},
       address,
@@ -489,54 +491,6 @@ const getById = async (id) => {
         country: (address && address.country) || '',
         state: (address && address.state) || '',
         city: (address && address.city) || '',
-      },
-      lawyer: lawyer || null,
-      tax: tax || null,
-    });
-  }
-
-  // 2. Legacy: professionals table — overlay the linked live account if any.
-  const legacy = await Professional.findByPk(id, { raw: true });
-  if (legacy) {
-    const overlayMap = await loadLegacyOverlays([legacy.id]);
-    const overlay = overlayMap.get(legacy.id) || null;
-    const overlayDetail = overlay && overlay.detail;
-    const overlayAddress = overlay && overlay.address;
-    const base = normalizeLegacyProfessional(legacy, overlay);
-
-    let lawyer = null;
-    let tax = null;
-    if (overlayDetail) {
-      [lawyer, tax] = await Promise.all([
-        LawyerDetail.findOne({
-          where: { professionalId: overlayDetail.id },
-          raw: true,
-        }),
-        TaxConsultantDetail.findOne({
-          where: { professionalId: overlayDetail.id },
-          raw: true,
-        }),
-      ]);
-    }
-
-    return applyOneReviewStats({
-      ...base,
-      about: (overlayDetail && overlayDetail.about) || legacy.bio || '',
-      education: overlayDetail ? toArray(overlayDetail.education) : [],
-      certifications: overlayDetail
-        ? toArray(overlayDetail.certifications)
-        : [],
-      achievements: overlayDetail ? toArray(overlayDetail.achievements) : [],
-      website: (overlayDetail && overlayDetail.website) || '',
-      linkedin: (overlayDetail && overlayDetail.linkedin) || '',
-      availability:
-        overlayDetail && toArray(overlayDetail.availability).length
-          ? toArray(overlayDetail.availability)
-          : toArray(legacy.availabilitySlots),
-      address: {
-        country: (overlayAddress && overlayAddress.country) || '',
-        state: (overlayAddress && overlayAddress.state) || '',
-        city: (overlayAddress && overlayAddress.city) || legacy.city || '',
       },
       lawyer: lawyer || null,
       tax: tax || null,

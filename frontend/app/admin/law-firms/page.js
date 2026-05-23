@@ -1,26 +1,24 @@
 'use client';
 
-// Admin — user management.
-// Auth-guarded and admin-only (platform_admin). Lists every platform user
-// with filters and pagination, and lets an admin create, view, edit,
-// suspend / activate, or delete accounts.
+// Admin — law firm management.
+// Auth-guarded and admin-only (platform_admin). Lists every firm on the
+// platform with filters and pagination, and lets an admin view, create,
+// edit, or delete any firm.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Users,
+  Building2,
   ShieldAlert,
   RefreshCw,
   AlertTriangle,
   Search,
   ChevronLeft,
   ChevronRight,
-  Ban,
-  CheckCircle2,
   Eye,
   Pencil,
   Trash2,
-  UserPlus,
+  Plus,
   MoreVertical,
 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
@@ -31,66 +29,49 @@ import Input from '@/components/common/Input';
 import Select from '@/components/common/Select';
 import Modal from '@/components/common/Modal';
 import EmptyState from '@/components/common/EmptyState';
+import Avatar from '@/components/common/Avatar';
 import { useAuth } from '@/components/AuthProvider';
 import { ROLES } from '@/utils/constants';
-import { formatDate, getInitials } from '@/utils/formatters';
+import { formatDate } from '@/utils/formatters';
 import {
-  listUsers,
-  updateUserStatus,
-  getUser,
-  createUser,
-  updateUser,
-  deleteUser,
+  listLawFirms,
+  getLawFirm,
+  createLawFirm,
+  updateLawFirm,
+  deleteLawFirm,
 } from '@/services/adminService';
 
 const PAGE_SIZE = 20;
 
-// Firms are not users — they are entities owned by professionals, so `firm`
-// is intentionally absent from both filter and create/edit role selects.
-const ROLE_OPTIONS = [
-  { value: '', label: 'All roles' },
-  { value: 'client', label: 'Client' },
-  { value: 'professional', label: 'Professional' },
-  { value: 'platform_admin', label: 'Platform admin' },
-];
-
-// Roles selectable when creating / editing a user (no "all" placeholder).
-const ROLE_FORM_OPTIONS = [
-  { value: 'client', label: 'Client' },
-  { value: 'professional', label: 'Professional' },
-  { value: 'platform_admin', label: 'Platform admin' },
-];
-
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
-  { value: 'active', label: 'Active' },
-  { value: 'suspended', label: 'Suspended' },
-  { value: 'pending_verification', label: 'Pending verification' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'PENDING_APPROVAL', label: 'Pending approval' },
+  { value: 'MODIFICATIONS_REQUESTED', label: 'Modifications requested' },
+  { value: 'REJECTED', label: 'Rejected' },
 ];
 
-const ROLE_LABELS = {
-  client: 'Client',
-  professional: 'Professional',
-  platform_admin: 'Platform admin',
-};
+// Same options as the filter, minus the "all" placeholder — used in forms.
+const STATUS_FORM_OPTIONS = STATUS_OPTIONS.filter((o) => o.value !== '');
 
-/** Build a display name from a user row. */
-function userName(u) {
-  if (!u) return 'Unknown user';
-  if (u.fullName) return u.fullName;
-  const parts = [u.firstName, u.lastName].filter(Boolean);
-  return parts.length ? parts.join(' ') : u.email || 'Unknown user';
+/** Status → { label, variant } for the firm status badge. */
+function statusBadge(status) {
+  const s = String(status || '').toUpperCase();
+  if (s === 'ACTIVE') return { label: 'Active', variant: 'green' };
+  if (s === 'PENDING_APPROVAL') {
+    return { label: 'Pending approval', variant: 'amber' };
+  }
+  if (s === 'MODIFICATIONS_REQUESTED') {
+    return { label: 'Modifications requested', variant: 'amber' };
+  }
+  if (s === 'REJECTED') return { label: 'Rejected', variant: 'red' };
+  return { label: status || 'Unknown', variant: 'gray' };
 }
 
-/** Status → { label, variant } for the user status badge. */
-function statusBadge(status) {
-  const s = String(status || '').toLowerCase();
-  if (s === 'active') return { label: 'Active', variant: 'green' };
-  if (s === 'suspended') return { label: 'Suspended', variant: 'red' };
-  if (s === 'pending_verification') {
-    return { label: 'Pending verification', variant: 'amber' };
-  }
-  return { label: status || 'Unknown', variant: 'gray' };
+/** Display the firm name with a sensible fallback. */
+function firmName(f) {
+  if (!f) return 'Unknown firm';
+  return f.firmName || 'Untitled firm';
 }
 
 function ListSkeleton() {
@@ -108,21 +89,25 @@ function ListSkeleton() {
 
 /** Empty form shape for the Create modal. */
 const EMPTY_CREATE_FORM = {
-  firstName: '',
-  lastName: '',
-  email: '',
-  mobileNumber: '',
-  role: 'client',
-  password: '',
-  confirmPassword: '',
+  firmName: '',
+  headquarters: '',
+  contactEmail: '',
+  contactNumber: '',
+  registrationNumber: '',
+  website: '',
+  establishedYear: '',
+  totalEmployees: '',
+  status: 'ACTIVE',
+  ownerUserId: '',
+  about: '',
 };
 
 /**
- * UserActionsMenu — single kebab dropdown holding View / Edit / Suspend /
- * Activate / Delete. Replaces the previous row of inline icon buttons so the
- * table stays compact at every width.
+ * FirmActionsMenu — single kebab dropdown holding View / Edit / Delete.
+ * Mirrors the UserActionsMenu pattern from app/admin/users/page.js so the
+ * table stays compact across widths.
  */
-function UserActionsMenu({ row, isSelf, onView, onEdit, onSuspend, onDelete }) {
+function FirmActionsMenu({ onView, onEdit, onDelete }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -141,10 +126,6 @@ function UserActionsMenu({ row, isSelf, onView, onEdit, onSuspend, onDelete }) {
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
-
-  const canToggle =
-    !isSelf && (row.status === 'active' || row.status === 'suspended');
-  const isActive = row.status === 'active';
 
   return (
     <div ref={ref} className="relative inline-block text-left">
@@ -185,42 +166,54 @@ function UserActionsMenu({ row, isSelf, onView, onEdit, onSuspend, onDelete }) {
           >
             <Pencil size={14} /> Edit
           </button>
-          {canToggle && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onSuspend();
-              }}
-              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${
-                isActive ? 'text-amber-700' : 'text-emerald-700'
-              }`}
-            >
-              {isActive ? <Ban size={14} /> : <CheckCircle2 size={14} />}
-              {isActive ? 'Suspend' : 'Activate'}
-            </button>
-          )}
-          {!isSelf && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onDelete();
-              }}
-              className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
-            >
-              <Trash2 size={14} /> Delete
-            </button>
-          )}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+            className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
+          >
+            <Trash2 size={14} /> Delete
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-export default function AdminUsersPage() {
+/** Build the payload for create/update from form state, omitting blanks. */
+function buildFirmPayload(form) {
+  const payload = {};
+  const trim = (v) => (typeof v === 'string' ? v.trim() : v);
+
+  if (trim(form.firmName)) payload.firmName = trim(form.firmName);
+  if (trim(form.headquarters)) payload.headquarters = trim(form.headquarters);
+  if (trim(form.contactEmail)) payload.contactEmail = trim(form.contactEmail);
+  if (trim(form.contactNumber)) {
+    payload.contactNumber = trim(form.contactNumber);
+  }
+  if (trim(form.registrationNumber)) {
+    payload.registrationNumber = trim(form.registrationNumber);
+  }
+  if (trim(form.website)) payload.website = trim(form.website);
+  if (form.establishedYear !== '' && form.establishedYear != null) {
+    const n = Number(form.establishedYear);
+    if (!Number.isNaN(n)) payload.establishedYear = n;
+  }
+  if (form.totalEmployees !== '' && form.totalEmployees != null) {
+    const n = Number(form.totalEmployees);
+    if (!Number.isNaN(n)) payload.totalEmployees = n;
+  }
+  if (form.status) payload.status = form.status;
+  if (trim(form.ownerUserId)) payload.ownerUserId = trim(form.ownerUserId);
+  if (trim(form.about)) payload.about = trim(form.about);
+
+  return payload;
+}
+
+export default function AdminLawFirmsPage() {
   const router = useRouter();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
 
@@ -232,14 +225,8 @@ export default function AdminUsersPage() {
   // Filter state. `searchInput` is the live field; `search` is the applied one.
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
-
-  // Confirm modal for suspend / activate.
-  const [target, setTarget] = useState(null); // { user, nextStatus }
-  const [submitting, setSubmitting] = useState(false);
-  const [actionError, setActionError] = useState('');
 
   // Create modal state.
   const [createOpen, setCreateOpen] = useState(false);
@@ -248,12 +235,12 @@ export default function AdminUsersPage() {
   const [createError, setCreateError] = useState('');
 
   // View modal state.
-  const [viewUser, setViewUser] = useState(null);
+  const [viewFirm, setViewFirm] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState('');
 
   // Edit modal state.
-  const [editTarget, setEditTarget] = useState(null); // user being edited
+  const [editTarget, setEditTarget] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState('');
@@ -276,21 +263,20 @@ export default function AdminUsersPage() {
     setLoading(true);
     setError('');
     try {
-      const { data, meta: m } = await listUsers({
+      const { data, meta: m } = await listLawFirms({
         page,
         limit: PAGE_SIZE,
-        role: role || undefined,
-        status: status || undefined,
         search: search || undefined,
+        status: status || undefined,
       });
       setRows(Array.isArray(data) ? data : []);
       setMeta(m || null);
     } catch (err) {
-      setError(err.message || 'Failed to load users.');
+      setError(err.message || 'Failed to load firms.');
     } finally {
       setLoading(false);
     }
-  }, [page, role, status, search]);
+  }, [page, search, status]);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && isAdmin) {
@@ -306,40 +292,12 @@ export default function AdminUsersPage() {
     setSearch(searchInput.trim());
   }
 
-  function changeRole(e) {
-    setPage(1);
-    setRole(e.target.value);
-  }
-
   function changeStatus(e) {
     setPage(1);
     setStatus(e.target.value);
   }
 
-  // ----- Status action -----------------------------------------------------
-
-  function openConfirm(row) {
-    const nextStatus = row.status === 'active' ? 'suspended' : 'active';
-    setActionError('');
-    setTarget({ user: row, nextStatus });
-  }
-
-  async function confirmAction() {
-    if (!target || submitting) return;
-    setSubmitting(true);
-    setActionError('');
-    try {
-      await updateUserStatus(target.user.id, target.nextStatus);
-      setTarget(null);
-      await load();
-    } catch (err) {
-      setActionError(err.message || 'Failed to update the user.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  // ----- Create user -------------------------------------------------------
+  // ----- Create firm -------------------------------------------------------
 
   function openCreate() {
     setCreateForm(EMPTY_CREATE_FORM);
@@ -363,90 +321,64 @@ export default function AdminUsersPage() {
     if (createSubmitting) return;
     setCreateError('');
 
-    const {
-      firstName,
-      lastName,
-      email,
-      mobileNumber,
-      role: newRole,
-      password,
-      confirmPassword,
-    } = createForm;
-
-    if (!firstName.trim() || !lastName.trim()) {
-      setCreateError('First name and last name are required.');
-      return;
-    }
-    if (!email.trim()) {
-      setCreateError('Email is required.');
-      return;
-    }
-    if (!password || password.length < 6) {
-      setCreateError('Password must be at least 6 characters.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setCreateError('Passwords do not match.');
+    if (!createForm.firmName.trim()) {
+      setCreateError('Firm name is required.');
       return;
     }
 
     setCreateSubmitting(true);
     try {
-      const payload = {
-        email: email.trim(),
-        password,
-        role: newRole,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        fullName: `${firstName.trim()} ${lastName.trim()}`.trim(),
-      };
-      if (mobileNumber.trim()) {
-        payload.mobileNumber = mobileNumber.trim();
-      }
-      await createUser(payload);
+      await createLawFirm(buildFirmPayload(createForm));
       setCreateOpen(false);
       setCreateForm(EMPTY_CREATE_FORM);
       await load();
     } catch (err) {
-      setCreateError(err.message || 'Failed to create user.');
+      setCreateError(err.message || 'Failed to create firm.');
     } finally {
       setCreateSubmitting(false);
     }
   }
 
-  // ----- View user ---------------------------------------------------------
+  // ----- View firm ---------------------------------------------------------
 
   async function openView(row) {
     setViewError('');
     setViewLoading(true);
-    setViewUser(row); // optimistic: show what we have immediately
+    setViewFirm(row); // optimistic
     try {
-      const full = await getUser(row.id);
-      if (full) setViewUser(full);
+      const full = await getLawFirm(row.id);
+      if (full) setViewFirm(full);
     } catch (err) {
-      setViewError(err.message || 'Failed to load user details.');
+      setViewError(err.message || 'Failed to load firm details.');
     } finally {
       setViewLoading(false);
     }
   }
 
   function closeView() {
-    setViewUser(null);
+    setViewFirm(null);
     setViewError('');
   }
 
-  // ----- Edit user ---------------------------------------------------------
+  // ----- Edit firm ---------------------------------------------------------
 
   function openEdit(row) {
     setEditError('');
     setEditTarget(row);
     setEditForm({
-      firstName: row.firstName || '',
-      lastName: row.lastName || '',
-      email: row.email || '',
-      mobileNumber: row.mobileNumber || '',
-      role: row.role || 'client',
-      password: '',
+      firmName: row.firmName || '',
+      headquarters: row.headquarters || '',
+      contactEmail: row.contactEmail || '',
+      contactNumber: row.contactNumber || '',
+      registrationNumber: row.registrationNumber || '',
+      website: row.website || '',
+      establishedYear:
+        row.establishedYear != null ? String(row.establishedYear) : '',
+      totalEmployees:
+        row.totalEmployees != null ? String(row.totalEmployees) : '',
+      status: row.status || 'ACTIVE',
+      ownerUserId: row.ownerUserId || '',
+      about: row.about || '',
     });
   }
 
@@ -467,60 +399,25 @@ export default function AdminUsersPage() {
     if (!editTarget || !editForm || editSubmitting) return;
     setEditError('');
 
-    const changes = {};
-    const trimmedFirst = editForm.firstName.trim();
-    const trimmedLast = editForm.lastName.trim();
-    const trimmedEmail = editForm.email.trim();
-    const trimmedMobile = editForm.mobileNumber.trim();
-
-    if (trimmedFirst !== (editTarget.firstName || '')) {
-      changes.firstName = trimmedFirst;
-    }
-    if (trimmedLast !== (editTarget.lastName || '')) {
-      changes.lastName = trimmedLast;
-    }
-    if (
-      trimmedFirst !== (editTarget.firstName || '') ||
-      trimmedLast !== (editTarget.lastName || '')
-    ) {
-      changes.fullName = `${trimmedFirst} ${trimmedLast}`.trim();
-    }
-    if (trimmedEmail !== (editTarget.email || '')) {
-      changes.email = trimmedEmail;
-    }
-    if (trimmedMobile !== (editTarget.mobileNumber || '')) {
-      changes.mobileNumber = trimmedMobile;
-    }
-    if (editForm.role !== editTarget.role) {
-      changes.role = editForm.role;
-    }
-    if (editForm.password) {
-      if (editForm.password.length < 6) {
-        setEditError('Password must be at least 6 characters.');
-        return;
-      }
-      changes.password = editForm.password;
-    }
-
-    if (Object.keys(changes).length === 0) {
-      closeEdit();
+    if (!editForm.firmName.trim()) {
+      setEditError('Firm name is required.');
       return;
     }
 
     setEditSubmitting(true);
     try {
-      await updateUser(editTarget.id, changes);
+      await updateLawFirm(editTarget.id, buildFirmPayload(editForm));
       setEditTarget(null);
       setEditForm(null);
       await load();
     } catch (err) {
-      setEditError(err.message || 'Failed to update user.');
+      setEditError(err.message || 'Failed to update firm.');
     } finally {
       setEditSubmitting(false);
     }
   }
 
-  // ----- Delete user -------------------------------------------------------
+  // ----- Delete firm -------------------------------------------------------
 
   function openDelete(row) {
     setDeleteError('');
@@ -538,11 +435,11 @@ export default function AdminUsersPage() {
     setDeleteSubmitting(true);
     setDeleteError('');
     try {
-      await deleteUser(deleteTarget.id);
+      await deleteLawFirm(deleteTarget.id);
       setDeleteTarget(null);
       await load();
     } catch (err) {
-      setDeleteError(err.message || 'Failed to delete user.');
+      setDeleteError(err.message || 'Failed to delete firm.');
     } finally {
       setDeleteSubmitting(false);
     }
@@ -551,16 +448,16 @@ export default function AdminUsersPage() {
   // ----- Guards ------------------------------------------------------------
 
   if (authLoading || !isAuthenticated) {
-    return <DashboardLayout role={ROLES.PLATFORM_ADMIN} title="Users" />;
+    return <DashboardLayout role={ROLES.PLATFORM_ADMIN} title="Firms" />;
   }
 
   if (!isAdmin) {
     return (
-      <DashboardLayout role={ROLES.PLATFORM_ADMIN} title="Users">
+      <DashboardLayout role={ROLES.PLATFORM_ADMIN} title="Firms">
         <EmptyState
           icon={<ShieldAlert size={24} />}
           title="Access denied"
-          description="You need a platform administrator account to manage users."
+          description="You need a platform administrator account to manage firms."
           action={
             <Button href="/dashboard" variant="outline">
               Back to dashboard
@@ -578,8 +475,8 @@ export default function AdminUsersPage() {
   return (
     <DashboardLayout
       role={ROLES.PLATFORM_ADMIN}
-      title="Users"
-      subtitle="Browse, filter and manage every account on the platform"
+      title="Firms"
+      subtitle="Manage every firm on the platform"
     >
       <div className="space-y-6">
         {/* Filter bar */}
@@ -591,10 +488,10 @@ export default function AdminUsersPage() {
             >
               <Input
                 label="Search"
-                name="user-search"
+                name="firm-search"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Name, email or mobile…"
+                placeholder="Firm name, headquarters or email…"
               />
               <Button type="submit" variant="outline">
                 <Search size={15} />
@@ -602,20 +499,12 @@ export default function AdminUsersPage() {
               </Button>
             </form>
             <Select
-              label="Role"
-              name="user-role"
-              value={role}
-              onChange={changeRole}
-              options={ROLE_OPTIONS}
-              className="lg:w-52"
-            />
-            <Select
               label="Status"
-              name="user-status"
+              name="firm-status"
               value={status}
               onChange={changeStatus}
               options={STATUS_OPTIONS}
-              className="lg:w-56"
+              className="lg:w-64"
             />
           </div>
         </Card>
@@ -624,12 +513,12 @@ export default function AdminUsersPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-              <Users size={18} />
+              <Building2 size={18} />
             </span>
             <p className="text-sm font-medium text-slate-700">
               {loading
-                ? 'Loading users…'
-                : `${total} user${total === 1 ? '' : 's'}`}
+                ? 'Loading firms…'
+                : `${total} firm${total === 1 ? '' : 's'}`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -643,8 +532,8 @@ export default function AdminUsersPage() {
               Refresh
             </Button>
             <Button size="sm" onClick={openCreate}>
-              <UserPlus size={15} />
-              Add user
+              <Plus size={15} />
+              Add firm
             </Button>
           </div>
         </div>
@@ -666,9 +555,9 @@ export default function AdminUsersPage() {
           </Card>
         ) : rows.length === 0 ? (
           <EmptyState
-            icon={<Users size={24} />}
-            title="No users found"
-            description="No accounts match your current filters. Try adjusting the search or filters."
+            icon={<Building2 size={24} />}
+            title="No firms found"
+            description="No firms match your current filters. Try adjusting the search or filters."
           />
         ) : (
           <>
@@ -677,11 +566,11 @@ export default function AdminUsersPage() {
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">User</th>
-                    <th className="px-4 py-3 font-semibold">Email</th>
-                    <th className="px-4 py-3 font-semibold">Role</th>
+                    <th className="px-4 py-3 font-semibold">Firm</th>
+                    <th className="px-4 py-3 font-semibold">Owner</th>
                     <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Joined</th>
+                    <th className="px-4 py-3 font-semibold">Members</th>
+                    <th className="px-4 py-3 font-semibold">Created</th>
                     <th className="px-4 py-3 font-semibold text-right">
                       Actions
                     </th>
@@ -689,52 +578,55 @@ export default function AdminUsersPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((row) => {
-                    const name = userName(row);
+                    const name = firmName(row);
                     const badge = statusBadge(row.status);
-                    const isSelf = user && row.id === user.id;
-                    const canToggle =
-                      !isSelf &&
-                      (row.status === 'active' ||
-                        row.status === 'suspended');
                     return (
                       <tr key={row.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-xs font-semibold text-white">
-                              {getInitials(name)}
-                            </span>
-                            <p className="truncate font-medium text-slate-800">
-                              {name}
-                            </p>
+                            <Avatar
+                              src={row.logo}
+                              name={name}
+                              size="sm"
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-slate-800">
+                                {name}
+                              </p>
+                              <p className="truncate text-xs text-slate-500">
+                                {row.headquarters || '—'}
+                              </p>
+                            </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {row.email || '—'}
-                        </td>
                         <td className="px-4 py-3">
-                          <Badge variant="gray">
-                            {ROLE_LABELS[row.role] || row.role || '—'}
-                          </Badge>
+                          {row.owner ? (
+                            <div className="min-w-0">
+                              <p className="truncate text-slate-700">
+                                {row.owner.name || '—'}
+                              </p>
+                              <p className="truncate text-xs text-slate-500">
+                                {row.owner.email || '—'}
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant={badge.variant}>{badge.label}</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {row.memberCount != null ? row.memberCount : 0}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {formatDate(row.createdAt)}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
-                            {isSelf && (
-                              <span className="text-xs text-slate-400">
-                                You
-                              </span>
-                            )}
-                            <UserActionsMenu
-                              row={row}
-                              isSelf={isSelf}
+                            <FirmActionsMenu
                               onView={() => openView(row)}
                               onEdit={() => openEdit(row)}
-                              onSuspend={() => openConfirm(row)}
                               onDelete={() => openDelete(row)}
                             />
                           </div>
@@ -778,69 +670,11 @@ export default function AdminUsersPage() {
         )}
       </div>
 
-      {/* Suspend / activate confirm modal */}
-      <Modal
-        open={!!target}
-        onClose={() => !submitting && setTarget(null)}
-        title={
-          target && target.nextStatus === 'suspended'
-            ? 'Suspend user'
-            : 'Activate user'
-        }
-        footer={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setTarget(null)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant={
-                target && target.nextStatus === 'suspended'
-                  ? 'danger'
-                  : 'primary'
-              }
-              size="sm"
-              onClick={confirmAction}
-              disabled={submitting}
-            >
-              {submitting
-                ? 'Working…'
-                : target && target.nextStatus === 'suspended'
-                ? 'Confirm suspend'
-                : 'Confirm activate'}
-            </Button>
-          </>
-        }
-      >
-        {target && (
-          <p className="text-sm text-slate-600">
-            {target.nextStatus === 'suspended' ? (
-              <>
-                Suspend <strong>{userName(target.user)}</strong>? They will
-                lose access until reactivated.
-              </>
-            ) : (
-              <>
-                Activate <strong>{userName(target.user)}</strong>? They will
-                regain access to the platform.
-              </>
-            )}
-          </p>
-        )}
-        {actionError && (
-          <p className="mt-3 text-xs text-red-600">{actionError}</p>
-        )}
-      </Modal>
-
-      {/* Create user modal */}
+      {/* Create firm modal */}
       <Modal
         open={createOpen}
         onClose={closeCreate}
-        title="Add user"
+        title="Add firm"
         footer={
           <>
             <Button
@@ -857,68 +691,108 @@ export default function AdminUsersPage() {
               onClick={submitCreate}
               disabled={createSubmitting}
             >
-              {createSubmitting ? 'Creating…' : 'Create user'}
+              {createSubmitting ? 'Creating…' : 'Create firm'}
             </Button>
           </>
         }
       >
         <form onSubmit={submitCreate} className="space-y-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Input
-              label="First name"
-              name="firstName"
-              value={createForm.firstName}
-              onChange={onCreateChange}
-              required
-            />
-            <Input
-              label="Last name"
-              name="lastName"
-              value={createForm.lastName}
-              onChange={onCreateChange}
-              required
-            />
-          </div>
           <Input
-            label="Email"
-            name="email"
-            type="email"
-            value={createForm.email}
+            label="Firm name"
+            name="firmName"
+            value={createForm.firmName}
             onChange={onCreateChange}
             required
           />
           <Input
-            label="Mobile number"
-            name="mobileNumber"
-            value={createForm.mobileNumber}
+            label="Headquarters"
+            name="headquarters"
+            value={createForm.headquarters}
             onChange={onCreateChange}
             placeholder="Optional"
           />
-          <Select
-            label="Role"
-            name="role"
-            value={createForm.role}
-            onChange={onCreateChange}
-            options={ROLE_FORM_OPTIONS}
-            required
-          />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
-              label="Password"
-              name="password"
-              type="password"
-              value={createForm.password}
+              label="Contact email"
+              name="contactEmail"
+              type="email"
+              value={createForm.contactEmail}
               onChange={onCreateChange}
-              required
-              hint="Minimum 6 characters"
+              placeholder="Optional"
             />
             <Input
-              label="Confirm password"
-              name="confirmPassword"
-              type="password"
-              value={createForm.confirmPassword}
+              label="Contact number"
+              name="contactNumber"
+              value={createForm.contactNumber}
               onChange={onCreateChange}
-              required
+              placeholder="Optional"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input
+              label="Registration number"
+              name="registrationNumber"
+              value={createForm.registrationNumber}
+              onChange={onCreateChange}
+              placeholder="Optional"
+            />
+            <Input
+              label="Website"
+              name="website"
+              value={createForm.website}
+              onChange={onCreateChange}
+              placeholder="https://"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input
+              label="Established year"
+              name="establishedYear"
+              type="number"
+              value={createForm.establishedYear}
+              onChange={onCreateChange}
+              placeholder="e.g. 2010"
+            />
+            <Input
+              label="Total employees"
+              name="totalEmployees"
+              type="number"
+              value={createForm.totalEmployees}
+              onChange={onCreateChange}
+              placeholder="e.g. 25"
+            />
+          </div>
+          <Select
+            label="Status"
+            name="status"
+            value={createForm.status}
+            onChange={onCreateChange}
+            options={STATUS_FORM_OPTIONS}
+            required
+          />
+          <Input
+            label="Owner user ID"
+            name="ownerUserId"
+            value={createForm.ownerUserId}
+            onChange={onCreateChange}
+            placeholder="Optional"
+            hint="Leave blank to create a firm without an owner"
+          />
+          <div>
+            <label
+              htmlFor="create-about"
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+            >
+              About
+            </label>
+            <textarea
+              id="create-about"
+              name="about"
+              rows={4}
+              value={createForm.about}
+              onChange={onCreateChange}
+              placeholder="Short description of the firm…"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
             />
           </div>
           {/* hidden submit so Enter inside inputs works */}
@@ -929,104 +803,205 @@ export default function AdminUsersPage() {
         )}
       </Modal>
 
-      {/* View user modal */}
+      {/* View firm modal */}
       <Modal
-        open={!!viewUser}
+        open={!!viewFirm}
         onClose={closeView}
-        title={viewUser ? userName(viewUser) : 'User details'}
+        title={viewFirm ? firmName(viewFirm) : 'Firm details'}
         footer={
           <Button variant="outline" size="sm" onClick={closeView}>
             Close
           </Button>
         }
       >
-        {viewUser && (
-          <div className="space-y-4">
+        {viewFirm && (
+          <div className="space-y-5">
             <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500 text-sm font-semibold text-white">
-                {getInitials(userName(viewUser))}
-              </span>
+              <Avatar
+                src={viewFirm.logo}
+                name={firmName(viewFirm)}
+                size="lg"
+              />
               <div className="min-w-0">
-                <p className="truncate font-medium text-slate-800">
-                  {userName(viewUser)}
+                <p className="truncate text-base font-semibold text-slate-800">
+                  {firmName(viewFirm)}
                 </p>
-                <p className="truncate text-xs text-slate-500">
-                  {viewUser.email || '—'}
-                </p>
+                <div className="mt-1">
+                  {(() => {
+                    const b = statusBadge(viewFirm.status);
+                    return <Badge variant={b.variant}>{b.label}</Badge>;
+                  })()}
+                </div>
               </div>
             </div>
 
             <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Role
-                </dt>
-                <dd className="mt-1">
-                  <Badge variant="gray">
-                    {ROLE_LABELS[viewUser.role] || viewUser.role || '—'}
-                  </Badge>
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Status
-                </dt>
-                <dd className="mt-1">
-                  {(() => {
-                    const b = statusBadge(viewUser.status);
-                    return <Badge variant={b.variant}>{b.label}</Badge>;
-                  })()}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Email
+                  Owner
                 </dt>
                 <dd className="mt-1 text-slate-700">
-                  {viewUser.email || '—'}
+                  {viewFirm.owner ? (
+                    <>
+                      <p className="truncate">{viewFirm.owner.name || '—'}</p>
+                      <p className="truncate text-xs text-slate-500">
+                        {viewFirm.owner.email || '—'}
+                      </p>
+                    </>
+                  ) : (
+                    '—'
+                  )}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Mobile number
+                  Registration number
                 </dt>
                 <dd className="mt-1 text-slate-700">
-                  {viewUser.mobileNumber || '—'}
+                  {viewFirm.registrationNumber || '—'}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Account verified
+                  Headquarters
                 </dt>
                 <dd className="mt-1 text-slate-700">
-                  {viewUser.accountVerified ? 'Yes' : 'No'}
+                  {viewFirm.headquarters || '—'}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Email verified
+                  Website
                 </dt>
-                <dd className="mt-1 text-slate-700">
-                  {viewUser.emailVerified ? 'Yes' : 'No'}
+                <dd className="mt-1 truncate text-slate-700">
+                  {viewFirm.website ? (
+                    <a
+                      href={viewFirm.website}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-amber-700 underline-offset-2 hover:underline"
+                    >
+                      {viewFirm.website}
+                    </a>
+                  ) : (
+                    '—'
+                  )}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Member since
+                  Contact email
                 </dt>
-                <dd className="mt-1 text-slate-700">
-                  {formatDate(viewUser.memberSince || viewUser.createdAt)}
+                <dd className="mt-1 truncate text-slate-700">
+                  {viewFirm.contactEmail || '—'}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Last login
+                  Contact number
                 </dt>
                 <dd className="mt-1 text-slate-700">
-                  {viewUser.lastLogin ? formatDate(viewUser.lastLogin) : '—'}
+                  {viewFirm.contactNumber || '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Established year
+                </dt>
+                <dd className="mt-1 text-slate-700">
+                  {viewFirm.establishedYear || '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Total employees
+                </dt>
+                <dd className="mt-1 text-slate-700">
+                  {viewFirm.totalEmployees != null
+                    ? viewFirm.totalEmployees
+                    : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Created
+                </dt>
+                <dd className="mt-1 text-slate-700">
+                  {formatDate(viewFirm.createdAt)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Updated
+                </dt>
+                <dd className="mt-1 text-slate-700">
+                  {formatDate(viewFirm.updatedAt)}
                 </dd>
               </div>
             </dl>
+
+            {viewFirm.about && (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  About
+                </p>
+                <p className="mt-1 whitespace-pre-line text-sm text-slate-700">
+                  {viewFirm.about}
+                </p>
+              </div>
+            )}
+
+            {Array.isArray(viewFirm.practiceAreas) &&
+              viewFirm.practiceAreas.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Practice areas
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {viewFirm.practiceAreas.map((area, i) => (
+                      <span
+                        key={`${area}-${i}`}
+                        className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
+                      >
+                        {area}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Members
+              </p>
+              {Array.isArray(viewFirm.members) && viewFirm.members.length > 0 ? (
+                <ul className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200">
+                  {viewFirm.members.map((m) => (
+                    <li
+                      key={m.id}
+                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-800">
+                          {m.name || '—'}
+                        </p>
+                        <p className="truncate text-xs text-slate-500">
+                          {m.email || '—'}
+                          {m.professionalType
+                            ? ` • ${m.professionalType}`
+                            : ''}
+                        </p>
+                      </div>
+                      <Badge variant="gray">{m.role || '—'}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">
+                  {viewLoading ? 'Loading members…' : 'No members yet.'}
+                </p>
+              )}
+            </div>
 
             {viewLoading && (
               <p className="text-xs text-slate-400">Loading latest details…</p>
@@ -1038,11 +1013,11 @@ export default function AdminUsersPage() {
         )}
       </Modal>
 
-      {/* Edit user modal */}
+      {/* Edit firm modal */}
       <Modal
         open={!!editTarget}
         onClose={closeEdit}
-        title={editTarget ? `Edit ${userName(editTarget)}` : 'Edit user'}
+        title={editTarget ? `Edit ${firmName(editTarget)}` : 'Edit firm'}
         footer={
           <>
             <Button
@@ -1066,48 +1041,94 @@ export default function AdminUsersPage() {
       >
         {editForm && (
           <form onSubmit={submitEdit} className="space-y-3">
+            <Input
+              label="Firm name"
+              name="firmName"
+              value={editForm.firmName}
+              onChange={onEditChange}
+              required
+            />
+            <Input
+              label="Headquarters"
+              name="headquarters"
+              value={editForm.headquarters}
+              onChange={onEditChange}
+            />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input
-                label="First name"
-                name="firstName"
-                value={editForm.firstName}
+                label="Contact email"
+                name="contactEmail"
+                type="email"
+                value={editForm.contactEmail}
                 onChange={onEditChange}
               />
               <Input
-                label="Last name"
-                name="lastName"
-                value={editForm.lastName}
+                label="Contact number"
+                name="contactNumber"
+                value={editForm.contactNumber}
                 onChange={onEditChange}
               />
             </div>
-            <Input
-              label="Email"
-              name="email"
-              type="email"
-              value={editForm.email}
-              onChange={onEditChange}
-            />
-            <Input
-              label="Mobile number"
-              name="mobileNumber"
-              value={editForm.mobileNumber}
-              onChange={onEditChange}
-            />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Input
+                label="Registration number"
+                name="registrationNumber"
+                value={editForm.registrationNumber}
+                onChange={onEditChange}
+              />
+              <Input
+                label="Website"
+                name="website"
+                value={editForm.website}
+                onChange={onEditChange}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Input
+                label="Established year"
+                name="establishedYear"
+                type="number"
+                value={editForm.establishedYear}
+                onChange={onEditChange}
+              />
+              <Input
+                label="Total employees"
+                name="totalEmployees"
+                type="number"
+                value={editForm.totalEmployees}
+                onChange={onEditChange}
+              />
+            </div>
             <Select
-              label="Role"
-              name="role"
-              value={editForm.role}
+              label="Status"
+              name="status"
+              value={editForm.status}
               onChange={onEditChange}
-              options={ROLE_FORM_OPTIONS}
+              options={STATUS_FORM_OPTIONS}
             />
             <Input
-              label="Password"
-              name="password"
-              type="password"
-              value={editForm.password}
+              label="Owner user ID"
+              name="ownerUserId"
+              value={editForm.ownerUserId}
               onChange={onEditChange}
-              hint="Leave blank to keep current"
+              hint="Leave blank to create a firm without an owner"
             />
+            <div>
+              <label
+                htmlFor="edit-about"
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+              >
+                About
+              </label>
+              <textarea
+                id="edit-about"
+                name="about"
+                rows={4}
+                value={editForm.about}
+                onChange={onEditChange}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
             <button type="submit" className="hidden" aria-hidden="true" />
           </form>
         )}
@@ -1116,11 +1137,12 @@ export default function AdminUsersPage() {
         )}
       </Modal>
 
-      {/* Delete confirm modal */}
+      {/* Delete firm confirm modal */}
       <Modal
         open={!!deleteTarget}
         onClose={closeDelete}
-        title="Delete user"
+        title="Delete firm"
+        size="sm"
         footer={
           <>
             <Button
@@ -1137,14 +1159,15 @@ export default function AdminUsersPage() {
               onClick={confirmDelete}
               disabled={deleteSubmitting}
             >
-              {deleteSubmitting ? 'Deleting…' : 'Delete user'}
+              {deleteSubmitting ? 'Deleting…' : 'Delete firm'}
             </Button>
           </>
         }
       >
         {deleteTarget && (
           <p className="text-sm text-slate-600">
-            Permanently delete <strong>{userName(deleteTarget)}</strong>? This
+            Permanently delete <strong>{firmName(deleteTarget)}</strong>?
+            Members, invitations and join requests will also be removed. This
             cannot be undone.
           </p>
         )}

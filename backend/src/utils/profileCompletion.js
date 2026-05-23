@@ -45,7 +45,7 @@ const computeProfileCompletion = ({
   checks.push(isFilled(address && address.postalCode));
 
   // --- Professional-specific fields ---------------------------------------
-  if (role === 'professional' || role === 'firm_professional') {
+  if (role === 'professional') {
     const pd = professionalDetail || {};
     checks.push(isFilled(pd.professionalType));
     checks.push(isFilled(pd.designation));
@@ -57,8 +57,8 @@ const computeProfileCompletion = ({
     checks.push(isFilled(pd.languages));
   }
 
-  // --- Firm-admin-specific fields -----------------------------------------
-  if (role === 'firm_admin') {
+  // --- Firm-specific fields -----------------------------------------------
+  if (role === 'firm') {
     const lf = lawFirm || {};
     checks.push(isFilled(lf.firmName));
     checks.push(isFilled(lf.registrationNumber));
