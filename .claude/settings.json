@@ -19,7 +19,17 @@
       "Bash(echo \"backend PID $!\")",
       "Bash(echo \"frontend PID $!\")",
       "Bash(curl -s -o /dev/null -w \"  HTTP %{http_code}\\\\n\" http://localhost:5001/api/firms)",
-      "Bash(curl -s -o /dev/null -w \"  HTTP %{http_code}\\\\n\" http://localhost:3000)"
+      "Bash(curl -s -o /dev/null -w \"  HTTP %{http_code}\\\\n\" http://localhost:3000)",
+      "Bash(curl -sS \"http://localhost:5001/api/firms?limit=1\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); arr=\\(d.get\\('data'\\) or d.get\\('firms'\\) or []\\) if isinstance\\(d, dict\\) else []; print\\('count', len\\(arr\\)\\); print\\('first id', arr[0].get\\('id'\\) if arr else 'NONE'\\)\")",
+      "Bash(curl -sS http://localhost:3000/professionals/prof-1)",
+      "Bash(curl -sS http://localhost:3000/firms/firm-1)",
+      "Bash(curl -sS \"http://localhost:5001/api/firms/firm-1\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); f=d.get\\('data'\\) or d; print\\('firmName', f.get\\('firmName'\\)\\); print\\('firmType', f.get\\('firmType'\\)\\); print\\('city', f.get\\('city'\\)\\); print\\('about', \\(f.get\\('about'\\) or ''\\)[:80]\\)\")",
+      "Bash(curl -sS http://localhost:3000/professionals)",
+      "Bash(curl -sS http://localhost:3000/firms)",
+      "Bash(curl -sS http://localhost:3000/about)",
+      "Bash(curl -sS http://localhost:3000/contact)"
     ]
   }
 }
