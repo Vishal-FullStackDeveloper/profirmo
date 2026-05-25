@@ -141,16 +141,37 @@ export default function ClientCasesPage() {
                       {c.category || '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-600">
-                      {c.professionalId ? (
-                        <Link
-                          href={`/professionals/${c.professionalId}`}
-                          className="font-medium text-amber-700 hover:text-amber-800"
-                        >
-                          {c.professionalId}
-                        </Link>
-                      ) : (
-                        <span className="text-slate-400">Unassigned</span>
-                      )}
+                      {(() => {
+                        // Prefer the decorated `professionals` array (has
+                        // resolved names); fall back to legacy single
+                        // `professional` / raw `professionalId`.
+                        const list =
+                          Array.isArray(c.professionals) && c.professionals.length > 0
+                            ? c.professionals
+                            : c.professional
+                              ? [c.professional]
+                              : c.professionalId
+                                ? [{ publicId: c.professionalId, name: c.professionalId }]
+                                : [];
+                        if (list.length === 0) {
+                          return (
+                            <span className="text-slate-400">Unassigned</span>
+                          );
+                        }
+                        return (
+                          <div className="flex flex-wrap items-center gap-1">
+                            {list.map((p) => (
+                              <Link
+                                key={p.publicId}
+                                href={`/professionals/${p.publicId}`}
+                                className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                              >
+                                {p.name || p.publicId}
+                              </Link>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={PRIORITY_VARIANT[c.priority] || 'gray'}>

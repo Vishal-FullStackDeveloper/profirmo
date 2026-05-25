@@ -27,6 +27,12 @@ const getMembers = asyncHandler(async (req, res) => {
   return successResponse(res, 200, 'Firm members fetched', { members });
 });
 
+// GET /api/law-firm/mine/clients — aggregated clients of every firm member.
+const getFirmClients = asyncHandler(async (req, res) => {
+  const result = await lawFirmService.getFirmClients(req.user.id);
+  return successResponse(res, 200, 'Firm clients fetched', result);
+});
+
 // POST /api/law-firm/mine/members — DEPRECATED: superseded by invitations.
 const addMember = asyncHandler(async (req, res) => {
   throw {
@@ -99,6 +105,7 @@ module.exports = {
   createFirm,
   updateFirm,
   getMembers,
+  getFirmClients,
   addMember,
   changeMemberRole,
   removeMember,

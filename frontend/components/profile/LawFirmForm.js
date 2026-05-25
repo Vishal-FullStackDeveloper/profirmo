@@ -46,6 +46,10 @@ function buildInitialState(firm) {
       f.totalEmployees === 0 || f.totalEmployees
         ? String(f.totalEmployees)
         : '',
+    numberOfProfessionals:
+      f.numberOfProfessionals === 0 || f.numberOfProfessionals
+        ? String(f.numberOfProfessionals)
+        : '',
     practiceAreas: toCsv(f.practiceAreas),
     linkedin: social.linkedin || '',
     twitter: social.twitter || '',
@@ -125,6 +129,9 @@ export default function LawFirmForm({ lawFirm, onSaved }) {
         contactNumber: form.contactNumber.trim(),
         totalEmployees: form.totalEmployees
           ? Number(form.totalEmployees)
+          : undefined,
+        numberOfProfessionals: form.numberOfProfessionals
+          ? Number(form.numberOfProfessionals)
           : undefined,
         practiceAreas: toArray(form.practiceAreas),
         socialLinks: {
@@ -219,6 +226,18 @@ export default function LawFirmForm({ lawFirm, onSaved }) {
             min="0"
             value={form.totalEmployees}
             onChange={(e) => update('totalEmployees', e.target.value)}
+            hint="Includes support staff"
+          />
+          <Input
+            label="Number of professionals"
+            name="numberOfProfessionals"
+            type="number"
+            min="0"
+            value={form.numberOfProfessionals}
+            onChange={(e) =>
+              update('numberOfProfessionals', e.target.value)
+            }
+            hint="Practising professionals in the firm"
           />
           <Input
             label="Headquarters"

@@ -10,6 +10,7 @@ import {
   MoreVertical,
   Users,
   CircleDashed,
+  ExternalLink,
 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import Card from '@/components/common/Card';
@@ -185,7 +186,6 @@ export default function FirmCasesPage() {
   const [addOpen, setAddOpen] = useState(false);
 
   const [reassignTarget, setReassignTarget] = useState(null);
-  const [reassignSubmittingId, setReassignSubmittingId] = useState(null);
   const [reassignError, setReassignError] = useState('');
 
   const [busyId, setBusyId] = useState(null);
@@ -211,8 +211,10 @@ export default function FirmCasesPage() {
     load();
   }, [load]);
 
-  async function ensureMembers() {
-    if (members.length > 0 || membersLoading) return;
+  // Load the firm's member list eagerly so AddCaseModal can render the
+  // assignee picker the very first time the user opens it (the picker is
+  // gated on `firmMembers.length > 0`).
+  const ensureMembers = useCallback(async () => {
     setMembersLoading(true);
     try {
       const data = await getLawFirm();
@@ -223,34 +225,75 @@ export default function FirmCasesPage() {
     } finally {
       setMembersLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    ensureMembers();
+  }, [ensureMembers]);
 
   function openReassign(c) {
     setReassignTarget(c);
     setReassignError('');
-    ensureMembers();
   }
 
   function closeReassign() {
-    if (reassignSubmittingId) return;
+    if (reassignSaving) return;
     setReassignTarget(null);
     setReassignError('');
   }
 
-  async function chooseMember(member) {
+  // Selected ids for the multi-select reassign panel.
+  const [reassignIds, setReassignIds] = useState([]);
+  const [reassignSaving, setReassignSaving] = useState(false);
+
+  // Whenever a different case is targeted, prefill the selection with its
+  // current assignees so the modal opens in the "current state".
+  useEffect(() => {
+    if (!reassignTarget) {
+      setReassignIds([]);
+      return;
+    }
+    const initial =
+      Array.isArray(reassignTarget.professionalIds) &&
+      reassignTarget.professionalIds.length > 0
+        ? reassignTarget.professionalIds
+        : reassignTarget.professionalId
+          ? [reassignTarget.professionalId]
+          : [];
+    setReassignIds([...new Set(initial.filter(Boolean))]);
+  }, [reassignTarget]);
+
+  function publicIdOf(member) {
+    return (
+      member.publicId ||
+      (member.professional && member.professional.publicId) ||
+      member.professionalId ||
+      member.professionalDetailId ||
+      null
+    );
+  }
+
+  function toggleReassign(pid) {
+    if (!pid) return;
+    setReassignIds((prev) =>
+      prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid]
+    );
+  }
+
+  async function saveReassign() {
     if (!reassignTarget) return;
-    const professionalId =
-      member.professionalId || member.professionalDetailId || member.id;
-    setReassignSubmittingId(member.id);
+    setReassignSaving(true);
     setReassignError('');
     try {
-      await caseService.update(reassignTarget.id, { professionalId });
+      await caseService.update(reassignTarget.id, {
+        professionalIds: reassignIds,
+      });
       setReassignTarget(null);
       await load();
     } catch (err) {
       setReassignError(err.message || 'Could not reassign case.');
     } finally {
-      setReassignSubmittingId(null);
+      setReassignSaving(false);
     }
   }
 
@@ -380,7 +423,39 @@ export default function FirmCasesPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-slate-600">
-                      {c.professionalId || '—'}
+                      {(() => {
+                        // Prefer the decorated `professionals` array; fall
+                        // back to the legacy single `professionalId`.
+                        const list =
+                          Array.isArray(c.professionals) && c.professionals.length > 0
+                            ? c.professionals
+                            : c.professional
+                              ? [c.professional]
+                              : c.professionalId
+                                ? [{ publicId: c.professionalId, name: c.professionalId }]
+                                : [];
+                        if (list.length === 0) {
+                          return (
+                            <span className="text-slate-400">Unassigned</span>
+                          );
+                        }
+                        return (
+                          <div className="flex flex-wrap items-center gap-1">
+                            {list.map((p) => (
+                              <a
+                                key={p.publicId}
+                                href={`/professionals/${p.publicId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                              >
+                                {p.name || p.publicId}
+                                <ExternalLink size={10} />
+                              </a>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={PRIORITY_VARIANT[c.priority] || 'gray'}>
@@ -431,6 +506,7 @@ export default function FirmCasesPage() {
           load();
         }}
         defaults={firmId ? { firmId } : undefined}
+        firmMembers={members}
       />
 
       <Modal
@@ -442,19 +518,30 @@ export default function FirmCasesPage() {
             : 'Reassign case'
         }
         footer={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={closeReassign}
-            disabled={!!reassignSubmittingId}
-          >
-            Close
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={closeReassign}
+              disabled={reassignSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={saveReassign}
+              disabled={reassignSaving}
+            >
+              {reassignSaving ? 'Saving…' : 'Save assignments'}
+            </Button>
+          </>
         }
       >
         <div className="space-y-3">
           <p className="text-sm text-slate-600">
-            Pick a firm member to assign this case to.
+            Toggle any firm members to assign or remove from this case.
+            Selecting nothing un-assigns the case.
           </p>
           {membersLoading ? (
             <div className="space-y-2">
@@ -474,12 +561,22 @@ export default function FirmCasesPage() {
           ) : (
             <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
               {members.map((m) => {
-                const busy = reassignSubmittingId === m.id;
+                const pid = publicIdOf(m);
+                const checked = pid ? reassignIds.includes(pid) : false;
                 return (
                   <li
                     key={m.id}
-                    className="flex items-center gap-3 px-3 py-3 hover:bg-slate-50"
+                    className={`flex items-center gap-3 px-3 py-3 transition-colors ${
+                      checked ? 'bg-emerald-50/60' : 'hover:bg-slate-50'
+                    }`}
                   >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      checked={checked}
+                      onChange={() => toggleReassign(pid)}
+                      disabled={!pid || reassignSaving}
+                    />
                     <Avatar src={m.profilePhoto} name={m.name} size="sm" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-slate-800">
@@ -491,14 +588,9 @@ export default function FirmCasesPage() {
                         </p>
                       )}
                     </div>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => chooseMember(m)}
-                      disabled={!!reassignSubmittingId}
-                    >
-                      {busy ? 'Assigning…' : 'Assign'}
-                    </Button>
+                    <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-400">
+                      {m.role}
+                    </span>
                   </li>
                 );
               })}

@@ -71,6 +71,7 @@ const resolveProfessionalNames = async (ids) => {
   const unique = [...new Set((ids || []).filter(Boolean))];
   if (unique.length === 0) return map;
 
+  // 1. Direct match against the legacy `professionals` table.
   const legacy = await Professional.findAll({
     where: { id: { [Op.in]: unique } },
     attributes: ['id', 'name'],
@@ -78,20 +79,38 @@ const resolveProfessionalNames = async (ids) => {
   });
   for (const p of legacy) map.set(p.id, p.name || '');
 
-  const missing = unique.filter((id) => !map.has(id));
+  // 2. Match against ProfessionalDetail.id for new-model professionals.
+  let missing = unique.filter((id) => !map.has(id));
   if (missing.length > 0) {
     const details = await ProfessionalDetail.findAll({
       where: { id: { [Op.in]: missing } },
       attributes: ['id', 'userId'],
       raw: true,
     });
-    const users = await User.findAll({
-      where: { id: { [Op.in]: details.map((d) => d.userId).filter(Boolean) } },
+    if (details.length > 0) {
+      const users = await User.findAll({
+        where: {
+          id: { [Op.in]: details.map((d) => d.userId).filter(Boolean) },
+        },
+        raw: true,
+      });
+      const userById = new Map(users.map((u) => [u.id, u]));
+      for (const d of details) {
+        map.set(d.id, displayName(userById.get(d.userId)));
+      }
+    }
+  }
+
+  // 3. Fall back to User.linkedId — covers reviews keyed by a user's alias
+  //    (e.g. firm-owner users whose linkedId points at a legacy firm id).
+  missing = unique.filter((id) => !map.has(id));
+  if (missing.length > 0) {
+    const aliasUsers = await User.findAll({
+      where: { linkedId: { [Op.in]: missing } },
       raw: true,
     });
-    const userById = new Map(users.map((u) => [u.id, u]));
-    for (const d of details) {
-      map.set(d.id, displayName(userById.get(d.userId)));
+    for (const u of aliasUsers) {
+      map.set(u.linkedId, displayName(u));
     }
   }
   return map;
@@ -132,13 +151,20 @@ const create = async ({ user, professionalId, rating, comment }) => {
     };
   }
 
+  // The JWT only carries `id / role / linkedId / firmId`, so we look up the
+  // full User row to pull the reviewer's display name. Falls back to 'Client'
+  // only when the row is somehow missing or fully empty.
+  const reviewerUser = await User.findByPk(user.id, { raw: true });
+  const reviewerName =
+    displayName(reviewerUser) || displayName(user) || 'Client';
+
   // Reviews are always against a professional; a firm has no review record
   // of its own (firm reviews = the collective reviews of its professionals).
-  // The client column is now `users.id` directly.
+  // The client column is `users.id` directly.
   const review = await Review.create({
     userId: user.id,
     clientId: user.role === 'client' ? user.id : null,
-    clientName: displayName(user) || 'Client',
+    clientName: reviewerName,
     professionalId,
     rating: safeRating,
     comment: String(comment || '').trim(),
@@ -153,7 +179,7 @@ const create = async ({ user, professionalId, rating, comment }) => {
       userId: reviewedUserId,
       type: 'review_received',
       title: 'New client review',
-      message: `${displayName(user) || 'A client'} left you a ${safeRating}-star review.`,
+      message: `${reviewerName} left you a ${safeRating}-star review.`,
       link: '/dashboard/professional/reviews',
       metadata: { reviewId: review.id, rating: safeRating },
     });

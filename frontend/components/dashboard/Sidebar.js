@@ -15,6 +15,7 @@ import {
   Briefcase,
   CalendarClock,
   FolderKanban,
+  UserCircle,
   UserPlus,
   ArrowLeft,
   ChevronRight,
@@ -60,6 +61,11 @@ const PROFESSIONAL_NAV = [
     href: '/professionals',
     icon: Search,
   },
+  {
+    labelKey: 'dash.nav.profile',
+    href: '/dashboard/professional/profile',
+    icon: UserCircle,
+  },
 ];
 
 const NAV_BY_ROLE = {
@@ -85,6 +91,11 @@ const NAV_BY_ROLE = {
       icon: Search,
     },
     { labelKey: 'dash.nav.browseFirms', href: '/firms', icon: Building2 },
+    {
+      labelKey: 'dash.nav.profile',
+      href: '/dashboard/client/profile',
+      icon: UserCircle,
+    },
   ],
   [ROLES.PROFESSIONAL]: PROFESSIONAL_NAV,
   [ROLES.FIRM_PROFESSIONAL]: PROFESSIONAL_NAV,

@@ -1,12 +1,28 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+// AddCaseModal — modal form to create OR edit a case. Reused by the
+// professional and firm cases lists.
+//
+// Multi-client support: callers pass either a single `clientId` (legacy) or
+// a `clientIds` array. The form renders a multi-select chip picker:
+//   - Firm dashboard  → loads firm-aggregated clients (every member's
+//                       clients, deduplicated) via getLawFirmClients().
+//   - Professional    → loads only the calling professional's clients via
+//                       clientService.getAll().
+//
+// Edit mode: when `mode === 'edit'` + `defaults.id` is set, the form
+// submits PATCH /api/cases/:id instead of POST /api/cases.
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Search, X, ChevronDown, Users } from 'lucide-react';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 import Select from '@/components/common/Select';
+import Avatar from '@/components/common/Avatar';
 import caseService from '@/services/caseService';
 import clientService from '@/services/clientService';
+import { getLawFirmClients } from '@/services/profileService';
 
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Low' },
@@ -16,8 +32,20 @@ const PRIORITY_OPTIONS = [
 ];
 
 function emptyForm(defaults) {
+  // Multi-client: accept either `clientIds` array or single `clientId`.
+  const initialIds = Array.isArray(defaults && defaults.clientIds)
+    ? defaults.clientIds
+    : defaults && defaults.clientId
+      ? [defaults.clientId]
+      : [];
+  // Multi-assignee: accept `professionalIds` array or single `professionalId`.
+  const initialProIds = Array.isArray(defaults && defaults.professionalIds)
+    ? defaults.professionalIds
+    : defaults && defaults.professionalId
+      ? [defaults.professionalId]
+      : [];
   return {
-    clientId: (defaults && defaults.clientId) || '',
+    clientIds: [...new Set(initialIds.filter(Boolean))],
     title: (defaults && defaults.title) || '',
     category: (defaults && defaults.category) || '',
     description: (defaults && defaults.description) || '',
@@ -26,25 +54,29 @@ function emptyForm(defaults) {
     courtName: (defaults && defaults.courtName) || '',
     opposingParty: (defaults && defaults.opposingParty) || '',
     nextHearingDate: (defaults && defaults.nextHearingDate) || '',
-    professionalId: (defaults && defaults.professionalId) || '',
+    professionalIds: [...new Set(initialProIds.filter(Boolean))],
   };
 }
 
-/**
- * AddCaseModal — modal form to create a case. Reused by the professional and
- * firm cases lists.
- *
- * Props: { open, onClose, onCreated, defaults }
- *   `defaults` may include `firmId` (shows the "Assign to professional"
- *   field) and any pre-filled form values.
- */
-export default function AddCaseModal({ open, onClose, onCreated, defaults }) {
+export default function AddCaseModal({
+  open,
+  onClose,
+  onCreated,
+  onUpdated,
+  defaults,
+  firmMembers,
+  mode = 'create',
+}) {
+  const isEdit = mode === 'edit' && defaults && defaults.id;
+  const firmId = defaults && defaults.firmId;
+
   const [form, setForm] = useState(() => emptyForm(defaults));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [clients, setClients] = useState([]);
   const [clientsLoading, setClientsLoading] = useState(false);
 
+  // Reset whenever the modal is (re)opened with new defaults.
   useEffect(() => {
     if (open) {
       setForm(emptyForm(defaults));
@@ -53,17 +85,23 @@ export default function AddCaseModal({ open, onClose, onCreated, defaults }) {
     }
   }, [open, defaults]);
 
-  // Load the client list the first time the modal opens.
+  // Load the client list when the modal opens. Source depends on the
+  // caller's context:
+  //   - Firm dashboard (firmId set)  → aggregate clients of every member.
+  //   - Professional (no firmId)     → only this professional's clients.
   useEffect(() => {
     if (!open) return;
     let active = true;
     setClientsLoading(true);
-    clientService
-      .getAll({ limit: 200 })
-      .then((res) => {
-        if (!active) return;
-        const data = (res && res.data) || [];
-        setClients(Array.isArray(data) ? data : []);
+    const loader = firmId
+      ? getLawFirmClients().then((d) => (d && d.items) || [])
+      : clientService.getAll({ limit: 200 }).then((res) => {
+          const data = (res && res.data) || [];
+          return Array.isArray(data) ? data : [];
+        });
+    loader
+      .then((list) => {
+        if (active) setClients(Array.isArray(list) ? list : []);
       })
       .catch(() => {
         if (active) setClients([]);
@@ -74,25 +112,127 @@ export default function AddCaseModal({ open, onClose, onCreated, defaults }) {
     return () => {
       active = false;
     };
-  }, [open]);
+  }, [open, firmId]);
 
-  const clientOptions = useMemo(() => {
-    const opts = clients.map((c) => ({
-      value: c.id,
-      label: `${c.name || c.email || c.phone || c.id}${
-        c.phone ? ` · ${c.phone}` : ''
-      }`,
-    }));
-    opts.unshift({ value: '', label: '— Select a client —' });
-    return opts;
+  // --- Client multi-select ---------------------------------------------------
+  const [clientQuery, setClientQuery] = useState('');
+  const [clientOpen, setClientOpen] = useState(false);
+  const clientRef = useRef(null);
+  useEffect(() => {
+    if (!clientOpen) return undefined;
+    function onClick(e) {
+      if (clientRef.current && !clientRef.current.contains(e.target)) {
+        setClientOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [clientOpen]);
+
+  const clientById = useMemo(() => {
+    const map = new Map();
+    for (const c of clients) map.set(c.id, c);
+    return map;
   }, [clients]);
 
-  const firmId = defaults && defaults.firmId;
+  const selectedClients = form.clientIds
+    .map((id) => clientById.get(id))
+    .filter(Boolean);
+
+  const filteredClients = useMemo(() => {
+    const q = clientQuery.trim().toLowerCase();
+    return clients
+      .filter((c) => !form.clientIds.includes(c.id))
+      .filter((c) =>
+        !q
+          ? true
+          : [c.name, c.email, c.phone]
+              .map((s) => String(s || '').toLowerCase())
+              .some((s) => s.includes(q))
+      );
+  }, [clients, form.clientIds, clientQuery]);
+
+  function addClient(id) {
+    setForm((f) =>
+      f.clientIds.includes(id)
+        ? f
+        : { ...f, clientIds: [...f.clientIds, id] }
+    );
+    setClientQuery('');
+  }
+  function removeClient(id) {
+    setForm((f) => ({ ...f, clientIds: f.clientIds.filter((x) => x !== id) }));
+  }
+
+  // --- Assignee picker (firm-only) -------------------------------------------
+  const [assigneeQuery, setAssigneeQuery] = useState('');
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
+  const assigneeRef = useRef(null);
+  useEffect(() => {
+    if (!assigneeOpen) return undefined;
+    function onClick(e) {
+      if (assigneeRef.current && !assigneeRef.current.contains(e.target)) {
+        setAssigneeOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [assigneeOpen]);
+
+  const memberOptions = useMemo(() => {
+    if (!Array.isArray(firmMembers)) return [];
+    return firmMembers
+      .map((m) => {
+        const p = m.professional || {};
+        return {
+          publicId: m.publicId || p.publicId || null,
+          name: m.name || p.name || '',
+          email: m.email || p.email || '',
+          profilePhoto: m.profilePhoto || p.profilePhoto || null,
+          professionalType: m.professionalType || p.professionalType || '',
+          role: m.role || '',
+        };
+      })
+      .filter((x) => x.publicId);
+  }, [firmMembers]);
+
+  const filteredMembers = useMemo(() => {
+    const q = assigneeQuery.trim().toLowerCase();
+    if (!q) return memberOptions;
+    return memberOptions.filter((m) =>
+      [m.name, m.email, m.professionalType]
+        .map((s) => String(s || '').toLowerCase())
+        .some((s) => s.includes(q))
+    );
+  }, [assigneeQuery, memberOptions]);
+
+  // Multi-select assignee state — list of publicIds.
+  const filteredMembersForPicker = filteredMembers.filter(
+    (m) => !form.professionalIds.includes(m.publicId)
+  );
+  const selectedMembers = form.professionalIds
+    .map((pid) => memberOptions.find((m) => m.publicId === pid))
+    .filter(Boolean);
+
+  function addAssignee(pid) {
+    if (!pid) return;
+    setForm((f) =>
+      f.professionalIds.includes(pid)
+        ? f
+        : { ...f, professionalIds: [...f.professionalIds, pid] }
+    );
+    setAssigneeQuery('');
+  }
+  function removeAssignee(pid) {
+    setForm((f) => ({
+      ...f,
+      professionalIds: f.professionalIds.filter((x) => x !== pid),
+    }));
+  }
 
   function update(name, value) {
     setForm((f) => ({ ...f, [name]: value }));
   }
-
   function handleChange(e) {
     update(e.target.name, e.target.value);
   }
@@ -113,7 +253,7 @@ export default function AddCaseModal({ open, onClose, onCreated, defaults }) {
     setSubmitting(true);
     try {
       const payload = {
-        clientId: form.clientId.trim() || undefined,
+        clientIds: form.clientIds,
         title: form.title.trim(),
         category: form.category.trim(),
         description: form.description.trim() || undefined,
@@ -122,18 +262,29 @@ export default function AddCaseModal({ open, onClose, onCreated, defaults }) {
         courtName: form.courtName.trim() || undefined,
         opposingParty: form.opposingParty.trim() || undefined,
         nextHearingDate: form.nextHearingDate || undefined,
-        status: 'open',
       };
+      if (!isEdit) payload.status = 'open';
       if (firmId) payload.firmId = firmId;
-      if (firmId && form.professionalId.trim()) {
-        payload.professionalId = form.professionalId.trim();
+      // Multi-assignee — send the full array. The backend mirrors the
+      // primary `professionalId` from the first entry. On edit, send the
+      // array even when empty so the user can fully un-assign a case.
+      const cleanedProIds = form.professionalIds.filter(Boolean);
+      if (cleanedProIds.length > 0) {
+        payload.professionalIds = cleanedProIds;
+      } else if (isEdit) {
+        payload.professionalIds = [];
       }
 
-      const created = await caseService.create(payload);
-      if (typeof onCreated === 'function') onCreated(created);
+      if (isEdit) {
+        const updated = await caseService.update(defaults.id, payload);
+        if (typeof onUpdated === 'function') onUpdated(updated);
+      } else {
+        const created = await caseService.create(payload);
+        if (typeof onCreated === 'function') onCreated(created);
+      }
       if (typeof onClose === 'function') onClose();
     } catch (err) {
-      setError(err.message || 'Could not create case.');
+      setError(err.message || 'Could not save case.');
     } finally {
       setSubmitting(false);
     }
@@ -144,11 +295,19 @@ export default function AddCaseModal({ open, onClose, onCreated, defaults }) {
     if (typeof onClose === 'function') onClose();
   }
 
+  const submitLabel = submitting
+    ? isEdit
+      ? 'Saving…'
+      : 'Creating…'
+    : isEdit
+      ? 'Save changes'
+      : 'Create case';
+
   return (
     <Modal
       open={open}
       onClose={handleClose}
-      title="New case"
+      title={isEdit ? 'Edit case' : 'New case'}
       size="lg"
       footer={
         <>
@@ -166,26 +325,102 @@ export default function AddCaseModal({ open, onClose, onCreated, defaults }) {
             onClick={submit}
             disabled={submitting}
           >
-            {submitting ? 'Creating…' : 'Create case'}
+            {submitLabel}
           </Button>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-3">
-        <Select
-          label="Client"
-          name="clientId"
-          value={form.clientId}
-          onChange={handleChange}
-          options={clientOptions}
-          hint={
-            clientsLoading
-              ? 'Loading clients…'
-              : clients.length === 0
-                ? 'No clients on file yet — add one from the Clients module.'
-                : 'Pick the client this case is for.'
-          }
-        />
+        {/* --- Client multi-select ----------------------------------------- */}
+        <div ref={clientRef} className="relative">
+          <label
+            htmlFor="case-clients"
+            className="mb-1.5 block text-sm font-medium text-slate-700"
+          >
+            Clients
+          </label>
+          {selectedClients.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {selectedClients.map((c) => (
+                <span
+                  key={c.id}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700"
+                >
+                  {c.name || c.email || c.phone || c.id}
+                  <button
+                    type="button"
+                    onClick={() => removeClient(c.id)}
+                    className="text-blue-400 hover:text-red-600"
+                    aria-label={`Remove ${c.name || 'client'}`}
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              id="case-clients"
+              type="text"
+              value={clientQuery}
+              onChange={(e) => {
+                setClientQuery(e.target.value);
+                setClientOpen(true);
+              }}
+              onFocus={() => setClientOpen(true)}
+              placeholder={
+                clientsLoading
+                  ? 'Loading clients…'
+                  : clients.length === 0
+                    ? 'No clients available yet'
+                    : 'Search clients by name, phone, or email…'
+              }
+              autoComplete="off"
+              className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-9 text-sm text-slate-800 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          </div>
+          {clientOpen && filteredClients.length > 0 && (
+            <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+              {filteredClients.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addClient(c.id);
+                      setClientOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-blue-50"
+                  >
+                    <Avatar
+                      src={c.profilePhoto}
+                      name={c.name || c.email || 'Client'}
+                      size="sm"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-800">
+                        {c.name || c.email || c.phone || c.id}
+                      </p>
+                      <p className="truncate text-xs text-slate-500">
+                        {[c.phone, c.email].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-1 text-xs text-slate-500">
+            <Users size={11} className="mr-0.5 inline" />
+            Select one or more clients.{' '}
+            {firmId
+              ? 'Showing every client linked to a firm member.'
+              : 'Showing only your linked clients.'}
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input
             label="Title"
@@ -203,6 +438,7 @@ export default function AddCaseModal({ open, onClose, onCreated, defaults }) {
             placeholder="e.g. Civil litigation"
           />
         </div>
+
         <div>
           <label
             htmlFor="case-description"
@@ -219,6 +455,7 @@ export default function AddCaseModal({ open, onClose, onCreated, defaults }) {
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
         </div>
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Select
             label="Priority"
@@ -258,16 +495,116 @@ export default function AddCaseModal({ open, onClose, onCreated, defaults }) {
           value={form.nextHearingDate}
           onChange={handleChange}
         />
-        {firmId && (
-          <Input
-            label="Assign to professional"
-            name="professionalId"
-            value={form.professionalId}
-            onChange={handleChange}
-            placeholder="prof-N or pdetail-..."
-            hint="Leave blank to create unassigned."
-          />
+
+        {/* Multi-assignee picker — only when the caller passes a member
+            list (firm dashboard). Professional dashboard auto-assigns the
+            creator via defaults.professionalIds. */}
+        {Array.isArray(firmMembers) && firmMembers.length > 0 && (
+          <div ref={assigneeRef} className="relative">
+            <label
+              htmlFor="case-assignee"
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+            >
+              Assign to professionals
+            </label>
+            {selectedMembers.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {selectedMembers.map((m) => (
+                  <span
+                    key={m.publicId}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
+                  >
+                    <Avatar
+                      src={m.profilePhoto}
+                      name={m.name}
+                      size="xs"
+                    />
+                    {m.name || m.email || m.publicId}
+                    <button
+                      type="button"
+                      onClick={() => removeAssignee(m.publicId)}
+                      className="text-emerald-400 hover:text-red-600"
+                      aria-label={`Remove ${m.name || 'assignee'}`}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="case-assignee"
+                type="text"
+                value={assigneeQuery}
+                onChange={(e) => {
+                  setAssigneeQuery(e.target.value);
+                  setAssigneeOpen(true);
+                }}
+                onFocus={() => setAssigneeOpen(true)}
+                placeholder={
+                  memberOptions.length === 0
+                    ? 'No professionals in your firm yet'
+                    : 'Search by name, email, or type…'
+                }
+                autoComplete="off"
+                className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-9 text-sm text-slate-800 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            </div>
+            {assigneeOpen && memberOptions.length > 0 && (
+              <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                {filteredMembersForPicker.length === 0 ? (
+                  <li className="px-3 py-2 text-xs text-slate-500">
+                    {selectedMembers.length === memberOptions.length
+                      ? 'All firm members already added.'
+                      : 'No matches.'}
+                  </li>
+                ) : (
+                  filteredMembersForPicker.map((m) => (
+                    <li key={m.publicId}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          addAssignee(m.publicId);
+                          setAssigneeQuery('');
+                          setAssigneeOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-emerald-50"
+                      >
+                        <Avatar
+                          src={m.profilePhoto}
+                          name={m.name}
+                          size="sm"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-slate-800">
+                            {m.name || '—'}
+                          </p>
+                          <p className="truncate text-xs text-slate-500">
+                            {m.email}
+                            {m.professionalType
+                              ? ` · ${m.professionalType}`
+                              : ''}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-400">
+                          {m.role}
+                        </span>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              Pick one or more firm members. Leave empty to keep the case
+              unassigned.
+            </p>
+          </div>
         )}
+
         <button type="submit" className="hidden" aria-hidden="true" />
         {error && <p className="text-xs text-red-600">{error}</p>}
       </form>

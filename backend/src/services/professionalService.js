@@ -158,7 +158,14 @@ const normalizeProfileProfessional = ({ user, address, detail }) => {
     rating: toNum(detail.rating),
     reviewsCount: toNum(detail.reviewsCount),
     verified: true,
-    availableNow: true,
+    // MariaDB stores booleans as TINYINT(1); 0/'0'/false all mean "off",
+    // null/undefined means "not set" (treated as available for legacy rows).
+    availableNow:
+      detail.availableNow === false ||
+      detail.availableNow === 0 ||
+      detail.availableNow === '0'
+        ? false
+        : true,
   };
 };
 

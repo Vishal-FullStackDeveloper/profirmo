@@ -10,17 +10,33 @@ import { useLanguage } from '@/components/LanguageProvider';
 import { useAuth } from '@/hooks/useAuth';
 import reviewService from '@/services/reviewService';
 import caseService from '@/services/caseService';
+import professionalService from '@/services/professionalService';
 import { ROLES } from '@/utils/constants';
-import { professionals } from '@/data/mockData';
 
 export default function ProfessionalDashboardPage() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const linkedId = user ? user.linkedId || user.firmId : undefined;
 
-  // Live data: reviews (for rating stat) and assigned cases (for the rest).
+  // Live data: reviews (for rating stat), assigned cases, and the caller's
+  // own professional record (for availability / rate).
   const [myReviews, setMyReviews] = useState([]);
   const [myCases, setMyCases] = useState([]);
+  const [myProfessional, setMyProfessional] = useState(null);
+
+  const loadProfessional = useCallback(async () => {
+    if (!linkedId) return;
+    try {
+      const data = await professionalService.getById(linkedId);
+      if (data && data.id) setMyProfessional(data);
+    } catch {
+      // Ignore — availability manager falls back to an empty schedule.
+    }
+  }, [linkedId]);
+
+  useEffect(() => {
+    loadProfessional();
+  }, [loadProfessional]);
 
   const loadStats = useCallback(async () => {
     const [reviewsRes, casesRes] = await Promise.allSettled([
@@ -64,17 +80,16 @@ export default function ProfessionalDashboardPage() {
     myCases.map((c) => c.clientId).filter(Boolean)
   ).size;
 
-  const professional =
-    professionals.find((p) => p.id === linkedId) || professionals[0];
+  const professional = myProfessional || {};
 
-  // Profile completion estimate.
+  // Profile completion estimate — drawn from live fields.
   const fields = [
     professional.bio,
-    professional.specialization,
+    professional.specialization || professional.designation,
     professional.registrationNumber,
     professional.languages && professional.languages.length,
-    professional.perMinuteRate,
-    professional.availabilitySlots && professional.availabilitySlots.length,
+    professional.consultationFee || professional.perMinuteRate,
+    professional.availability && professional.availability.length,
   ];
   const filled = fields.filter(Boolean).length;
   const completion = Math.round((filled / fields.length) * 100);
@@ -114,7 +129,10 @@ export default function ProfessionalDashboardPage() {
         </Card>
 
         {/* Availability */}
-        <AvailabilityManager professional={professional} />
+        <AvailabilityManager
+          professional={professional}
+          onSaved={loadProfessional}
+        />
 
         {/* Earnings & performance */}
         <section>

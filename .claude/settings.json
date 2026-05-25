@@ -15,7 +15,11 @@
       "Bash(curl -s -o /dev/null -w \"/firms → %{http_code}\\\\n\" http://localhost:3000/firms)",
       "Bash(curl -s -o /dev/null -w \"/firms/firm-1 → %{http_code}\\\\n\" http://localhost:3000/firms/firm-1)",
       "Bash(curl -s http://localhost:5001/api/firms)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(echo \"backend PID $!\")",
+      "Bash(echo \"frontend PID $!\")",
+      "Bash(curl -s -o /dev/null -w \"  HTTP %{http_code}\\\\n\" http://localhost:5001/api/firms)",
+      "Bash(curl -s -o /dev/null -w \"  HTTP %{http_code}\\\\n\" http://localhost:3000)"
     ]
   }
 }

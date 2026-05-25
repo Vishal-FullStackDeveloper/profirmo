@@ -1,25 +1,35 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Users, RefreshCw } from 'lucide-react';
+import { Users, RefreshCw, UserPlus } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import ClientTable from '@/components/dashboard/ClientTable';
+import AddClientModal from '@/components/dashboard/AddClientModal';
 import EmptyState from '@/components/common/EmptyState';
+import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
-import caseService from '@/services/caseService';
+import { getLawFirmClients } from '@/services/profileService';
 import { ROLES } from '@/utils/constants';
 
 export default function FirmClientsPage() {
-  const [cases, setCases] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [memberCount, setMemberCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [inviteNotice, setInviteNotice] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
-      const data = await caseService.getFirmCases();
-      setCases(Array.isArray(data && data.items) ? data.items : []);
-    } catch {
-      setCases([]);
+      const data = await getLawFirmClients();
+      setClients(Array.isArray(data && data.items) ? data.items : []);
+      setMemberCount(Number(data && data.memberCount) || 0);
+    } catch (err) {
+      setLoadError(err.message || 'Failed to load firm clients.');
+      setClients([]);
+      setMemberCount(0);
     } finally {
       setLoading(false);
     }
@@ -29,23 +39,22 @@ export default function FirmClientsPage() {
     load();
   }, [load]);
 
-  // Derive the firm's client list from the unique `client` payloads on its
-  // cases (case responses already carry `client: { id, name, phone, email }`).
-  const clientMap = new Map();
-  for (const c of cases) {
-    if (c.client && c.client.id && !clientMap.has(c.client.id)) {
-      clientMap.set(c.client.id, c.client);
-    } else if (c.clientId && !clientMap.has(c.clientId)) {
-      clientMap.set(c.clientId, { id: c.clientId, name: c.clientId });
+  async function handleAdded(result) {
+    if (result && result.inviteSent) {
+      setInviteNotice(
+        `Invitation email sent to ${result.email}. They can claim their account from that link.`
+      );
+    } else {
+      setInviteNotice('');
     }
+    await load();
   }
-  const firmClients = [...clientMap.values()];
 
   return (
     <DashboardLayout
       role={ROLES.FIRM_ADMIN}
       title="Clients"
-      subtitle="Clients with cases at your firm"
+      subtitle="Clients of every professional in your firm"
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -56,21 +65,48 @@ export default function FirmClientsPage() {
             <p className="text-sm font-medium text-slate-700">
               {loading
                 ? 'Loading clients…'
-                : `${firmClients.length} client${
-                    firmClients.length === 1 ? '' : 's'
+                : `${clients.length} client${
+                    clients.length === 1 ? '' : 's'
+                  } across ${memberCount} professional${
+                    memberCount === 1 ? '' : 's'
                   }`}
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={load}
-            disabled={loading}
-          >
-            <RefreshCw size={15} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={load}
+              disabled={loading}
+            >
+              <RefreshCw size={15} />
+              Refresh
+            </Button>
+            <Button size="sm" onClick={() => setModalOpen(true)}>
+              <UserPlus size={15} />
+              Add client
+            </Button>
+          </div>
         </div>
+
+        {loadError && (
+          <Card>
+            <p className="text-sm text-red-600">{loadError}</p>
+          </Card>
+        )}
+
+        {inviteNotice && (
+          <div className="flex items-start justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            <span>{inviteNotice}</span>
+            <button
+              type="button"
+              onClick={() => setInviteNotice('')}
+              className="text-emerald-700/70 hover:text-emerald-900"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="space-y-3">
@@ -81,16 +117,28 @@ export default function FirmClientsPage() {
               />
             ))}
           </div>
-        ) : firmClients.length === 0 ? (
+        ) : clients.length === 0 ? (
           <EmptyState
             icon={<Users size={24} />}
             title="No clients yet"
-            description="Clients appear here once your firm has cases assigned to them."
+            description="Add a client, or wait for professionals in your firm to add theirs — every member's clients show up here."
+            action={
+              <Button onClick={() => setModalOpen(true)} variant="primary">
+                <UserPlus size={15} />
+                Add client
+              </Button>
+            }
           />
         ) : (
-          <ClientTable clients={firmClients} />
+          <ClientTable clients={clients} />
         )}
       </div>
+
+      <AddClientModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onAdded={handleAdded}
+      />
     </DashboardLayout>
   );
 }

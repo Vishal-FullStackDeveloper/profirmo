@@ -9,6 +9,8 @@ import Badge from '@/components/common/Badge';
 import EmptyState from '@/components/common/EmptyState';
 import AddCaseModal from '@/components/cases/AddCaseModal';
 import caseService from '@/services/caseService';
+import { useAuth } from '@/components/AuthProvider';
+import firmJoinService from '@/services/firmJoinService';
 import { ROLES } from '@/utils/constants';
 import { formatDate } from '@/utils/formatters';
 
@@ -45,10 +47,34 @@ function ListSkeleton() {
 }
 
 export default function ProfessionalCasesPage() {
+  const { user } = useAuth();
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [firmIdForCreate, setFirmIdForCreate] = useState(null);
+
+  // If the caller belongs to a firm, surface its id so cases created from
+  // the professional dashboard are tagged with the firm and surface in the
+  // firm's cases list.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const membership = await firmJoinService.getMyMembership();
+        if (!active) return;
+        setFirmIdForCreate(
+          (membership && membership.firm && (membership.firm.legacyFirmId || membership.firm.id)) ||
+            null
+        );
+      } catch {
+        if (active) setFirmIdForCreate(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -208,6 +234,14 @@ export default function ProfessionalCasesPage() {
         onCreated={() => {
           setAddOpen(false);
           load();
+        }}
+        defaults={{
+          // Auto-assign the creator (so cases land on their dashboard).
+          professionalIds:
+            user && user.linkedId ? [user.linkedId] : [],
+          // Tag the case with the creator's firm (if any) so it surfaces
+          // in the firm cases list.
+          firmId: firmIdForCreate || undefined,
         }}
       />
     </DashboardLayout>

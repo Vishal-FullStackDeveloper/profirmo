@@ -10,6 +10,9 @@ import {
   Trash2,
   AlertTriangle,
   RefreshCw,
+  ExternalLink,
+  Search,
+  Loader2,
 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import Card from '@/components/common/Card';
@@ -25,6 +28,7 @@ import {
   removeFirmMember,
   createFirmInvitation,
 } from '@/services/profileService';
+import { searchProfessionals } from '@/services/firmService';
 import Input from '@/components/common/Input';
 import Select from '@/components/common/Select';
 import { ROLES } from '@/utils/constants';
@@ -151,6 +155,9 @@ export default function FirmProfessionalsPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState('');
   const [inviteSuccess, setInviteSuccess] = useState('');
+  const [emailSuggestions, setEmailSuggestions] = useState([]);
+  const [emailSearching, setEmailSearching] = useState(false);
+  const [emailSelected, setEmailSelected] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -214,6 +221,47 @@ export default function FirmProfessionalsPage() {
     setInviteForm({ email: '', role: 'member', message: '' });
     setInviteError('');
     setInviteSuccess('');
+    setEmailSuggestions([]);
+    setEmailSearching(false);
+    setEmailSelected(null);
+  }
+
+  // Debounced email autocomplete against /api/law-firm/search-professionals.
+  useEffect(() => {
+    if (!inviteOpen) return undefined;
+    const q = inviteForm.email.trim();
+    if (q.length < 2) {
+      setEmailSuggestions([]);
+      setEmailSearching(false);
+      return undefined;
+    }
+    // If the user has clicked a suggestion and the email matches, don't keep
+    // re-firing the search — it's already locked in.
+    if (emailSelected && emailSelected.email === q) {
+      return undefined;
+    }
+    let active = true;
+    setEmailSearching(true);
+    const handle = setTimeout(async () => {
+      try {
+        const list = await searchProfessionals(q);
+        if (active) setEmailSuggestions(Array.isArray(list) ? list : []);
+      } catch {
+        if (active) setEmailSuggestions([]);
+      } finally {
+        if (active) setEmailSearching(false);
+      }
+    }, 300);
+    return () => {
+      active = false;
+      clearTimeout(handle);
+    };
+  }, [inviteForm.email, inviteOpen, emailSelected]);
+
+  function pickSuggestion(s) {
+    setInviteForm((f) => ({ ...f, email: s.email || '' }));
+    setEmailSelected(s);
+    setEmailSuggestions([]);
   }
 
   async function submitInvite(e) {
@@ -334,14 +382,14 @@ export default function FirmProfessionalsPage() {
                 <Card key={m.id} hover>
                   <div className="flex items-start gap-3">
                     <Avatar
-                      src={m.profilePhoto}
-                      name={m.name}
+                      src={m.profilePhoto || (m.professional && m.professional.profilePhoto)}
+                      name={m.name || (m.professional && m.professional.name)}
                       size="md"
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <p className="truncate font-medium text-slate-800">
-                          {m.name || '—'}
+                          {m.name || (m.professional && m.professional.name) || '—'}
                         </p>
                         {!isOwner && (
                           <MemberActionsMenu
@@ -352,22 +400,38 @@ export default function FirmProfessionalsPage() {
                           />
                         )}
                       </div>
-                      {m.email && (
+                      {(m.email || (m.professional && m.professional.email)) && (
                         <p className="truncate text-xs text-slate-500">
-                          {m.email}
+                          {m.email || m.professional.email}
                         </p>
                       )}
-                      {m.professionalType && (
+                      {(m.professionalType ||
+                        (m.professional && m.professional.professionalType)) && (
                         <p className="truncate text-xs text-slate-500">
-                          {m.professionalType}
+                          {m.professionalType || m.professional.professionalType}
                         </p>
                       )}
-                      <div className="mt-2">
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
                         <Badge variant={roleBadgeVariant(m.role)}>
                           {isOwner ? 'Owner' : roleLabel(m.role)}
                         </Badge>
+                        {(m.publicId ||
+                          (m.professional && m.professional.publicId)) && (
+                          <a
+                            href={`/professionals/${
+                              m.publicId ||
+                              (m.professional && m.professional.publicId)
+                            }`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-blue-300 hover:text-blue-700"
+                          >
+                            View profile
+                            <ExternalLink size={12} />
+                          </a>
+                        )}
                         {busy && (
-                          <span className="ml-2 text-xs text-slate-400">
+                          <span className="text-xs text-slate-400">
                             Saving…
                           </span>
                         )}
@@ -452,16 +516,92 @@ export default function FirmProfessionalsPage() {
             professional on the platform before they can accept and join your
             firm.
           </p>
-          <Input
-            label="Email"
-            name="email"
-            type="email"
-            value={inviteForm.email}
-            onChange={(e) =>
-              setInviteForm((f) => ({ ...f, email: e.target.value }))
-            }
-            required
-          />
+          <div>
+            <label
+              htmlFor="invite-email"
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+            >
+              Email
+            </label>
+            <div className="relative">
+              <input
+                id="invite-email"
+                name="email"
+                type="email"
+                value={inviteForm.email}
+                onChange={(e) => {
+                  setInviteForm((f) => ({ ...f, email: e.target.value }));
+                  // Typing breaks the "selected suggestion" lock.
+                  if (emailSelected && emailSelected.email !== e.target.value) {
+                    setEmailSelected(null);
+                  }
+                }}
+                placeholder="Start typing to search approved professionals…"
+                autoComplete="off"
+                required
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 transition-colors focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
+              />
+              {emailSearching && (
+                <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-400" />
+              )}
+            </div>
+            {emailSuggestions.length > 0 && (
+              <ul className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+                {emailSuggestions.map((s) => (
+                  <li key={s.userId}>
+                    <button
+                      type="button"
+                      onClick={() => pickSuggestion(s)}
+                      className="flex w-full flex-col items-start gap-0.5 border-b border-slate-100 px-3 py-2 text-left transition last:border-b-0 hover:bg-amber-50"
+                    >
+                      <span className="text-sm font-medium text-slate-800">
+                        {s.fullName || s.email}
+                      </span>
+                      <span className="truncate text-xs text-slate-500">
+                        {s.email}
+                        {s.professionalType ? ` · ${s.professionalType}` : ''}
+                      </span>
+                      {s.currentFirm && (
+                        <span
+                          className={`mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            s.currentFirm.isMyFirm
+                              ? 'bg-slate-100 text-slate-600'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          <AlertTriangle size={11} />
+                          {s.currentFirm.isMyFirm
+                            ? `Already in your firm (${s.currentFirm.role || 'member'})`
+                            : `Already in ${s.currentFirm.firmName || 'another firm'}`}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {emailSelected && emailSelected.currentFirm && (
+              <div
+                className={`mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-xs ${
+                  emailSelected.currentFirm.isMyFirm
+                    ? 'bg-slate-50 text-slate-600'
+                    : 'bg-amber-50 text-amber-800'
+                }`}
+              >
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                <span>
+                  {emailSelected.currentFirm.isMyFirm
+                    ? `${emailSelected.fullName || emailSelected.email} is already a member of your firm.`
+                    : `${
+                        emailSelected.fullName || emailSelected.email
+                      } is already a member of ${
+                        emailSelected.currentFirm.firmName ||
+                        'another firm'
+                      }. They must leave that firm before they can accept your invitation.`}
+                </span>
+              </div>
+            )}
+          </div>
           <Select
             label="Role"
             name="role"

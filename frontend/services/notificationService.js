@@ -25,6 +25,23 @@ export async function listNotifications({ page = 1, limit = 20 } = {}) {
 }
 
 /**
+ * Paginated list — returns `{ items, page, limit, total, totalPages }`. Use
+ * this from a dedicated notifications page where pagination matters.
+ */
+export async function listNotificationsPaginated({ page = 1, limit = 20 } = {}) {
+  const res = await get('/api/notifications', { params: { page, limit } });
+  const items = Array.isArray(res && res.data) ? res.data : [];
+  const meta = (res && res.meta) || {};
+  return {
+    items,
+    page: Number(meta.page) || page,
+    limit: Number(meta.limit) || limit,
+    total: Number(meta.total) || items.length,
+    totalPages: Number(meta.totalPages) || 1,
+  };
+}
+
+/**
  * Get the count of unread notifications.
  * @returns {Promise<number>}
  */
@@ -55,6 +72,7 @@ export async function markAllRead() {
 
 export default {
   listNotifications,
+  listNotificationsPaginated,
   getUnreadCount,
   markRead,
   markAllRead,

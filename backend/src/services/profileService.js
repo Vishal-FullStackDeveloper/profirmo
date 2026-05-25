@@ -54,6 +54,11 @@ const PROFESSIONAL_DETAIL_FIELDS = [
   'licenseDocument',
   'identityDocument',
   'certificationsDocuments',
+  // Availability + rate live on the same row so the booking page can read
+  // them via GET /api/professionals/:id without a second query.
+  'availability',
+  'availableNow',
+  'consultationFee',
 ];
 
 // lawyer_specific_details columns settable via the body's `lawyer` object.

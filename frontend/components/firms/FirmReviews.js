@@ -56,12 +56,18 @@ export default function FirmReviews({ firmId, onAppeal }) {
 
   return (
     <Card>
-      <div className="mb-5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MessageSquare size={18} className="text-blue-600" />
-          <h2 className="text-base font-semibold text-slate-900">
-            {t('firmDetail.clientReviews')}
-          </h2>
+      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <MessageSquare size={18} className="text-blue-600" />
+            <h2 className="text-base font-semibold text-slate-900">
+              Reviews of our professionals
+            </h2>
+          </div>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Clients review individual professionals — a firm&apos;s rating is
+            the collective rating of every professional working under it.
+          </p>
         </div>
         {!loading && count > 0 && (
           <div className="flex items-center gap-2 text-sm">

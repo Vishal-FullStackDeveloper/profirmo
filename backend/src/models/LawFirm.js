@@ -37,6 +37,10 @@ const LawFirm = sequelize.define(
     contactEmail: { type: DataTypes.STRING, allowNull: true },
     contactNumber: { type: DataTypes.STRING, allowNull: true },
     totalEmployees: { type: DataTypes.INTEGER, allowNull: true },
+    // Self-declared number of practising professionals in the firm. Separate
+    // from `totalEmployees` (which may include support staff) and from the
+    // derived `professionalCount` based on FirmMember rows.
+    numberOfProfessionals: { type: DataTypes.INTEGER, allowNull: true },
     practiceAreas: jsonField('practiceAreas', []),
     socialLinks: jsonField('socialLinks', {}),
     registrationCertificate: { type: DataTypes.STRING, allowNull: true },

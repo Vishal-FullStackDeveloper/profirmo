@@ -7,7 +7,7 @@ import Button from '@/components/common/Button';
 import Avatar from '@/components/common/Avatar';
 import RatingStars from '@/components/common/RatingStars';
 import { useLanguage } from '@/components/LanguageProvider';
-import { formatCurrency } from '@/utils/formatters';
+import { formatCurrency, slugify } from '@/utils/formatters';
 
 /**
  * ProfessionalCard — summary card for a single professional.
@@ -97,7 +97,9 @@ export default function ProfessionalCard({ professional }) {
 
       <div className="mt-4 flex gap-2">
         <Button
-          href={`/professionals/${id}`}
+          href={`/professionals/${id}${
+            slugify(name) ? `/${slugify(name)}` : ''
+          }`}
           variant="outline"
           size="sm"
           className="flex-1"

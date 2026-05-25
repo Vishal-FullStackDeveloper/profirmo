@@ -97,6 +97,22 @@ export function getInitials(name) {
 }
 
 /**
+ * Convert a human-readable name into a URL-friendly slug. Lowercased,
+ * diacritic-stripped, non-alphanumerics replaced with hyphens, collapsed
+ * runs and edge hyphens removed. Returns '' when input is unusable.
+ */
+export function slugify(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+/**
  * Truncate a string to n characters, appending an ellipsis.
  */
 export function truncate(str, n = 100) {

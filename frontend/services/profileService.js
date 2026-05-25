@@ -65,6 +65,15 @@ export async function getLawFirm() {
 }
 
 /**
+ * Aggregated clients of every member professional in the caller's firm.
+ * @returns {Promise<{firmId, items, memberCount}>}
+ */
+export async function getLawFirmClients() {
+  const res = await get('/api/law-firm/mine/clients');
+  return unwrap(res);
+}
+
+/**
  * Create a new law firm (firm_admin).
  * @returns {Promise<Object>}
  */
@@ -117,11 +126,20 @@ export async function createFirmInvitation({ email, role, message }) {
  * @returns {Promise<Object>}
  */
 export async function updateFirmMember(id, { role, status }) {
-  const res = await apiRequest(`/api/law-firm/mine/members/${id}`, {
-    method: 'PUT',
-    body: { role, status },
-  });
-  return unwrap(res);
+  // Role changes use the dedicated route (PATCH /:id/role). Status changes
+  // would need a separate route; for now we only support role updates here.
+  if (role) {
+    const res = await apiRequest(`/api/law-firm/mine/members/${id}/role`, {
+      method: 'PATCH',
+      body: { role },
+    });
+    return unwrap(res);
+  }
+  if (status) {
+    // No status endpoint yet — caller should not rely on this branch.
+    return null;
+  }
+  return null;
 }
 
 /**
@@ -139,6 +157,7 @@ export default {
   updateProfile,
   updateProfessionalDetails,
   getLawFirm,
+  getLawFirmClients,
   createLawFirm,
   updateLawFirm,
   addFirmMember,

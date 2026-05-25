@@ -18,6 +18,13 @@ const File = sequelize.define(
       defaultValue: genId,
     },
     caseId: { type: DataTypes.STRING(64), allowNull: true },
+    // Optional link to a CaseUpdate row when this file is attached to a
+    // case update (rather than directly to the case).
+    caseUpdateId: { type: DataTypes.STRING(64), allowNull: true },
+    // Original storage URL the upload service returned (PhotoUpload /
+    // FileUpload). Lets the UI render a download link without resolving
+    // through the upload registry.
+    url: { type: DataTypes.STRING(512), allowNull: true },
     name: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
     size: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
     type: {
@@ -30,7 +37,7 @@ const File = sequelize.define(
   {
     tableName: 'files',
     timestamps: true,
-    indexes: [{ fields: ['caseId'] }],
+    indexes: [{ fields: ['caseId'] }, { fields: ['caseUpdateId'] }],
   }
 );
 

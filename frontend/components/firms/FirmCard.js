@@ -7,6 +7,7 @@ import Button from '@/components/common/Button';
 import Avatar from '@/components/common/Avatar';
 import RatingStars from '@/components/common/RatingStars';
 import { useLanguage } from '@/components/LanguageProvider';
+import { slugify } from '@/utils/formatters';
 
 /**
  * FirmCard — summary card for a single firm.
@@ -99,7 +100,9 @@ export default function FirmCard({ firm }) {
 
       <div className="mt-5 border-t border-slate-100 pt-4">
         <Button
-          href={`/firms/${id}`}
+          href={`/firms/${id}${
+            slugify(firmName) ? `/${slugify(firmName)}` : ''
+          }`}
           variant="outline"
           size="sm"
           className="w-full"

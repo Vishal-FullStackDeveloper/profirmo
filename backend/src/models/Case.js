@@ -6,6 +6,7 @@
 
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
+const jsonField = require('./jsonField');
 
 const genId = () =>
   `case-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -19,8 +20,22 @@ const Case = sequelize.define(
       allowNull: false,
       defaultValue: genId,
     },
+    // Primary client for this case — kept for back-compat with surfaces
+    // that expect a single client. New code should read `clientIds` (and
+    // the decorated `clients` array on API responses) instead.
     clientId: { type: DataTypes.STRING(64), allowNull: true },
+    // Multi-client support — a case may have any number of clients (e.g.
+    // joint litigation). Stored as a JSON array of users.id values. The
+    // afterFind hook in models/index.js parses it for raw queries.
+    clientIds: jsonField('clientIds', []),
+    // Primary assignee — back-compat for single-assignee surfaces.
     professionalId: { type: DataTypes.STRING(64), allowNull: true },
+    // Multi-assignee support: a case can be assigned to any number of
+    // professionals. Stored as a JSON array of public professional ids
+    // (legacy `prof-N` OR new `pdetail-...`). The afterFind hook parses
+    // this for raw queries; the primary `professionalId` column stays in
+    // sync (= professionalIds[0]).
+    professionalIds: jsonField('professionalIds', []),
     firmId: { type: DataTypes.STRING(64), allowNull: true },
     title: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
     category: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },

@@ -48,6 +48,7 @@ const PHASE7_COLUMNS = {
   professional_details: [
     ['consultationFee', 'DECIMAL(10,2)'],
     ['availability', 'LONGTEXT'],
+    ['availableNow', 'TINYINT(1) NULL'],
     ['degreeCertificate', 'VARCHAR(255)'],
   ],
 };
@@ -72,6 +73,7 @@ const LISTING_COLUMNS = {
   law_firms: [
     ['rating', 'DECIMAL(3,2) DEFAULT 0'],
     ['reviewsCount', 'INT DEFAULT 0'],
+    ['numberOfProfessionals', 'INT NULL'],
   ],
 };
 
@@ -280,6 +282,13 @@ async function runMigrations() {
     ['nextHearingDate', 'DATE'],
     ['assignedByUserId', 'VARCHAR(64)'],
     ['assignedAt', 'DATETIME'],
+    // Multi-client support: JSON array of users.id values. The primary
+    // `clientId` column stays for back-compat (= clientIds[0]).
+    ['clientIds', 'LONGTEXT'],
+    // Multi-assignee support: JSON array of public professional ids. The
+    // primary `professionalId` column stays for back-compat (=
+    // professionalIds[0]).
+    ['professionalIds', 'LONGTEXT'],
   ];
   let caseColsAdded = 0;
   for (const [col, type] of CASE_COLUMNS) {
@@ -297,6 +306,35 @@ async function runMigrations() {
   console.log(
     `[Migrate] Case column check complete (${caseColsAdded} processed).`
   );
+
+  // 7c. Files: optional link to a CaseUpdate, plus a `url` column so the
+  //     UI can render attachments without a second round-trip.
+  const FILE_COLUMNS = [
+    ['caseUpdateId', 'VARCHAR(64)'],
+    ['url', 'VARCHAR(512)'],
+  ];
+  for (const [col, type] of FILE_COLUMNS) {
+    try {
+      await sequelize.query(
+        `ALTER TABLE \`files\` ADD COLUMN IF NOT EXISTS \`${col}\` ${type}`
+      );
+    } catch (err) {
+      console.warn(`[Migrate] Could not add files.${col}: ${err.message}`);
+    }
+  }
+
+  // 7d. CaseUpdate `title` column for existing DBs.
+  try {
+    await sequelize.query(
+      'ALTER TABLE `case_updates` ADD COLUMN IF NOT EXISTS `title` VARCHAR(255)'
+    );
+  } catch (err) {
+    // The case_updates table may not exist on a fresh DB yet — sync() will
+    // create it with the column already on the model.
+    if (!/doesn'?t exist|Unknown table/i.test(err.message)) {
+      console.warn(`[Migrate] Could not add case_updates.title: ${err.message}`);
+    }
+  }
 
   // 7b. Allow ownerless firms — admin can create a law firm before assigning
   //     an owner. Earlier the column was NOT NULL.
@@ -554,6 +592,23 @@ async function runMigrations() {
   //     unused `firmId` column from the reviews table.
   await runReviewFirmIdDrop();
 
+  // 13. Reviews can target either a legacy `professionals.id` or a new-model
+  //     `professional_details.id`, so the legacy FK on reviews.professionalId
+  //     → professionals.id is wrong (blocks reviews against new-model pros).
+  //     Drop it; the column stays as a plain string.
+  await runReviewProfessionalFkDrop();
+
+  // 14. Same class of stale FKs on cases / bookings / consultations: their
+  //     `professionalId` and `firmId` columns now hold either legacy or
+  //     new-model ids, so the original FKs to `professionals` / `firms`
+  //     reject the new-model values. Drop every such FK; the columns stay.
+  await runDependentLegacyFkDrop();
+
+  // 15. Backfill empty CaseNote.authorName values from the User row — older
+  //     entries were written with an empty name because the JWT carried no
+  //     name fields. Idempotent: skips notes that already have a name.
+  await runCaseNoteAuthorNameBackfill();
+
   console.log('[Migrate] Migrations finished successfully.');
 }
 
@@ -569,7 +624,13 @@ async function runOwnerMemberBackfill() {
       FirmMember,
       ProfessionalDetail,
     } = require('../models');
-    const firms = await LawFirm.findAll({ raw: true });
+    // Read only the columns we use so the query still works when the model
+    // includes columns the DB has not yet picked up via the additive column
+    // check that runs below this phase.
+    const firms = await LawFirm.findAll({
+      attributes: ['id', 'ownerUserId'],
+      raw: true,
+    });
     let added = 0;
     let detailsCreated = 0;
     for (const f of firms) {
@@ -603,6 +664,146 @@ async function runOwnerMemberBackfill() {
     }
   } catch (err) {
     console.warn(`[Migrate] Owner FirmMember backfill failed: ${err.message}`);
+  }
+}
+
+// `cases / bookings / consultations` keep `professionalId` and `firmId` as
+// plain string columns now (they can hold either a legacy id or a new-model
+// id). The original Sequelize-generated FKs to the legacy `professionals`
+// and `firms` tables reject new-model writes — drop every such FK on these
+// three tables. Idempotent (queries INFORMATION_SCHEMA and skips when
+// already gone).
+async function runDependentLegacyFkDrop() {
+  const targets = [
+    { table: 'cases', column: 'professionalId', refTable: 'professionals' },
+    { table: 'cases', column: 'firmId', refTable: 'firms' },
+    { table: 'cases', column: 'clientId', refTable: 'clients' },
+    { table: 'bookings', column: 'professionalId', refTable: 'professionals' },
+    { table: 'bookings', column: 'clientId', refTable: 'clients' },
+    {
+      table: 'consultations',
+      column: 'professionalId',
+      refTable: 'professionals',
+    },
+    { table: 'consultations', column: 'clientId', refTable: 'clients' },
+  ];
+  for (const { table, column, refTable } of targets) {
+    try {
+      const [rows] = await sequelize.query(
+        `SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
+           WHERE TABLE_SCHEMA = DATABASE()
+             AND TABLE_NAME = ?
+             AND COLUMN_NAME = ?
+             AND REFERENCED_TABLE_NAME = ?`,
+        { replacements: [table, column, refTable] }
+      );
+      for (const fk of rows) {
+        try {
+          await sequelize.query(
+            `ALTER TABLE \`${table}\` DROP FOREIGN KEY \`${fk.CONSTRAINT_NAME}\``
+          );
+          console.log(
+            `[Migrate] Dropped ${table} FK ${fk.CONSTRAINT_NAME} (${column} → ${refTable}).`
+          );
+        } catch (err) {
+          console.warn(
+            `[Migrate] Could not drop ${table} FK ${fk.CONSTRAINT_NAME}: ${err.message}`
+          );
+        }
+      }
+    } catch (err) {
+      console.warn(
+        `[Migrate] Could not inspect ${table}.${column} FKs: ${err.message}`
+      );
+    }
+  }
+}
+
+// One-shot backfill: any CaseNote written before the JWT-vs-name fix has
+// an empty `authorName` because `displayName(req.user)` returned ''. Look
+// each one up by `authorUserId` and copy the resolved name back. Notes
+// that already carry a name (or have no `authorUserId`) are left alone.
+async function runCaseNoteAuthorNameBackfill() {
+  try {
+    const { CaseNote, User } = require('../models');
+    const { Op } = require('sequelize');
+    const empties = await CaseNote.findAll({
+      where: {
+        authorUserId: { [Op.ne]: null },
+        [Op.or]: [{ authorName: '' }, { authorName: null }],
+      },
+      raw: true,
+    });
+    if (empties.length === 0) return;
+
+    const userIds = [
+      ...new Set(empties.map((n) => n.authorUserId).filter(Boolean)),
+    ];
+    const users = userIds.length
+      ? await User.findAll({
+          where: { id: { [Op.in]: userIds } },
+          raw: true,
+        })
+      : [];
+    const nameByUserId = new Map(
+      users.map((u) => [
+        u.id,
+        u.fullName ||
+          [u.firstName, u.lastName].filter(Boolean).join(' ').trim() ||
+          u.name ||
+          '',
+      ])
+    );
+    let patched = 0;
+    for (const n of empties) {
+      const name = nameByUserId.get(n.authorUserId);
+      if (!name) continue;
+      await CaseNote.update(
+        { authorName: name },
+        { where: { id: n.id } }
+      );
+      patched += 1;
+    }
+    if (patched > 0) {
+      console.log(`[Migrate] CaseNote authorName backfill: +${patched}.`);
+    }
+  } catch (err) {
+    console.warn(`[Migrate] CaseNote authorName backfill failed: ${err.message}`);
+  }
+}
+
+// Reviews now point at the unified professional id (legacy prof-N OR
+// new-model pdetail-...). The legacy FK on reviews.professionalId →
+// professionals.id rejects pdetail- writes, so drop it. The column itself
+// stays. Idempotent.
+async function runReviewProfessionalFkDrop() {
+  try {
+    const [fks] = await sequelize.query(
+      `SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'reviews'
+           AND COLUMN_NAME = 'professionalId'
+           AND REFERENCED_TABLE_NAME = 'professionals'`
+    );
+    if (fks.length === 0) return;
+    for (const fk of fks) {
+      try {
+        await sequelize.query(
+          `ALTER TABLE \`reviews\` DROP FOREIGN KEY \`${fk.CONSTRAINT_NAME}\``
+        );
+        console.log(
+          `[Migrate] Dropped reviews FK ${fk.CONSTRAINT_NAME} (professionalId → professionals).`
+        );
+      } catch (err) {
+        console.warn(
+          `[Migrate] Could not drop reviews FK ${fk.CONSTRAINT_NAME}: ${err.message}`
+        );
+      }
+    }
+  } catch (err) {
+    console.warn(
+      `[Migrate] Could not inspect reviews.professionalId FK: ${err.message}`
+    );
   }
 }
 

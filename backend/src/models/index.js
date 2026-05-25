@@ -19,6 +19,7 @@ const Review = require('./Review');
 const ReviewAppeal = require('./ReviewAppeal');
 const CaseNote = require('./CaseNote');
 const CaseLog = require('./CaseLog');
+const CaseUpdate = require('./CaseUpdate');
 const File = require('./File');
 const Upload = require('./Upload');
 
@@ -69,8 +70,10 @@ const fkCascade = (foreignKey) => ({
 Firm.hasMany(Professional, fkSetNull('firmId'));
 Professional.belongsTo(Firm, fkSetNull('firmId'));
 
-Firm.hasMany(Case, fkSetNull('firmId'));
-Case.belongsTo(Firm, fkSetNull('firmId'));
+// `cases.firmId` can be a legacy firm id (`firm-N`) OR a new-model
+// `law_firms.id`. The column is a plain string at the application layer —
+// no Sequelize association so Sequelize doesn't recreate a stale FK to the
+// legacy `firms` table.
 
 // Reviews are always against a professional; a firm's reviews are simply the
 // collective reviews of its member professionals. No Firm <-> Review FK.
@@ -92,17 +95,15 @@ ProfessionalClient.belongsTo(User, {
 });
 
 // --- Professional relationships -------------------------------------------
-Professional.hasMany(Case, fkCascade('professionalId'));
-Case.belongsTo(Professional, fkCascade('professionalId'));
+// `cases.professionalId`, `bookings.professionalId`, and
+// `consultations.professionalId` can be either a legacy `professionals.id`
+// OR a new-model `professional_details.id`. They're plain string columns at
+// the application layer — no Sequelize association so Sequelize doesn't
+// recreate stale FKs to the legacy `professionals` table.
 
-Professional.hasMany(Booking, fkCascade('professionalId'));
-Booking.belongsTo(Professional, fkCascade('professionalId'));
-
-Professional.hasMany(Consultation, fkCascade('professionalId'));
-Consultation.belongsTo(Professional, fkCascade('professionalId'));
-
-Professional.hasMany(Review, fkSetNull('professionalId'));
-Review.belongsTo(Professional, fkSetNull('professionalId'));
+// Reviews can reference either a legacy `professionals.id` or a new-model
+// `professional_details.id`. The column is therefore a plain string at the
+// application layer — no Sequelize association / FK constraint.
 
 // --- Review appeals --------------------------------------------------------
 // A review can be appealed; removing the review removes its appeal records.
@@ -115,6 +116,8 @@ Case.hasMany(CaseNote, fkCascade('caseId'));
 CaseNote.belongsTo(Case, fkCascade('caseId'));
 Case.hasMany(CaseLog, fkCascade('caseId'));
 CaseLog.belongsTo(Case, fkCascade('caseId'));
+Case.hasMany(CaseUpdate, fkCascade('caseId'));
+CaseUpdate.belongsTo(Case, fkCascade('caseId'));
 
 // --- Booking <-> Consultation ---------------------------------------------
 Booking.hasOne(Consultation, fkSetNull('bookingId'));
@@ -268,6 +271,8 @@ LawFirm.addHook(
   'afterFind',
   jsonParser(['practiceAreas', 'socialLinks', 'taxDocuments'])
 );
+Case.addHook('afterFind', jsonParser(['clientIds', 'professionalIds']));
+CaseUpdate.addHook('afterFind', jsonParser(['attachments']));
 
 module.exports = {
   sequelize,
@@ -277,6 +282,7 @@ module.exports = {
   Firm,
   ProfessionalClient,
   Case,
+  CaseUpdate,
   Booking,
   Consultation,
   Review,

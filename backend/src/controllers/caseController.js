@@ -71,6 +71,34 @@ const addCaseNote = asyncHandler(async (req, res) => {
   return successResponse(res, 201, 'Note added', note);
 });
 
+// PATCH /api/cases/:id/notes/:noteId
+const editCaseNote = asyncHandler(async (req, res) => {
+  const note = await caseService.editNote(
+    req.params.noteId,
+    req.user,
+    req.body && req.body.body
+  );
+  if (!note) throw { statusCode: 404, message: 'Note not found.' };
+  return successResponse(res, 200, 'Note edited', note);
+});
+
+// DELETE /api/cases/:id/notes/:noteId
+const deleteCaseNote = asyncHandler(async (req, res) => {
+  const removed = await caseService.deleteNote(req.params.noteId, req.user);
+  if (!removed) throw { statusCode: 404, message: 'Note not found.' };
+  return successResponse(res, 200, 'Note deleted', removed);
+});
+
+// DELETE /api/cases/:id/updates/:updateId
+const deleteCaseUpdate = asyncHandler(async (req, res) => {
+  const removed = await caseService.deleteUpdate(
+    req.params.updateId,
+    req.user
+  );
+  if (!removed) throw { statusCode: 404, message: 'Update not found.' };
+  return successResponse(res, 200, 'Update deleted', removed);
+});
+
 // GET /api/cases/:id/log
 const getCaseLog = asyncHandler(async (req, res) => {
   const entries = await caseService.listLog(req.params.id);
@@ -98,6 +126,35 @@ const getCasesByProfessional = asyncHandler(async (req, res) => {
   return successResponse(res, 200, 'Professional cases fetched', cases);
 });
 
+// GET /api/cases/:id/updates
+const listCaseUpdates = asyncHandler(async (req, res) => {
+  const updates = await caseService.listUpdates(req.params.id);
+  return successResponse(res, 200, 'Case updates fetched', updates);
+});
+
+// POST /api/cases/:id/updates
+const addCaseUpdate = asyncHandler(async (req, res) => {
+  const update = await caseService.addUpdate(
+    req.params.id,
+    req.user,
+    req.body
+  );
+  return successResponse(res, 201, 'Update added', update);
+});
+
+// PATCH /api/cases/:id/updates/:updateId
+const editCaseUpdate = asyncHandler(async (req, res) => {
+  const update = await caseService.editUpdate(
+    req.params.updateId,
+    req.user,
+    req.body
+  );
+  if (!update) {
+    throw { statusCode: 404, message: 'Update not found.' };
+  }
+  return successResponse(res, 200, 'Update edited', update);
+});
+
 module.exports = {
   listCases,
   getCase,
@@ -111,5 +168,11 @@ module.exports = {
   getFirmCases,
   getCaseNotes,
   addCaseNote,
+  editCaseNote,
+  deleteCaseNote,
+  deleteCaseUpdate,
   getCaseLog,
+  listCaseUpdates,
+  addCaseUpdate,
+  editCaseUpdate,
 };

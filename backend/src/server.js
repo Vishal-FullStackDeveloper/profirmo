@@ -26,9 +26,10 @@ const SYNC_ORDER = [
   db.Review,
   // ReviewAppeal references reviews — created right after Review.
   db.ReviewAppeal,
-  // Case notes + log reference cases.
+  // Case notes + log + updates reference cases.
   db.CaseNote,
   db.CaseLog,
+  db.CaseUpdate,
   db.File,
   // --- Phase-2 profile / firm tables, parents-first --------------------
   db.Address,

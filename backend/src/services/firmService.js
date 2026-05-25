@@ -12,9 +12,13 @@ const {
 const reviewStats = require('./reviewStats');
 
 /**
- * Resolve the professional listing-ids whose reviews make up a firm's
- * collective reviews. Works for a legacy firm id or a law-firm id — legacy
- * firms own `professionals` rows, new-model firms own `firm_members`.
+ * Resolve the public professional ids whose reviews make up a firm's
+ * collective reviews. Source of truth is `firm_members` only — the legacy
+ * `professionals.firmId` snapshot is intentionally ignored so reviews track
+ * the firm's current roster (the migration backfills an owner-member row
+ * for every LawFirm, so legacy firms are covered too).
+ *
+ * Accepts either a legacy `firm-N` id or the actual `law_firms.id`.
  * @param {string} firmId
  * @returns {Promise<string[]>}
  */
@@ -30,57 +34,57 @@ const getFirmProfessionalIds = async (firmId) => {
       raw: true,
     });
   }
-  const underlyingId = lawFirm ? lawFirm.id : null;
-  // Legacy `professionals.firmId` always uses the legacy/public id.
-  const legacyPublicId = (lawFirm && lawFirm.legacyFirmId) || firmId;
+  if (!lawFirm) return [];
 
-  const [legacyPros, members] = await Promise.all([
-    Professional.findAll({
-      where: { firmId: legacyPublicId },
-      attributes: ['id'],
-      raw: true,
-    }),
-    underlyingId
-      ? FirmMember.findAll({
-          where: { firmId: underlyingId },
-          attributes: ['professionalId'],
-          raw: true,
-        })
-      : Promise.resolve([]),
-  ]);
+  const members = await FirmMember.findAll({
+    where: { firmId: lawFirm.id, status: 'active' },
+    attributes: ['professionalId'],
+    raw: true,
+  });
+  if (members.length === 0) return [];
 
-  // Translate FirmMember.professionalId (ProfessionalDetail.id) to the public
-  // professional id (user.linkedId || detail.id) used by listings and reviews.
+  // Translate FirmMember.professionalId (ProfessionalDetail.id) to the
+  // public professional id (user.linkedId || detail.id) used by listings
+  // and reviews.
   const detailIds = [
     ...new Set(members.map((m) => m.professionalId).filter(Boolean)),
   ];
-  let publicProfIdByDetail = new Map();
-  if (detailIds.length) {
-    const details = await ProfessionalDetail.findAll({
-      where: { id: { [Op.in]: detailIds } },
-      attributes: ['id', 'userId'],
-      raw: true,
-    });
-    const userIds = details.map((d) => d.userId).filter(Boolean);
-    const users = userIds.length
-      ? await User.findAll({
-          where: { id: { [Op.in]: userIds } },
-          attributes: ['id', 'linkedId'],
-          raw: true,
-        })
-      : [];
-    const linkedByUser = new Map(users.map((u) => [u.id, u.linkedId]));
-    publicProfIdByDetail = new Map(
-      details.map((d) => [d.id, linkedByUser.get(d.userId) || d.id])
-    );
-  }
-  const memberPublicIds = members
-    .map((m) => publicProfIdByDetail.get(m.professionalId) || m.professionalId)
-    .filter(Boolean);
+  const details = await ProfessionalDetail.findAll({
+    where: { id: { [Op.in]: detailIds } },
+    attributes: ['id', 'userId'],
+    raw: true,
+  });
+  const userIds = details.map((d) => d.userId).filter(Boolean);
+  const users = userIds.length
+    ? await User.findAll({
+        where: { id: { [Op.in]: userIds } },
+        attributes: ['id', 'linkedId'],
+        raw: true,
+      })
+    : [];
+  // Each member can be referenced by either their ProfessionalDetail.id or
+  // their User.linkedId (some users carry a legacy `prof-N`, some carry
+  // `firm-N` from the firm-owner unification, others carry the detail id
+  // itself). Reviews may be keyed by any of these aliases depending on
+  // which URL the reviewer started from, so the firm-reviews lookup must
+  // accept all of them.
+  const linkedByUser = new Map(users.map((u) => [u.id, u.linkedId]));
+  const aliasesByDetail = new Map(
+    details.map((d) => {
+      const aliases = new Set([d.id]);
+      const linked = linkedByUser.get(d.userId);
+      if (linked) aliases.add(linked);
+      return [d.id, [...aliases]];
+    })
+  );
 
   return [
-    ...new Set([...legacyPros.map((p) => p.id), ...memberPublicIds]),
-  ];
+    ...new Set(
+      members.flatMap(
+        (m) => aliasesByDetail.get(m.professionalId) || [m.professionalId]
+      )
+    ),
+  ].filter(Boolean);
 };
 
 /**
@@ -138,17 +142,28 @@ const buildFirmProfessionalMap = async (firms) => {
         })
       : [];
     const linkedByUser = new Map(users.map((u) => [u.id, u.linkedId]));
+    // Each ProfessionalDetail maps to the FULL alias list a review could be
+    // keyed by — detail.id plus the user's linkedId. Reviews against any of
+    // those aliases count toward the firm's collective reviews.
     publicProfIdByDetail = new Map(
-      details.map((d) => [d.id, linkedByUser.get(d.userId) || d.id])
+      details.map((d) => {
+        const aliases = new Set([d.id]);
+        const linked = linkedByUser.get(d.userId);
+        if (linked) aliases.add(linked);
+        return [d.id, [...aliases]];
+      })
     );
   }
 
   for (const m of members) {
     const pub = publicByUnderlying.get(m.firmId);
     if (!pub || !m.professionalId) continue;
-    const publicProfId =
-      publicProfIdByDetail.get(m.professionalId) || m.professionalId;
-    map.get(pub).push(publicProfId);
+    const aliases = publicProfIdByDetail.get(m.professionalId);
+    if (Array.isArray(aliases) && aliases.length > 0) {
+      map.get(pub).push(...aliases);
+    } else {
+      map.get(pub).push(m.professionalId);
+    }
   }
 
   // De-duplicate each firm's professional list.
@@ -270,7 +285,33 @@ const buildFirmExpertiseMap = async (groupMap) => {
  */
 const applyReviewStats = async (firms) => {
   if (!Array.isArray(firms) || firms.length === 0) return firms;
+  // `groupMap` contains every alias a review could be keyed by (detail.id
+  // plus user.linkedId) — so its length is an alias count, not a member
+  // count. We still need a true member count for the listing card.
   const groupMap = await buildFirmProfessionalMap(firms);
+  const underlyingIds = firms
+    .map((f) => f._underlyingId)
+    .filter(Boolean);
+  const memberCountByFirm = new Map();
+  if (underlyingIds.length > 0) {
+    const rows = await FirmMember.findAll({
+      where: {
+        firmId: { [Op.in]: underlyingIds },
+        status: 'active',
+      },
+      attributes: ['firmId', 'professionalId'],
+      raw: true,
+    });
+    const seen = new Map();
+    for (const r of rows) {
+      if (!seen.has(r.firmId)) seen.set(r.firmId, new Set());
+      seen.get(r.firmId).add(r.professionalId);
+    }
+    for (const f of firms) {
+      const set = seen.get(f._underlyingId);
+      memberCountByFirm.set(f.id, set ? set.size : 0);
+    }
+  }
   const [stats, expertiseMap] = await Promise.all([
     reviewStats.getFirmStatsForGroups(groupMap),
     buildFirmExpertiseMap(groupMap),
@@ -279,8 +320,8 @@ const applyReviewStats = async (firms) => {
     const s = stats.get(f.id);
     f.reviewsCount = s ? s.count : 0;
     f.rating = s ? s.average : 0;
-    // Exact professional count — the firm's actual resolved members.
-    f.professionalCount = (groupMap.get(f.id) || []).length;
+    // Exact professional count = unique active FirmMember rows.
+    f.professionalCount = memberCountByFirm.get(f.id) || 0;
     // Practice areas = union of member professionals' expertise. Falls back
     // to the firm's own stored list when no members have populated theirs.
     const aggregated = expertiseMap.get(f.id) || [];
@@ -607,6 +648,7 @@ const getById = async (id) => {
     establishedYear: lawFirm.establishedYear || null,
     registrationNumber: lawFirm.registrationNumber || '',
     totalEmployees: lawFirm.totalEmployees || null,
+    numberOfProfessionals: lawFirm.numberOfProfessionals || null,
     registrationCertificate: lawFirm.registrationCertificate || null,
     businessLicense: lawFirm.businessLicense || null,
     taxDocuments: Array.isArray(lawFirm.taxDocuments)

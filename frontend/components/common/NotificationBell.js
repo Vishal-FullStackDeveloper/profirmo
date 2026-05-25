@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Check, CheckCheck, Loader2 } from 'lucide-react';
+import { Bell, Check, CheckCheck, Loader2, ArrowRight } from 'lucide-react';
 import {
   listNotifications,
   getUnreadCount,
@@ -181,7 +181,7 @@ export default function NotificationBell() {
           </div>
 
           {/* Body */}
-          <div className="max-h-[24rem] overflow-y-auto">
+          <div className="max-h-[22rem] overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center gap-2 px-4 py-10 text-sm text-slate-500">
                 <Loader2 size={16} className="animate-spin" />
@@ -211,6 +211,7 @@ export default function NotificationBell() {
                 </p>
               </div>
             ) : (
+              <>
               <ul className="divide-y divide-slate-100">
                 {items.map((item) => (
                   <li key={item.id}>
@@ -257,7 +258,23 @@ export default function NotificationBell() {
                   </li>
                 ))}
               </ul>
+              </>
             )}
+          </div>
+
+          {/* Footer — always visible, links to the dedicated page */}
+          <div className="border-t border-slate-100 bg-slate-50/50">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                router.push('/notifications');
+              }}
+              className="flex w-full items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-teal-700 transition hover:bg-teal-50 hover:text-teal-800"
+            >
+              See all notifications
+              <ArrowRight size={13} />
+            </button>
           </div>
         </div>
       )}

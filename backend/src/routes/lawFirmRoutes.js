@@ -12,6 +12,7 @@ router.use(authenticate);
 // Read the caller's firm + members + role + approval status.
 router.get('/mine', lawFirmController.getMyFirm);
 router.get('/mine/members', lawFirmController.getMembers);
+router.get('/mine/clients', lawFirmController.getFirmClients);
 
 // Search approved professionals to invite (declared before /mine paths is
 // not required, but kept near the read routes for clarity).

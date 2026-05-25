@@ -78,6 +78,42 @@ export async function listLog(id) {
   return unwrap(res) || [];
 }
 
+/** Updates (rich notes with date/time + attachments) for a case. */
+export async function listUpdates(id) {
+  const res = await get(`${BASE}/${id}/updates`);
+  return unwrap(res) || [];
+}
+
+/** Add an update — `{ title?, body, scheduledAt?, nextHearingDate?, attachments? }`. */
+export async function addUpdate(id, data) {
+  const res = await post(`${BASE}/${id}/updates`, data);
+  return unwrap(res);
+}
+
+/** Edit an existing update — partial body of the same fields as addUpdate. */
+export async function editUpdate(caseId, updateId, data) {
+  const res = await patch(`${BASE}/${caseId}/updates/${updateId}`, data);
+  return unwrap(res);
+}
+
+/** Delete an update. */
+export async function deleteUpdate(caseId, updateId) {
+  const res = await del(`${BASE}/${caseId}/updates/${updateId}`);
+  return unwrap(res);
+}
+
+/** Edit an existing note body. */
+export async function editNote(caseId, noteId, body) {
+  const res = await patch(`${BASE}/${caseId}/notes/${noteId}`, { body });
+  return unwrap(res);
+}
+
+/** Delete a note. */
+export async function deleteNote(caseId, noteId) {
+  const res = await del(`${BASE}/${caseId}/notes/${noteId}`);
+  return unwrap(res);
+}
+
 /** Fetch all cases for a given client. */
 export function getByClient(clientId) {
   return get(BASE, { params: { clientId } });
@@ -102,4 +138,10 @@ export default {
   listNotes,
   addNote,
   listLog,
+  listUpdates,
+  addUpdate,
+  editUpdate,
+  deleteUpdate,
+  editNote,
+  deleteNote,
 };

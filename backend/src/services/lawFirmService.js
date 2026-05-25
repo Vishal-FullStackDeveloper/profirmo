@@ -13,6 +13,7 @@ const {
   FirmApproval,
   ProfessionalDetail,
   ProfessionalApproval,
+  ProfessionalClient,
 } = require('../models');
 const { enqueue } = require('./queueService');
 const notificationService = require('./notificationService');
@@ -32,6 +33,7 @@ const LAW_FIRM_FIELDS = [
   'contactEmail',
   'contactNumber',
   'totalEmployees',
+  'numberOfProfessionals',
   'practiceAreas',
   'socialLinks',
   'registrationCertificate',
@@ -76,19 +78,45 @@ const listFirmMembers = async (firmId) => {
       m.professionalId
     );
     let professional = null;
+    let publicId = null;
+    let name = null;
+    let email = null;
+    let profilePhoto = null;
+    let professionalType = null;
     if (professionalDetail) {
       const pd = plain(professionalDetail);
       const user = await User.findByPk(pd.userId);
-      const u = plain(user);
+      const u = plain(user) || {};
+      publicId = u.linkedId || pd.id;
+      name =
+        u.fullName ||
+        [u.firstName, u.lastName].filter(Boolean).join(' ').trim() ||
+        u.name ||
+        null;
+      email = u.email || null;
+      profilePhoto = u.profilePhoto || null;
+      professionalType = pd.professionalType || null;
       professional = {
+        publicId,
         professionalId: pd.id,
         userId: pd.userId,
-        professionalType: pd.professionalType || null,
-        name: u ? u.fullName || u.name || null : null,
-        email: u ? u.email || null : null,
+        professionalType,
+        name,
+        email,
+        profilePhoto,
       };
     }
-    enriched.push({ ...m, professional });
+    // Flatten the most-used fields onto the member row so the dashboard
+    // can read `m.name` / `m.email` / `m.profilePhoto` directly.
+    enriched.push({
+      ...m,
+      publicId,
+      name,
+      email,
+      profilePhoto,
+      professionalType,
+      professional,
+    });
   }
   return enriched;
 };
@@ -483,36 +511,169 @@ const searchProfessionals = async (userId, query) => {
       ],
     },
     limit: 20,
+    raw: true,
   });
+  if (users.length === 0) return [];
 
-  // Exclude users already in the caller's firm.
+  // Caller's own firm — used to flag "this is already my member" vs.
+  // "this is someone else's member".
   const ctx = await resolveFirmContext(userId);
-  const memberUserIds = new Set();
-  if (ctx.lawFirm) {
-    const members = await listFirmMembers(ctx.lawFirm.id);
-    for (const m of members) {
-      if (m.professional && m.professional.userId) {
-        memberUserIds.add(m.professional.userId);
-      }
-    }
+  const myFirmId = ctx.lawFirm ? ctx.lawFirm.id : null;
+
+  // For every candidate user, find their ProfessionalDetail + any active
+  // FirmMember row (capped to one — owners/co-owners/members are mutually
+  // exclusive within a firm and a professional can only belong to one firm).
+  const candidateUserIds = users.map((u) => u.id);
+  const details = await ProfessionalDetail.findAll({
+    where: { userId: { [Op.in]: candidateUserIds } },
+    attributes: ['id', 'userId', 'professionalType'],
+    raw: true,
+  });
+  const detailByUserId = new Map(details.map((d) => [d.userId, d]));
+  const detailIds = details.map((d) => d.id).filter(Boolean);
+  const members = detailIds.length
+    ? await FirmMember.findAll({
+        where: {
+          professionalId: { [Op.in]: detailIds },
+          status: 'active',
+        },
+        attributes: ['firmId', 'professionalId', 'role'],
+        raw: true,
+      })
+    : [];
+  const memberByDetailId = new Map(
+    members.map((m) => [m.professionalId, m])
+  );
+  const firmNameById = new Map();
+  const firmIds = [...new Set(members.map((m) => m.firmId))];
+  if (firmIds.length) {
+    const firms = await LawFirm.findAll({
+      where: { id: { [Op.in]: firmIds } },
+      attributes: ['id', 'firmName'],
+      raw: true,
+    });
+    for (const f of firms) firmNameById.set(f.id, f.firmName || '');
   }
 
-  const out = [];
-  for (const user of users) {
-    if (memberUserIds.has(user.id)) continue;
-    const professionalDetail = await ProfessionalDetail.findOne({
-      where: { userId: user.id },
-    });
-    out.push({
+  return users.map((user) => {
+    const detail = detailByUserId.get(user.id);
+    const member = detail ? memberByDetailId.get(detail.id) : null;
+    const currentFirm = member
+      ? {
+          firmId: member.firmId,
+          firmName: firmNameById.get(member.firmId) || '',
+          role: member.role || '',
+          // Flag: is this the caller's own firm, or someone else's?
+          isMyFirm: myFirmId === member.firmId,
+        }
+      : null;
+    return {
       userId: user.id,
       fullName: user.fullName || user.name || null,
       email: user.email,
-      professionalType: professionalDetail
-        ? professionalDetail.professionalType || null
-        : null,
-    });
+      profilePhoto: user.profilePhoto || null,
+      professionalType: detail ? detail.professionalType || null : null,
+      currentFirm,
+    };
+  });
+};
+
+/**
+ * Aggregated client list for the caller's firm: every client linked to any
+ * active firm-member professional via `professional_clients`. De-duplicated
+ * across members (the same client may be linked to multiple professionals
+ * in the firm). Returns `{ firmId, items, memberCount }`.
+ *
+ * @param {string} userId
+ * @returns {Promise<{ firmId: string|null, items: Array, memberCount: number }>}
+ */
+const getFirmClients = async (userId) => {
+  const ctx = await resolveFirmContext(userId);
+  if (!ctx.lawFirm) return { firmId: null, items: [], memberCount: 0 };
+
+  // 1. All active members → their public professional id
+  //    (user.linkedId || professional_details.id).
+  const members = await FirmMember.findAll({
+    where: { firmId: ctx.lawFirm.id, status: 'active' },
+    attributes: ['professionalId'],
+    raw: true,
+  });
+  if (members.length === 0) {
+    return { firmId: ctx.lawFirm.id, items: [], memberCount: 0 };
   }
-  return out;
+  const detailIds = [
+    ...new Set(members.map((m) => m.professionalId).filter(Boolean)),
+  ];
+  const details = await ProfessionalDetail.findAll({
+    where: { id: { [Op.in]: detailIds } },
+    attributes: ['id', 'userId'],
+    raw: true,
+  });
+  const memberUserIds = details.map((d) => d.userId).filter(Boolean);
+  const linkedUsers = memberUserIds.length
+    ? await User.findAll({
+        where: { id: { [Op.in]: memberUserIds } },
+        attributes: ['id', 'linkedId'],
+        raw: true,
+      })
+    : [];
+  const linkedByUserId = new Map(linkedUsers.map((u) => [u.id, u.linkedId]));
+  const publicProfIds = [
+    ...new Set(
+      details.map((d) => linkedByUserId.get(d.userId) || d.id).filter(Boolean)
+    ),
+  ];
+  if (publicProfIds.length === 0) {
+    return {
+      firmId: ctx.lawFirm.id,
+      items: [],
+      memberCount: members.length,
+    };
+  }
+
+  // 2. All professional_clients links keyed to any of those professionals.
+  const links = await ProfessionalClient.findAll({
+    where: { professionalId: { [Op.in]: publicProfIds } },
+    attributes: ['professionalId', 'clientUserId'],
+    raw: true,
+  });
+  if (links.length === 0) {
+    return {
+      firmId: ctx.lawFirm.id,
+      items: [],
+      memberCount: members.length,
+    };
+  }
+
+  // 3. Resolve every linked client-user (de-duplicated).
+  const clientUserIds = [...new Set(links.map((l) => l.clientUserId))];
+  const clientUsers = await User.findAll({
+    where: { id: { [Op.in]: clientUserIds }, role: 'client' },
+    raw: true,
+  });
+  const displayName = (u) =>
+    u
+      ? u.fullName ||
+        [u.firstName, u.lastName].filter(Boolean).join(' ').trim() ||
+        u.name ||
+        ''
+      : '';
+  const items = clientUsers.map((u) => ({
+    id: u.id,
+    name: displayName(u),
+    email: u.email || '',
+    phone: u.mobileNumber || '',
+    city: u.city || '',
+    userType: u.userType || 'individual',
+    profilePhoto: u.profilePhoto || null,
+    createdAt: u.createdAt,
+  }));
+
+  return {
+    firmId: ctx.lawFirm.id,
+    items,
+    memberCount: members.length,
+  };
 };
 
 module.exports = {
@@ -520,6 +681,7 @@ module.exports = {
   createFirm,
   updateFirm,
   getMembers,
+  getFirmClients,
   changeMemberRole,
   removeMember,
   searchProfessionals,

@@ -58,6 +58,10 @@ const ProfessionalDetail = sequelize.define(
     // --- Phase-7 additive columns ----------------------------------------
     consultationFee: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
     availability: jsonField('availability', []),
+    // Live "available now" toggle the booking page uses to enable instant
+    // consultations. NULL is treated as "available" so legacy rows remain
+    // bookable until the professional explicitly toggles off.
+    availableNow: { type: DataTypes.BOOLEAN, allowNull: true },
     degreeCertificate: { type: DataTypes.STRING, allowNull: true },
     // --- Listing additive columns ----------------------------------------
     rating: { type: DataTypes.DECIMAL(3, 2), allowNull: true, defaultValue: 0 },
