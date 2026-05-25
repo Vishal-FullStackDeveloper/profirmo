@@ -5,6 +5,14 @@ const description =
 export const metadata = {
   title,
   description,
+  keywords: [
+    'Contact Pro Firmo',
+    'Pro Firmo support',
+    'legal consultation help',
+    'tax consultation help',
+    'partnership enquiries',
+    'customer support',
+  ],
   alternates: { canonical: '/contact' },
   openGraph: { title: `${title} | Pro Firmo`, description, url: '/contact' },
   twitter: { title: `${title} | Pro Firmo`, description },

@@ -5,6 +5,13 @@ const description =
 export const metadata = {
   title,
   description,
+  keywords: [
+    'Pro Firmo privacy policy',
+    'data protection',
+    'user privacy',
+    'personal information policy',
+    'data collection policy',
+  ],
   alternates: { canonical: '/privacy' },
   openGraph: { title: `${title} | Pro Firmo`, description, url: '/privacy' },
   twitter: { title: `${title} | Pro Firmo`, description },
