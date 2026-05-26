@@ -69,17 +69,71 @@ function Section({ icon, title, children }) {
   );
 }
 
-/** A single label/value pair. Renders nothing when the value is empty. */
+/** A single label/value pair. Renders nothing when the value is empty.
+ *  Non-primitive values (arrays / plain objects) are stringified so a
+ *  shape change in the API never crashes the page with the React
+ *  "Objects are not valid as a React child" error. */
 function Field({ label, value }) {
   if (value === null || value === undefined || value === '') return null;
+  let display = value;
+  if (
+    typeof value !== 'string' &&
+    typeof value !== 'number' &&
+    !(typeof value === 'object' && value.$$typeof) // React element
+  ) {
+    if (Array.isArray(value)) {
+      display = value
+        .map((v) => (typeof v === 'object' ? JSON.stringify(v) : String(v)))
+        .filter(Boolean)
+        .join(', ');
+    } else if (typeof value === 'object') {
+      display = JSON.stringify(value);
+    }
+    if (!display) return null;
+  }
   return (
     <div>
       <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
         {label}
       </dt>
-      <dd className="mt-0.5 text-sm text-slate-800 break-words">{value}</dd>
+      <dd className="mt-0.5 text-sm text-slate-800 break-words">{display}</dd>
     </div>
   );
+}
+
+/** Format availability — either an array of `{ day, slots }` objects, an
+ *  array of strings, or a single string — into a single human-readable line.
+ *  `slots` may itself be an array of strings or `{ from, to }` objects. */
+function formatAvailability(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (!Array.isArray(value)) return JSON.stringify(value);
+  const formatSlot = (slot) => {
+    if (!slot) return '';
+    if (typeof slot === 'string') return slot;
+    if (typeof slot === 'object') {
+      if (slot.from && slot.to) return `${slot.from}–${slot.to}`;
+      if (slot.start && slot.end) return `${slot.start}–${slot.end}`;
+    }
+    return '';
+  };
+  return value
+    .map((entry) => {
+      if (!entry) return '';
+      if (typeof entry === 'string') return entry;
+      if (typeof entry === 'object') {
+        const day = entry.day || entry.dayOfWeek || '';
+        const slots = Array.isArray(entry.slots)
+          ? entry.slots.map(formatSlot).filter(Boolean).join(', ')
+          : formatSlot(entry.slots);
+        if (!day && !slots) return '';
+        if (!slots) return day;
+        return `${day}: ${slots}`;
+      }
+      return '';
+    })
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /** A boolean field rendered as a Yes / No tick row. */
@@ -574,7 +628,7 @@ export default function AdminProfessionalReviewPage() {
                   : null
               }
             />
-            <Field label="Availability" value={pd.availability} />
+            <Field label="Availability" value={formatAvailability(pd.availability)} />
             <Field
               label="Website"
               value={
