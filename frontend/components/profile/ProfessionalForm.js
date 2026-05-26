@@ -10,9 +10,11 @@ import { CheckCircle2, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Select from '@/components/common/Select';
+import MultiCombobox from '@/components/common/MultiCombobox';
 import Button from '@/components/common/Button';
 import FileUpload from '@/components/common/FileUpload';
 import { updateProfessionalDetails } from '@/services/profileService';
+import { useCategories, useCities } from '@/hooks/useAppSettings';
 
 const PROFESSIONAL_TYPES = [
   { value: 'Lawyer', label: 'Lawyer' },
@@ -62,8 +64,13 @@ function buildInitialState(detail, lawyer, tech) {
     bio: d.bio || '',
     about: d.about || '',
     skills: toCsv(d.skills),
-    expertise: toCsv(d.expertise),
     languages: toCsv(d.languages),
+    subCategoryIds: Array.isArray(d.subCategoryIds)
+      ? d.subCategoryIds.filter(Boolean)
+      : [],
+    practiceCities: Array.isArray(d.practiceCities)
+      ? d.practiceCities.filter(Boolean)
+      : [],
     certifications: toCsv(d.certifications),
     education: toCsv(d.education),
     achievements: toCsv(d.achievements),
@@ -91,7 +98,6 @@ function buildInitialState(detail, lawyer, tech) {
     availability: toCsv(l.availability),
     // Tech sub-form
     technologies: toCsv(t.technologies),
-    specialization: t.specialization || '',
     githubProfile: t.githubProfile || '',
     portfolioUrl: t.portfolioUrl || '',
     techCertifications: toCsv(t.certifications),
@@ -121,9 +127,20 @@ export default function ProfessionalForm({
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const { categories } = useCategories();
+  const { cities } = useCities();
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function toggleSubCategory(id) {
+    setForm((f) => {
+      const set = new Set(f.subCategoryIds || []);
+      if (set.has(id)) set.delete(id);
+      else set.add(id);
+      return { ...f, subCategoryIds: Array.from(set) };
+    });
   }
 
   // ---- certification documents (array of URL strings) ----------------------
@@ -180,7 +197,6 @@ export default function ProfessionalForm({
         bio: form.bio.trim(),
         about: form.about.trim(),
         skills: toArray(form.skills),
-        expertise: toArray(form.expertise),
         languages: toArray(form.languages),
         certifications: toArray(form.certifications),
         education: toArray(form.education),
@@ -193,6 +209,12 @@ export default function ProfessionalForm({
         certificationsDocuments: form.certificationsDocuments
           .map((url) => (url || '').trim())
           .filter(Boolean),
+        subCategoryIds: Array.isArray(form.subCategoryIds)
+          ? form.subCategoryIds
+          : [],
+        practiceCities: Array.isArray(form.practiceCities)
+          ? form.practiceCities.filter(Boolean)
+          : [],
       };
 
       if (isLawyer) {
@@ -213,7 +235,6 @@ export default function ProfessionalForm({
       } else if (isTech) {
         payload.tech = {
           technologies: toArray(form.technologies),
-          specialization: form.specialization.trim(),
           githubProfile: form.githubProfile.trim(),
           portfolioUrl: form.portfolioUrl.trim(),
           certifications: toArray(form.techCertifications),
@@ -251,6 +272,67 @@ export default function ProfessionalForm({
             Your expertise, experience and credentials.
           </p>
         </div>
+
+        {/* Admin-managed taxonomy: professionals can pick multiple
+            sub-categories that drive their listing + search filter tags. */}
+        <MultiCombobox
+          label="Practice cities"
+          name="practiceCities"
+          value={form.practiceCities || []}
+          onChange={(next) => update('practiceCities', next)}
+          options={cities.map((c) => ({ value: c.name, label: c.name }))}
+          placeholder="Select every city you take clients in…"
+          hint="Clients filtering the listing by city will see you for any of these."
+        />
+
+        {categories.length > 0 && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Categories & sub-categories
+            </label>
+            <p className="mb-2 text-xs text-slate-500">
+              Pick every area you practise in — these power search filters and
+              the badges on your profile.
+            </p>
+            <div className="space-y-3">
+              {categories.map((cat) => (
+                <div
+                  key={cat.id}
+                  className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                >
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    {cat.name}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(cat.subCategories || []).map((s) => {
+                      const checked =
+                        form.subCategoryIds &&
+                        form.subCategoryIds.includes(s.id);
+                      return (
+                        <label
+                          key={s.id}
+                          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${
+                            checked
+                              ? 'border-amber-300 bg-amber-50 text-amber-800'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-amber-200'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={!!checked}
+                            onChange={() => toggleSubCategory(s.id)}
+                          />
+                          {s.name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Select
@@ -328,13 +410,6 @@ export default function ProfessionalForm({
             value={form.skills}
             onChange={(e) => update('skills', e.target.value)}
             hint="Comma-separated, e.g. Negotiation, Drafting"
-          />
-          <Input
-            label="Expertise"
-            name="expertise"
-            value={form.expertise}
-            onChange={(e) => update('expertise', e.target.value)}
-            hint="Comma-separated"
           />
           <Input
             label="Languages"
@@ -475,12 +550,6 @@ export default function ProfessionalForm({
                 value={form.technologies}
                 onChange={(e) => update('technologies', e.target.value)}
                 hint="Comma-separated"
-              />
-              <Input
-                label="Specialization"
-                name="specialization"
-                value={form.specialization}
-                onChange={(e) => update('specialization', e.target.value)}
               />
               <Input
                 label="GitHub profile"

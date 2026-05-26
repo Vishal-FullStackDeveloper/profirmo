@@ -5,8 +5,10 @@ import { SlidersHorizontal, Filter, ChevronDown } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Select from '@/components/common/Select';
+import Combobox from '@/components/common/Combobox';
 import { useLanguage } from '@/components/LanguageProvider';
 import { useFilterOptions } from '@/hooks/useFilterOptions';
+import { useCities, useSubCategoriesFlat } from '@/hooks/useAppSettings';
 import { EXPERIENCE_RANGES, RATE_RANGES } from '@/utils/constants';
 
 const toOptions = (arr) => arr.map((v) => ({ value: v, label: v }));
@@ -18,7 +20,7 @@ const FILTER_KEYS = [
   'city',
   'professionType',
   'professionalType',
-  'specialization',
+  'subCategoryId',
   'experience',
   'rateRange',
   'minRating',
@@ -55,7 +57,11 @@ export default function ProfessionalFilters({
   onApplied,
 }) {
   const { t } = useLanguage();
+  // `options` keeps language list from live data. Cities and categories now
+  // come from the admin-managed lists so they stay in sync with the panel.
   const options = useFilterOptions();
+  const { cities } = useCities();
+  const { subCategories } = useSubCategoriesFlat();
   // Mobile-only open/closed state. Desktop ignores this (panel is lg:block).
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -158,42 +164,36 @@ export default function ProfessionalFilters({
               placeholder={t('profCmp.searchPlaceholder')}
             />
 
-            <Select
+            <Combobox
               label={t('profCmp.city')}
               name="city"
               value={params.city || ''}
               onChange={(e) => update({ city: e.target.value || undefined })}
-              options={[
-                { value: '', label: t('profCmp.allCities') },
-                ...toOptions(options.cities),
-              ]}
+              placeholder={t('profCmp.allCities')}
+              options={cities.map((c) => ({ value: c.name, label: c.name }))}
             />
 
-            <Select
+            <Combobox
               label={t('profCmp.profession')}
-              name="professionType"
-              value={params.professionType || ''}
+              name="subCategoryId"
+              value={params.subCategoryId || ''}
               onChange={(e) =>
-                update({ professionType: e.target.value || undefined })
+                update({
+                  subCategoryId: e.target.value || undefined,
+                  // Clear the legacy professionType filter so the two cannot
+                  // fight each other in the listing service.
+                  professionType: undefined,
+                })
               }
-              options={[
-                { value: '', label: t('profCmp.allProfessions') },
-                ...toOptions(options.professionalTypes),
-              ]}
+              placeholder={t('profCmp.allProfessions')}
+              options={subCategories.map((s) => ({
+                value: s.id,
+                label: `${s.categoryName} — ${s.name}`,
+              }))}
             />
 
-            <Select
-              label={t('profCmp.specialization')}
-              name="specialization"
-              value={params.specialization || ''}
-              onChange={(e) =>
-                update({ specialization: e.target.value || undefined })
-              }
-              options={[
-                { value: '', label: t('profCmp.allSpecializations') },
-                ...toOptions(options.specializations),
-              ]}
-            />
+            {/* Specialization filter was removed — the new sub-category
+                taxonomy above replaces it. */}
 
             <Select
               label={t('profCmp.experience')}

@@ -19,6 +19,11 @@ import {
   UserPlus,
   ArrowLeft,
   ChevronRight,
+  Settings,
+  ListTree,
+  MapPin,
+  Inbox,
+  TrendingUp,
 } from 'lucide-react';
 import BrandLogo from '@/components/common/BrandLogo';
 import { useLanguage } from '@/components/LanguageProvider';
@@ -166,6 +171,24 @@ const NAV_BY_ROLE = {
       ],
     },
     { labelKey: 'dash.nav.users', href: '/admin/users', icon: Users },
+    // Sales pipeline: Lead -> Opportunity -> Client. The two screens are
+    // grouped so admin can flip between them quickly.
+    {
+      labelKey: 'dash.nav.pipeline',
+      icon: TrendingUp,
+      children: [
+        {
+          labelKey: 'dash.nav.leads',
+          href: '/admin/leads',
+          icon: Inbox,
+        },
+        {
+          labelKey: 'dash.nav.opportunities',
+          href: '/admin/opportunities',
+          icon: TrendingUp,
+        },
+      ],
+    },
     {
       labelKey: 'dash.nav.reviews',
       href: '/admin/reviews',
@@ -180,6 +203,24 @@ const NAV_BY_ROLE = {
       labelKey: 'dash.nav.auditLogs',
       href: '/admin/audit-logs',
       icon: ScrollText,
+    },
+    // App settings: admin-managed taxonomy + city list that drive every
+    // dropdown across the platform.
+    {
+      labelKey: 'dash.nav.appSettings',
+      icon: Settings,
+      children: [
+        {
+          labelKey: 'dash.nav.categories',
+          href: '/admin/categories',
+          icon: ListTree,
+        },
+        {
+          labelKey: 'dash.nav.cities',
+          href: '/admin/cities',
+          icon: MapPin,
+        },
+      ],
     },
   ],
 };

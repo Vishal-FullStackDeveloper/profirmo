@@ -27,6 +27,8 @@ import PhotoUpload from '@/components/common/PhotoUpload';
 import { useAuth } from '@/components/AuthProvider';
 import { resendVerification } from '@/services/authService';
 import { isEmail, isPhone, isStrongPassword } from '@/utils/validators';
+import { useCities } from '@/hooks/useAppSettings';
+import Combobox from '@/components/common/Combobox';
 import ProfessionalRegistrationForm, {
   PROFESSIONAL_TYPES,
 } from '@/components/professionals/ProfessionalRegistrationForm';
@@ -115,6 +117,9 @@ export default function SignupPage() {
   const [clientErrors, setClientErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [banner, setBanner] = useState('');
+
+  // Admin-managed city list powers the signup dropdown.
+  const { cities } = useCities();
 
   // Professional form state.
   const [proSubmitting, setProSubmitting] = useState(false);
@@ -658,23 +663,19 @@ export default function SignupPage() {
                     </p>
                   )}
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    City
-                  </label>
-                  <input
-                    name="city"
-                    value={client.city}
-                    onChange={handleClientChange}
-                    placeholder="Mumbai"
-                    className={clientFieldClass('city')}
-                  />
-                  {clientErrors.city && (
-                    <p className="mt-1 text-xs text-red-600">
-                      {clientErrors.city}
-                    </p>
-                  )}
-                </div>
+                <Combobox
+                  label="City"
+                  name="city"
+                  value={client.city}
+                  onChange={handleClientChange}
+                  placeholder="Select city…"
+                  options={cities.map((c) => ({
+                    value: c.name,
+                    label: c.name,
+                  }))}
+                  error={clientErrors.city}
+                  required
+                />
               </div>
 
               <div>

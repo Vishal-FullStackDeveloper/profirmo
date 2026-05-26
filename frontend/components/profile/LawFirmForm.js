@@ -8,10 +8,12 @@ import { useState } from 'react';
 import { CheckCircle2, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
+import Combobox from '@/components/common/Combobox';
 import Button from '@/components/common/Button';
 import PhotoUpload from '@/components/common/PhotoUpload';
 import FileUpload from '@/components/common/FileUpload';
 import { createLawFirm, updateLawFirm } from '@/services/profileService';
+import { useCities } from '@/hooks/useAppSettings';
 
 function toArray(str) {
   if (!str) return [];
@@ -75,6 +77,8 @@ export default function LawFirmForm({ lawFirm, onSaved }) {
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const { cities } = useCities();
+  const cityOptions = cities.map((c) => ({ value: c.name, label: c.name }));
 
   const isNew = !lawFirm;
 
@@ -239,11 +243,13 @@ export default function LawFirmForm({ lawFirm, onSaved }) {
             }
             hint="Practising professionals in the firm"
           />
-          <Input
+          <Combobox
             label="Headquarters"
             name="headquarters"
             value={form.headquarters}
             onChange={(e) => update('headquarters', e.target.value)}
+            options={cityOptions}
+            placeholder="Select city…"
           />
           <Input
             label="Practice areas"

@@ -59,6 +59,12 @@ const PROFESSIONAL_DETAIL_FIELDS = [
   'availability',
   'availableNow',
   'consultationFee',
+  // Admin-managed taxonomy: array of SubCategory.id values. The parent
+  // Category is inferred from sub_categories.categoryId.
+  'subCategoryIds',
+  // Array of city names where the professional practises (separate from
+  // their address city). Drives the listing city filter.
+  'practiceCities',
 ];
 
 // lawyer_specific_details columns settable via the body's `lawyer` object.

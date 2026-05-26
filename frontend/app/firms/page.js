@@ -6,17 +6,20 @@ import Footer from '@/components/common/Footer';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Select from '@/components/common/Select';
+import Combobox from '@/components/common/Combobox';
 import EmptyState from '@/components/common/EmptyState';
 import FirmCard from '@/components/firms/FirmCard';
 import { useFirms } from '@/hooks/useFirms';
 import { useLanguage } from '@/components/LanguageProvider';
-import { CITIES, FIRM_TYPES } from '@/utils/constants';
+import { FIRM_TYPES } from '@/utils/constants';
+import { useCities } from '@/hooks/useAppSettings';
 
 const toOptions = (arr) => arr.map((v) => ({ value: v, label: v }));
 
 export default function FirmsPage() {
   const { t } = useLanguage();
   const { items, meta, loading, error, params, setParams } = useFirms();
+  const { cities } = useCities();
   const update = (patch) =>
     setParams((prev) => ({ ...prev, ...patch, page: 1 }));
 
@@ -64,15 +67,13 @@ export default function FirmsPage() {
                 onChange={(e) => update({ search: e.target.value })}
                 placeholder={t('firmList.searchPlaceholder')}
               />
-              <Select
+              <Combobox
                 label={t('firmList.city')}
                 name="city"
                 value={params.city || ''}
                 onChange={(e) => update({ city: e.target.value || undefined })}
-                options={[
-                  { value: '', label: t('firmList.allCities') },
-                  ...toOptions(CITIES),
-                ]}
+                placeholder={t('firmList.allCities')}
+                options={cities.map((c) => ({ value: c.name, label: c.name }))}
               />
               <Select
                 label={t('firmList.firmType')}

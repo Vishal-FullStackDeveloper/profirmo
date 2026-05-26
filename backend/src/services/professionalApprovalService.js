@@ -13,6 +13,8 @@ const {
   LawyerDetail,
   TaxConsultantDetail,
   ProfessionalApproval,
+  Category,
+  SubCategory,
 } = require('../models');
 const { enqueue } = require('./queueService');
 const notificationService = require('./notificationService');
@@ -110,13 +112,44 @@ async function getReviewPayload(approvalId) {
     }
   }
 
+  // Resolve sub-category ids to readable {id, name, categoryName} rows so the
+  // admin review page can render labels without an extra fetch.
+  let detailPlain = professionalDetail
+    ? professionalDetail.get({ plain: true })
+    : null;
+  if (detailPlain) {
+    const ids = Array.isArray(detailPlain.subCategoryIds)
+      ? detailPlain.subCategoryIds.filter(Boolean)
+      : [];
+    if (ids.length > 0) {
+      const subs = await SubCategory.findAll({
+        where: { id: { [Op.in]: ids } },
+        raw: true,
+      });
+      const catIds = [...new Set(subs.map((s) => s.categoryId))];
+      const cats = catIds.length
+        ? await Category.findAll({
+            where: { id: { [Op.in]: catIds } },
+            raw: true,
+          })
+        : [];
+      const catNameById = new Map(cats.map((c) => [c.id, c.name]));
+      detailPlain.subCategories = subs.map((s) => ({
+        id: s.id,
+        name: s.name,
+        categoryId: s.categoryId,
+        categoryName: catNameById.get(s.categoryId) || '',
+      }));
+    } else {
+      detailPlain.subCategories = [];
+    }
+  }
+
   return {
     approval: approval.get({ plain: true }),
     user: user ? reviewUserView(user) : null,
     address: address ? address.get({ plain: true }) : null,
-    professionalDetail: professionalDetail
-      ? professionalDetail.get({ plain: true })
-      : null,
+    professionalDetail: detailPlain,
     lawyerDetail: lawyerDetail ? lawyerDetail.get({ plain: true }) : null,
     taxConsultantDetail: taxConsultantDetail
       ? taxConsultantDetail.get({ plain: true })

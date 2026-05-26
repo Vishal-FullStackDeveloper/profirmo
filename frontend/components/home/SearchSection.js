@@ -3,31 +3,33 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Briefcase, MapPin, ChevronDown, Sparkles } from 'lucide-react';
+import { Search, Briefcase, MapPin, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/components/LanguageProvider';
-import { useFilterOptions } from '@/hooks/useFilterOptions';
-
-const POPULAR = [
-  'Divorce Lawyer',
-  'GST Consultant',
-  'Property Lawyer',
-  'Income Tax Consultant',
-  'Criminal Lawyer',
-];
+import Combobox from '@/components/common/Combobox';
+import { useCities, useSubCategoriesFlat } from '@/hooks/useAppSettings';
 
 export default function SearchSection() {
   const router = useRouter();
   const { t } = useLanguage();
-  const options = useFilterOptions();
+  const { subCategories } = useSubCategoriesFlat();
+  const { cities } = useCities();
   const [keyword, setKeyword] = useState('');
   const [profession, setProfession] = useState('');
   const [city, setCity] = useState('');
+
+  // Up to five active sub-categories make the "popular" chip row.
+  const popular = subCategories.slice(0, 5);
 
   const handleSearch = (e) => {
     e.preventDefault();
     const params = new URLSearchParams();
     if (keyword.trim()) params.set('search', keyword.trim());
-    if (profession) params.set('category', profession);
+    // `profession` holds a sub-category id; the listing page accepts it via
+    // `subCategoryId`. `category` is kept as a back-compat alias.
+    if (profession) {
+      params.set('subCategoryId', profession);
+      params.set('category', profession);
+    }
     if (city) params.set('city', city);
     const qs = params.toString();
     router.push(qs ? `/professionals?${qs}` : '/professionals');
@@ -74,43 +76,28 @@ export default function SearchSection() {
               />
             </div>
 
-            {/* Profession */}
-            <div className="relative">
-              <Briefcase className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <select
-                value={profession}
-                onChange={(e) => setProfession(e.target.value)}
-                aria-label={t('search.professionAria')}
-                className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-9 text-sm text-slate-800 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
-              >
-                <option value="">{t('search.allProfessions')}</option>
-                {options.professionalTypes.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Profession — admin-managed sub-categories, searchable */}
+            <Combobox
+              name="profession"
+              value={profession}
+              onChange={(e) => setProfession(e.target.value)}
+              placeholder={t('search.allProfessions')}
+              leftIcon={<Briefcase size={16} />}
+              options={subCategories.map((s) => ({
+                value: s.id,
+                label: `${s.categoryName} — ${s.name}`,
+              }))}
+            />
 
-            {/* City */}
-            <div className="relative">
-              <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <select
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                aria-label={t('search.cityAria')}
-                className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-9 text-sm text-slate-800 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
-              >
-                <option value="">{t('search.allCities')}</option>
-                {options.cities.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* City — admin-managed list, searchable */}
+            <Combobox
+              name="city"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder={t('search.allCities')}
+              leftIcon={<MapPin size={16} />}
+              options={cities.map((c) => ({ value: c.name, label: c.name }))}
+            />
 
             {/* Submit */}
             <button
@@ -129,13 +116,13 @@ export default function SearchSection() {
             <Sparkles className="h-3.5 w-3.5 text-green-500" />
             {t('search.popular')}
           </span>
-          {POPULAR.map((term) => (
+          {popular.map((s) => (
             <Link
-              key={term}
-              href={`/professionals?category=${encodeURIComponent(term)}`}
+              key={s.id}
+              href={`/professionals?subCategoryId=${encodeURIComponent(s.id)}`}
               className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:-translate-y-0.5 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700"
             >
-              {term}
+              {s.name}
             </Link>
           ))}
         </div>

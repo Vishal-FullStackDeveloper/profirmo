@@ -29,7 +29,29 @@
       "Bash(curl -sS http://localhost:3000/professionals)",
       "Bash(curl -sS http://localhost:3000/firms)",
       "Bash(curl -sS http://localhost:3000/about)",
-      "Bash(curl -sS http://localhost:3000/contact)"
+      "Bash(curl -sS http://localhost:3000/contact)",
+      "Bash(curl -sS http://localhost:5001/api/app-settings/categories)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -sS http://localhost:5001/api/app-settings/cities)",
+      "Bash(curl -sS -o /dev/null -w \"/ %{http_code} | /search %{http_code} | /firms %{http_code} | /admin/categories %{http_code} | /admin/cities %{http_code} | /signup %{http_code}\\\\n\" http://localhost:3000/ http://localhost:3000/search http://localhost:3000/firms http://localhost:3000/admin/categories http://localhost:3000/admin/cities http://localhost:3000/signup)",
+      "Bash(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3000__TRACKED_VAR__)",
+      "Bash(curl -sS \"http://localhost:5001/api/professionals?limit=2\")",
+      "Bash(curl -sS http://localhost:5001/api/admin/categories -H \"Content-Type: application/json\" -d '{\"name\":\"Test Category\"}')",
+      "Bash(curl -sS http://localhost:3000/)",
+      "Bash(curl -sS \"http://localhost:5001/api/professionals/prof-1\")",
+      "Bash(curl -sS -H \"Origin: http://localhost:3000\" -b /tmp/lead.cookie http://localhost:5001/api/leads/me)",
+      "Bash(curl -sS -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' -X POST http://localhost:5001/api/leads -d '{\"fullName\":\"No Email\",\"phone\":\"+91-9876543210\"}')",
+      "Bash(curl -sS -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' -X POST http://localhost:5001/api/leads -d '{\"fullName\":\"Acme Test\",\"email\":\"acme@example.com\",\"phone\":\"+91-9876543210\",\"source\":\"Advanced Search\"}')",
+      "Bash(curl -sS -o /dev/null -w \"GET /api/leads/me %{http_code}\\\\n\" http://localhost:5001/api/leads/me)",
+      "Bash(curl -sS -o /dev/null -w \"POST /api/admin/leads \\(unauth\\) %{http_code}\\\\n\" -X POST -H \"Content-Type: application/json\" -H \"Origin: http://localhost:3000\" -d '{}' http://localhost:5001/api/admin/leads)",
+      "Bash(curl -sS -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' -c /tmp/leadck -X POST http://localhost:5001/api/leads -d '{\"fullName\":\"Demo Two\",\"email\":\"demo2@example.com\",\"phone\":\"+91-9000000000\",\"source\":\"Homepage AI CTA\"}')",
+      "Bash(curl -sS -H \"Origin: http://localhost:3000\" -b /tmp/leadck http://localhost:5001/api/leads/me)",
+      "Bash(curl -sS -o /dev/null -w \"/search %{http_code}\\\\n\" http://localhost:3000/search)",
+      "Bash(curl -sS http://localhost:3000/search)",
+      "Bash(curl -sS -H \"Content-Type: application/json\" -H \"Origin: http://localhost:3000\" -c /tmp/leadck -X POST http://localhost:5001/api/leads -d '{\"fullName\":\"Widget Test\",\"email\":\"widget@example.com\",\"phone\":\"+91-9000000001\",\"source\":\"Advanced Search\"}')",
+      "Bash(curl -sS -b /tmp/leadck http://localhost:3000/search)",
+      "Bash(curl -sS -o /dev/null -w \"/ %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -sS -i -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' -X POST http://localhost:5001/api/auth/forgot-password -d '{\"email\":\"vishal@liamtra.com\"}')"
     ]
   }
 }

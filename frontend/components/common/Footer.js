@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Twitter, Linkedin, Github, Mail, ArrowRight, MapPin } from 'lucide-react';
-import { CITIES } from '@/utils/constants';
+import { useCities } from '@/hooks/useAppSettings';
 import { useLanguage } from '@/components/LanguageProvider';
 
 const SOCIALS = [
@@ -42,6 +42,8 @@ const COLUMNS = [
 export default function Footer() {
   const year = new Date().getFullYear();
   const { t } = useLanguage();
+  const { cities } = useCities();
+  const cityNames = cities.map((c) => c.name);
 
   return (
     <footer className="relative overflow-hidden bg-slate-950 text-slate-400">
@@ -146,7 +148,7 @@ export default function Footer() {
           </p>
 
           <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-2.5 sm:grid-cols-3 lg:grid-cols-3">
-            {CITIES.map((city) => (
+            {cityNames.map((city) => (
               <Link
                 key={`law-${city}`}
                 href={`/professionals?city=${encodeURIComponent(city)}`}
@@ -155,7 +157,7 @@ export default function Footer() {
                 {t('footer.lawyersIn', { city: t(`city.${city}`) })}
               </Link>
             ))}
-            {CITIES.map((city) => (
+            {cityNames.map((city) => (
               <Link
                 key={`tax-${city}`}
                 href={`/professionals?city=${encodeURIComponent(

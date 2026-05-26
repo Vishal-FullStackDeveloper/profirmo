@@ -8,8 +8,53 @@ const {
   ProfessionalApproval,
   LawyerDetail,
   TaxConsultantDetail,
+  Category,
+  SubCategory,
 } = require('../models');
 const reviewStats = require('./reviewStats');
+
+/**
+ * Cache of resolved sub-category lookup data. Cleared every 60s — the admin
+ * panel mutates these tables infrequently, so a short TTL keeps listing
+ * responses snappy without going completely stale.
+ */
+let subCategoryCache = null;
+let subCategoryCacheAt = 0;
+const SUBCAT_TTL_MS = 60 * 1000;
+
+const loadSubCategoryLookup = async () => {
+  const now = Date.now();
+  if (subCategoryCache && now - subCategoryCacheAt < SUBCAT_TTL_MS) {
+    return subCategoryCache;
+  }
+  const [subs, cats] = await Promise.all([
+    SubCategory.findAll({ raw: true }),
+    Category.findAll({ raw: true }),
+  ]);
+  const catNameById = new Map(cats.map((c) => [c.id, c.name]));
+  const byId = new Map();
+  for (const s of subs) {
+    byId.set(s.id, {
+      id: s.id,
+      name: s.name,
+      categoryId: s.categoryId,
+      categoryName: catNameById.get(s.categoryId) || '',
+    });
+  }
+  subCategoryCache = byId;
+  subCategoryCacheAt = now;
+  return byId;
+};
+
+const resolveSubCategories = (ids, lookup) => {
+  if (!Array.isArray(ids) || ids.length === 0) return [];
+  const out = [];
+  for (const id of ids) {
+    const row = lookup.get(id);
+    if (row) out.push(row);
+  }
+  return out;
+};
 
 /**
  * Overwrite `rating` / `reviewsCount` on each item with the exact values
@@ -147,12 +192,14 @@ const normalizeProfileProfessional = ({ user, address, detail }) => {
     specialization: detail.designation || '',
     designation: detail.designation || '',
     organization: detail.organization || '',
-    city: (address && address.city) || '',
+    city: (address && address.city) || (user && user.city) || '',
     profilePhoto: (user && user.profilePhoto) || null,
     yearsOfExperience: toNum(detail.yearsOfExperience),
     bio: detail.bio || '',
     skills: toArray(detail.skills),
     expertise: toArray(detail.expertise),
+    subCategoryIds: toArray(detail.subCategoryIds),
+    practiceCities: toArray(detail.practiceCities),
     languages: toArray(detail.languages),
     consultationFee: toNum(detail.consultationFee),
     rating: toNum(detail.rating),
@@ -183,7 +230,7 @@ const loadProfileProfessionals = async () => {
 
   const userIds = [...new Set(approvals.map((a) => a.userId).filter(Boolean))];
 
-  const [details, users, addresses] = await Promise.all([
+  const [details, users, addresses, subCategoryLookup] = await Promise.all([
     ProfessionalDetail.findAll({
       where: { userId: { [Op.in]: userIds } },
       raw: true,
@@ -193,6 +240,7 @@ const loadProfileProfessionals = async () => {
       where: { userId: { [Op.in]: userIds } },
       raw: true,
     }),
+    loadSubCategoryLookup(),
   ]);
 
   const userById = new Map(users.map((u) => [u.id, u]));
@@ -202,13 +250,16 @@ const loadProfileProfessionals = async () => {
   for (const detail of details) {
     const user = userById.get(detail.userId);
     if (!user) continue;
-    items.push(
-      normalizeProfileProfessional({
-        user,
-        address: addressByUserId.get(detail.userId) || null,
-        detail,
-      })
+    const item = normalizeProfileProfessional({
+      user,
+      address: addressByUserId.get(detail.userId) || null,
+      detail,
+    });
+    item.subCategories = resolveSubCategories(
+      item.subCategoryIds,
+      subCategoryLookup
     );
+    items.push(item);
   }
   return items;
 };
@@ -281,6 +332,31 @@ const filterProfessionals = (items, filters = {}) => {
     );
   }
 
+  // Admin-managed taxonomy filter: a professional matches when any of their
+  // selected sub-category ids equals the requested id.
+  if (filters.subCategoryId) {
+    const wanted = String(filters.subCategoryId);
+    rows = rows.filter((p) =>
+      toArray(p.subCategoryIds).some((id) => String(id) === wanted)
+    );
+  }
+  // Filter by parent category id — match any sub-category whose id is in
+  // the supplied set. The set is built by the controller from the public
+  // /api/app-settings/categories response.
+  if (filters.subCategoryIdsAny) {
+    const wantedSet = new Set(
+      (Array.isArray(filters.subCategoryIdsAny)
+        ? filters.subCategoryIdsAny
+        : String(filters.subCategoryIdsAny).split(',')
+      ).map((s) => String(s).trim()).filter(Boolean)
+    );
+    if (wantedSet.size > 0) {
+      rows = rows.filter((p) =>
+        toArray(p.subCategoryIds).some((id) => wantedSet.has(String(id)))
+      );
+    }
+  }
+
   if (filters.specialization) {
     const q = String(filters.specialization).toLowerCase();
     rows = rows.filter(
@@ -307,7 +383,15 @@ const filterProfessionals = (items, filters = {}) => {
   const city = filters.city || filters.location;
   if (city) {
     const q = String(city).toLowerCase();
-    rows = rows.filter((p) => String(p.city || '').toLowerCase() === q);
+    // A professional matches when the city is their base address city OR
+    // any of the cities they have flagged as a practice city.
+    rows = rows.filter((p) => {
+      if (String(p.city || '').toLowerCase() === q) return true;
+      const practice = toArray(p.practiceCities).map((c) =>
+        String(c).toLowerCase()
+      );
+      return practice.includes(q);
+    });
   }
 
   const minExp = numParam(filters.minExperience);
@@ -475,7 +559,7 @@ const getById = async (id) => {
       address,
       detail,
     });
-    const [lawyer, tax] = await Promise.all([
+    const [lawyer, tax, subCategoryLookup] = await Promise.all([
       LawyerDetail.findOne({
         where: { professionalId: detail.id },
         raw: true,
@@ -484,7 +568,12 @@ const getById = async (id) => {
         where: { professionalId: detail.id },
         raw: true,
       }),
+      loadSubCategoryLookup(),
     ]);
+    base.subCategories = resolveSubCategories(
+      base.subCategoryIds,
+      subCategoryLookup
+    );
     return applyOneReviewStats({
       ...base,
       about: detail.about || '',

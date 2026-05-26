@@ -1,6 +1,7 @@
 'use client';
 
-import Link from 'next/link';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Sparkles,
   Check,
@@ -13,6 +14,7 @@ import {
   BadgeCheck,
 } from 'lucide-react';
 import { useLanguage } from '@/components/LanguageProvider';
+import LeadCaptureModal from '@/components/leads/LeadCaptureModal';
 
 const CHECKLIST = [
   'aiAssistant.checklist1',
@@ -51,6 +53,8 @@ const FEATURES = [
 
 export default function AIAssistantSection() {
   const { t } = useLanguage();
+  const router = useRouter();
+  const [leadOpen, setLeadOpen] = useState(false);
 
   return (
     <section className="relative overflow-hidden bg-slate-950 py-20 sm:py-28">
@@ -276,15 +280,28 @@ export default function AIAssistantSection() {
             ))}
           </div>
 
-          <Link
-            href="/search"
+          <button
+            type="button"
+            onClick={() => setLeadOpen(true)}
             className="group mt-8 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-glow-sm transition hover:-translate-y-0.5 hover:shadow-glow"
           >
             {t('aiAssistant.cta')}
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
+          </button>
         </div>
       </div>
+
+      <LeadCaptureModal
+        open={leadOpen}
+        onClose={() => setLeadOpen(false)}
+        onSuccess={() => {
+          setLeadOpen(false);
+          router.push('/search');
+        }}
+        source="Homepage AI CTA"
+        title="Discuss with AI"
+        subtitle="Share a few details and we'll route you to the right professional."
+      />
     </section>
   );
 }

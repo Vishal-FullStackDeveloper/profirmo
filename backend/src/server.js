@@ -59,6 +59,17 @@ const SYNC_ORDER = [
   db.PasswordResetOtp,
   // Link table between professionals and client-users (many-to-many).
   db.ProfessionalClient,
+  // --- App settings taxonomy ------------------------------------------
+  // Category is the parent of SubCategory (FK). City has no FK.
+  db.Category,
+  db.SubCategory,
+  db.City,
+  // --- Sales pipeline -------------------------------------------------
+  // Lead -> Opportunity -> User(client). LeadActivity is polymorphic on
+  // (entityType, entityId), no FK constraint declared.
+  db.Lead,
+  db.Opportunity,
+  db.LeadActivity,
 ];
 
 // Boot the Profirmo HTTP server.

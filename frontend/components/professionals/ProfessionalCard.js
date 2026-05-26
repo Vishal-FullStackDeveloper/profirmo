@@ -11,9 +11,9 @@ import { formatCurrency, slugify } from '@/utils/formatters';
 
 /**
  * ProfessionalCard — summary card for a single professional.
- * Renders the API shape: name, professionalType, specialization, city,
- * profilePhoto, yearsOfExperience, consultationFee, rating, reviewsCount,
- * availableNow, verified.
+ * Renders the API shape: name, professionalType, subCategories, city,
+ * practiceCities, profilePhoto, yearsOfExperience, consultationFee, rating,
+ * reviewsCount, availableNow, verified.
  *
  * Props: { professional }
  */
@@ -25,8 +25,9 @@ export default function ProfessionalCard({ professional }) {
     id,
     name,
     professionalType,
-    specialization,
+    subCategories,
     city,
+    practiceCities,
     profilePhoto,
     yearsOfExperience,
     rating,
@@ -35,6 +36,21 @@ export default function ProfessionalCard({ professional }) {
     availableNow,
     verified,
   } = professional;
+
+  // First two admin-managed sub-categories surface under the name. The rest
+  // are summarised as "+N" so the card stays a fixed height.
+  const subs = Array.isArray(subCategories) ? subCategories : [];
+  const visibleSubs = subs.slice(0, 2);
+  const extraSubsCount = Math.max(0, subs.length - visibleSubs.length);
+
+  // Practice cities chip row. The base city already shows above, so de-dupe
+  // it so we don't render Mumbai twice.
+  const practice = Array.isArray(practiceCities)
+    ? practiceCities.filter(Boolean)
+    : [];
+  const otherPractice = practice.filter(
+    (c) => String(c).toLowerCase() !== String(city || '').toLowerCase()
+  );
 
   return (
     <Card hover className="flex h-full flex-col">
@@ -56,8 +72,22 @@ export default function ProfessionalCard({ professional }) {
           <p className="mt-0.5 truncate text-sm font-medium text-blue-700">
             {professionalType}
           </p>
-          {specialization && (
-            <p className="truncate text-xs text-slate-500">{specialization}</p>
+          {visibleSubs.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {visibleSubs.map((s) => (
+                <span
+                  key={s.id}
+                  className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-inset ring-amber-200"
+                >
+                  {s.name}
+                </span>
+              ))}
+              {extraSubsCount > 0 && (
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                  +{extraSubsCount}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -74,6 +104,23 @@ export default function ProfessionalCard({ professional }) {
           {t('profCmp.yrsExp', { count: yearsOfExperience || 0 })}
         </span>
       </div>
+
+      {otherPractice.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-start gap-1.5 text-[11px] text-slate-500">
+          <span className="inline-flex items-center gap-1 font-medium text-slate-400">
+            <MapPin size={11} />
+            Also practises in
+          </span>
+          {otherPractice.map((c) => (
+            <span
+              key={c}
+              className="rounded-full bg-teal-50 px-2 py-0.5 font-medium text-teal-700"
+            >
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="mt-3">
         <RatingStars rating={rating || 0} count={reviewsCount || 0} size="sm" />

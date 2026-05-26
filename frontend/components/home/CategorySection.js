@@ -14,7 +14,7 @@ import {
   Briefcase,
   Layers,
 } from 'lucide-react';
-import { CATEGORIES } from '@/utils/constants';
+import { useCategories } from '@/hooks/useAppSettings';
 import { useLanguage } from '@/components/LanguageProvider';
 
 const ICONS = {
@@ -30,24 +30,32 @@ const ICONS = {
   'company-registration-consultant': Briefcase,
 };
 
-// The 10 canonical consultation categories, derived from the shared constant.
-// `type` is 'legal' for the lawyer categories and 'tax' for the rest.
-const TAX_CATEGORIES = new Set([
-  'Tax Consultant',
-  'GST Consultant',
-  'Income Tax Consultant',
-  'Company Registration Consultant',
-]);
-
-const categories = CATEGORIES.map((name) => ({
-  id: name,
-  name,
-  slug: name.toLowerCase().replace(/\s+/g, '-'),
-  type: TAX_CATEGORIES.has(name) ? 'tax' : 'legal',
-}));
-
 export default function CategorySection() {
   const { t } = useLanguage();
+  const { categories: apiCategories } = useCategories();
+
+  // Flatten the admin-managed taxonomy and keep only sub-categories an
+  // admin has flagged as "Featured". The home page surfaces a curated few
+  // — anything else stays accessible via the full search/filter page.
+  const categories = [];
+  for (const cat of apiCategories) {
+    const isTax = String(cat.slug || '').toLowerCase() === 'tax';
+    for (const sub of cat.subCategories || []) {
+      if (!sub.featured) continue;
+      const slug = String(sub.name || '')
+        .toLowerCase()
+        .replace(/\s+/g, '-');
+      categories.push({
+        id: sub.id,
+        name: sub.name,
+        slug,
+        type: isTax ? 'tax' : 'legal',
+      });
+    }
+  }
+  // If no sub-category is featured yet, hide the section entirely so the
+  // home page doesn't render an empty grid.
+  if (categories.length === 0) return null;
 
   return (
     <section className="bg-slate-50 py-20 sm:py-28">
@@ -72,9 +80,7 @@ export default function CategorySection() {
             return (
               <Link
                 key={category.id}
-                href={`/professionals?category=${encodeURIComponent(
-                  category.name
-                )}`}
+                href={`/search?category=${encodeURIComponent(category.id)}`}
                 className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-glow-cyan"
               >
                 <span

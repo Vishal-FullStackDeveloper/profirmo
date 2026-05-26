@@ -617,8 +617,24 @@ export default function AdminProfessionalReviewPage() {
             </div>
           )}
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ChipList
+              label="Sub-categories"
+              value={
+                Array.isArray(pd.subCategoryNames)
+                  ? pd.subCategoryNames
+                  : Array.isArray(pd.subCategories)
+                  ? pd.subCategories.map((s) =>
+                      s && s.name
+                        ? s.categoryName
+                          ? `${s.categoryName} — ${s.name}`
+                          : s.name
+                        : ''
+                    )
+                  : null
+              }
+            />
+            <ChipList label="Practice cities" value={pd.practiceCities} />
             <ChipList label="Skills" value={pd.skills} />
-            <ChipList label="Expertise" value={pd.expertise} />
             <ChipList label="Languages" value={pd.languages} />
             <ChipList label="Education" value={pd.education} />
             <ChipList label="Certifications" value={pd.certifications} />

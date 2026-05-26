@@ -7,9 +7,11 @@ import { useState } from 'react';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
+import Combobox from '@/components/common/Combobox';
 import Button from '@/components/common/Button';
 import PhotoUpload from '@/components/common/PhotoUpload';
 import { updateProfile } from '@/services/profileService';
+import { useCities } from '@/hooks/useAppSettings';
 
 function buildInitialState(user, address) {
   const u = user || {};
@@ -38,6 +40,8 @@ export default function PersonalInfoForm({ user, address, onSaved }) {
   const [form, setForm] = useState(() => buildInitialState(user, address));
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const { cities } = useCities();
+  const cityOptions = cities.map((c) => ({ value: c.name, label: c.name }));
   const [feedback, setFeedback] = useState(null); // { type, message }
 
   function update(field, value) {
@@ -164,11 +168,13 @@ export default function PersonalInfoForm({ user, address, onSaved }) {
               onChange={(e) => update('addressLine', e.target.value)}
               className="sm:col-span-2"
             />
-            <Input
+            <Combobox
               label="City"
               name="city"
               value={form.city}
               onChange={(e) => update('city', e.target.value)}
+              options={cityOptions}
+              placeholder="Select city…"
             />
             <Input
               label="State"

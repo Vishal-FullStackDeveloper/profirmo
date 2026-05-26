@@ -25,17 +25,29 @@ function ProfessionalsContent() {
     { value: 'fee', label: t('profList.sortPriceLow') },
   ];
 
-  // Seed filters from the URL query (?search=&city=&category=) once on mount.
+  // Seed filters from the URL query (?search=&city=&subCategoryId=) once on
+  // mount. `category` is kept as a back-compat alias for older inbound links —
+  // values starting with `subcat-` are treated as ids, everything else is a
+  // legacy free-text professionType.
   useEffect(() => {
     if (seeded.current) return;
     seeded.current = true;
     const search = searchParams.get('search');
     const city = searchParams.get('city');
+    const subCategoryId = searchParams.get('subCategoryId');
     const category = searchParams.get('category');
     const seed = {};
     if (search) seed.search = search;
     if (city) seed.city = city;
-    if (category) seed.professionType = category;
+    if (subCategoryId) {
+      seed.subCategoryId = subCategoryId;
+    } else if (category) {
+      if (String(category).startsWith('subcat-')) {
+        seed.subCategoryId = category;
+      } else {
+        seed.professionType = category;
+      }
+    }
     if (Object.keys(seed).length > 0) {
       setParams((prev) => ({ ...prev, ...seed }));
     }

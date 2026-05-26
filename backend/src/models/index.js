@@ -52,6 +52,21 @@ const FirmJoinRequest = require('./FirmJoinRequest');
 // email are plain indexed columns — no association / FK is declared.
 const PasswordResetOtp = require('./PasswordResetOtp');
 
+// --- App settings: taxonomy + cities ---------------------------------------
+// Admin-managed lists that drive every category / sub-category / city
+// dropdown across the app.
+const Category = require('./Category');
+const SubCategory = require('./SubCategory');
+const City = require('./City');
+
+// --- Sales pipeline: Lead -> Opportunity -> Client -------------------------
+// Lead captured from the homepage CTA and the gated advanced-search popup,
+// promoted to Opportunity by an admin and finally converted into a
+// User(role=client). LeadActivity is the shared timeline for both entities.
+const Lead = require('./Lead');
+const Opportunity = require('./Opportunity');
+const LeadActivity = require('./LeadActivity');
+
 // Optional relationship — clearing the parent nulls the foreign key.
 const fkSetNull = (foreignKey) => ({
   foreignKey,
@@ -248,8 +263,14 @@ ProfessionalDetail.addHook(
     'achievements',
     'certificationsDocuments',
     'availability',
+    'subCategoryIds',
+    'practiceCities',
   ])
 );
+
+// --- Category <-> SubCategory ---------------------------------------------
+Category.hasMany(SubCategory, fkCascade('categoryId'));
+SubCategory.belongsTo(Category, fkCascade('categoryId'));
 LawyerDetail.addHook(
   'afterFind',
   jsonParser([
@@ -307,4 +328,10 @@ module.exports = {
   FirmInvitation,
   FirmJoinRequest,
   PasswordResetOtp,
+  Category,
+  SubCategory,
+  City,
+  Lead,
+  Opportunity,
+  LeadActivity,
 };

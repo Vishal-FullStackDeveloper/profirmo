@@ -24,10 +24,11 @@ export default function ProfessionalProfileHeader({ professional }) {
     id,
     name,
     professionalType,
-    specialization,
     designation,
     organization,
     city,
+    practiceCities,
+    subCategories,
     profilePhoto,
     yearsOfExperience,
     languages = [],
@@ -39,6 +40,14 @@ export default function ProfessionalProfileHeader({ professional }) {
     lawyer,
     tax,
   } = professional;
+
+  const subs = Array.isArray(subCategories) ? subCategories : [];
+  const practice = Array.isArray(practiceCities)
+    ? practiceCities.filter(Boolean)
+    : [];
+  const otherPractice = practice.filter(
+    (c) => String(c).toLowerCase() !== String(city || '').toLowerCase()
+  );
 
   const isLegal = /lawyer|advocate/i.test(professionalType || '');
   const regLabel = isLegal ? t('profCmp.regBar') : t('profCmp.regTax');
@@ -76,10 +85,21 @@ export default function ProfessionalProfileHeader({ professional }) {
             <p className="mt-1 text-base font-semibold text-blue-700">
               {professionalType}
             </p>
-            {(designation || specialization) && (
-              <p className="text-sm text-slate-500">
-                {designation || specialization}
-              </p>
+            {designation && (
+              <p className="text-sm text-slate-500">{designation}</p>
+            )}
+
+            {subs.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {subs.map((s) => (
+                  <span
+                    key={s.id}
+                    className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200"
+                  >
+                    {s.name}
+                  </span>
+                ))}
+              </div>
             )}
 
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600">
@@ -107,6 +127,23 @@ export default function ProfessionalProfileHeader({ professional }) {
                 size="sm"
               />
             </div>
+
+            {otherPractice.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="inline-flex items-center gap-1 font-medium text-slate-500">
+                  <MapPin size={12} className="text-slate-400" />
+                  Also practises in
+                </span>
+                {otherPractice.map((c) => (
+                  <span
+                    key={c}
+                    className="rounded-full bg-teal-50 px-2.5 py-0.5 font-medium text-teal-700"
+                  >
+                    {c}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {languages.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">

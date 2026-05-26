@@ -7,11 +7,11 @@ import {
   Sparkles,
   ArrowRight,
   Star,
-  Send,
   BadgeCheck,
   ShieldCheck,
 } from 'lucide-react';
 import { useLanguage } from '@/components/LanguageProvider';
+import LeadCaptureModal from '@/components/leads/LeadCaptureModal';
 
 const TRUST_AVATARS = [12, 32, 45, 56, 68];
 
@@ -37,12 +37,7 @@ const FLOAT_CARDS = [
 export default function HeroSection() {
   const router = useRouter();
   const { t } = useLanguage();
-  const [issue, setIssue] = useState('');
-
-  function handleSubmit(e) {
-    e.preventDefault();
-    router.push('/professionals');
-  }
+  const [leadOpen, setLeadOpen] = useState(false);
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-amber-50 via-white to-teal-50 pb-24 pt-16 sm:pt-20">
@@ -77,38 +72,26 @@ export default function HeroSection() {
             {t('hero.subtext')}
           </p>
 
-          {/* Describe-your-case entry */}
-          <form
-            onSubmit={handleSubmit}
-            className="glass mt-8 flex flex-col gap-2 rounded-2xl p-2 shadow-card sm:flex-row sm:items-center"
-          >
-            <div className="relative flex-1">
-              <Sparkles className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400" />
-              <input
-                type="text"
-                value={issue}
-                onChange={(e) => setIssue(e.target.value)}
-                placeholder={t('hero.inputPlaceholder')}
-                aria-label={t('hero.inputAria')}
-                className="w-full rounded-xl bg-transparent py-3 pl-10 pr-3 text-sm text-slate-800 placeholder-slate-400 outline-none"
-              />
-            </div>
+          {/* Primary CTA — opens the lead-capture modal. Once the visitor
+              submits their details we redirect them to /search. */}
+          <div className="mt-8 flex flex-wrap items-center gap-4">
             <button
-              type="submit"
-              className="group inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-glow-sm transition hover:-translate-y-0.5 hover:shadow-glow"
+              type="button"
+              onClick={() => setLeadOpen(true)}
+              className="group inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3.5 text-base font-semibold text-white shadow-glow-sm transition hover:-translate-y-0.5 hover:shadow-glow"
             >
-              <Send className="h-4 w-4" />
-              {t('hero.matchButton')}
+              <Sparkles className="h-4 w-4" />
+              Discuss with AI
+              <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
             </button>
-          </form>
-
-          <Link
-            href="/professionals"
-            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 transition hover:text-indigo-600"
-          >
-            {t('hero.browseLink')}
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
+            <Link
+              href="/professionals"
+              className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 transition hover:text-indigo-600"
+            >
+              {t('hero.browseLink')}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
 
           {/* Trust row */}
           <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
@@ -256,6 +239,18 @@ export default function HeroSection() {
           ))}
         </div>
       </div>
+
+      <LeadCaptureModal
+        open={leadOpen}
+        onClose={() => setLeadOpen(false)}
+        onSuccess={() => {
+          setLeadOpen(false);
+          router.push('/search');
+        }}
+        source="Homepage AI CTA"
+        title="Discuss with AI"
+        subtitle="Share a few details and we'll route you to the right professional."
+      />
     </section>
   );
 }

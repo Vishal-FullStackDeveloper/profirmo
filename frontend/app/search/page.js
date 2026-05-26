@@ -1,26 +1,25 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Users, Building2, AlertCircle } from 'lucide-react';
+import Script from 'next/script';
+import { Search, Users, Building2, AlertCircle, Lock } from 'lucide-react';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Select from '@/components/common/Select';
+import Combobox from '@/components/common/Combobox';
 import EmptyState from '@/components/common/EmptyState';
 import ProfessionalCard from '@/components/professionals/ProfessionalCard';
 import FirmCard from '@/components/firms/FirmCard';
 import { useLanguage } from '@/components/LanguageProvider';
 import { useProfessionals } from '@/hooks/useProfessionals';
 import { useFirms } from '@/hooks/useFirms';
-import {
-  PROFESSION_TYPES,
-  CITIES,
-  EXPERIENCE_RANGES,
-  RATE_RANGES,
-} from '@/utils/constants';
-
-const toOptions = (arr) => arr.map((v) => ({ value: v, label: v }));
+import { useAuth } from '@/components/AuthProvider';
+import { EXPERIENCE_RANGES, RATE_RANGES } from '@/utils/constants';
+import { useCities, useSubCategoriesFlat } from '@/hooks/useAppSettings';
+import LeadCaptureModal from '@/components/leads/LeadCaptureModal';
+import { fetchMyLeadStatus } from '@/services/leadService';
 
 const INITIAL_FILTERS = {
   keyword: '',
@@ -34,8 +33,44 @@ const INITIAL_FILTERS = {
 
 export default function SearchPage() {
   const { t } = useLanguage();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [mode, setMode] = useState('individual');
   const [filters, setFilters] = useState(INITIAL_FILTERS);
+
+  // Lead gate. While `leadCheck` is 'pending' we render a soft skeleton so
+  // the modal does not flash on top of the search UI. `granted` means either
+  // the visitor has a valid lead cookie or they're authenticated; only then
+  // is the filter panel + results allowed to interact.
+  const [leadCheck, setLeadCheck] = useState('pending'); // pending|granted|blocked
+
+  useEffect(() => {
+    let active = true;
+    if (authLoading) return undefined;
+    if (isAuthenticated) {
+      setLeadCheck('granted');
+      return undefined;
+    }
+    (async () => {
+      const has = await fetchMyLeadStatus();
+      if (!active) return;
+      setLeadCheck(has ? 'granted' : 'blocked');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [authLoading, isAuthenticated]);
+
+  // While the gate is up the visitor cannot navigate away via the back
+  // button either — re-pin to /search if they try.
+  useEffect(() => {
+    if (leadCheck !== 'blocked') return undefined;
+    function onPop() {
+      window.history.pushState(null, '', '/search');
+    }
+    window.history.pushState(null, '', '/search');
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [leadCheck]);
 
   const RATING_OPTIONS = [
     { value: '', label: t('searchPage.anyRating') },
@@ -47,6 +82,10 @@ export default function SearchPage() {
   const update = (patch) => setFilters((prev) => ({ ...prev, ...patch }));
   const resetFilters = () => setFilters(INITIAL_FILTERS);
 
+  // Admin-managed taxonomy + cities power both filter dropdowns.
+  const { cities } = useCities();
+  const { subCategories } = useSubCategoriesFlat();
+
   // Translate the UI filter state into API query params for each hook.
   const proParams = useMemo(() => {
     const expRange = EXPERIENCE_RANGES.find(
@@ -55,7 +94,9 @@ export default function SearchPage() {
     const rateRange = RATE_RANGES.find((r) => r.value === filters.rateRange);
     return {
       search: filters.keyword || undefined,
-      professionType: filters.category || undefined,
+      // The category dropdown stores a sub-category id; forward it under the
+      // new query param the backend filter recognises.
+      subCategoryId: filters.category || undefined,
       city: filters.location || undefined,
       minRating: filters.rating || undefined,
       availableNow: filters.availableNow || undefined,
@@ -111,6 +152,52 @@ export default function SearchPage() {
   const error = isIndividual ? proError : firmError;
   const results = isIndividual ? professionals : firms;
 
+  // While we check the gate, hide interactive UI so the modal does not flash
+  // over real results. Once `granted`, the page renders normally. When
+  // `blocked`, we render NO search content at all — just a neutral cover so
+  // there's nothing for the visitor to peek at behind the modal.
+  const gateOpen = leadCheck === 'blocked';
+  const gatePending = leadCheck === 'pending' || authLoading;
+  const locked = gateOpen || gatePending;
+
+  // Locked state: render the header + a placeholder cover. The non-
+  // dismissible LeadCaptureModal sits on top and is the only way forward.
+  if (locked) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main
+          className="flex flex-1 items-center justify-center bg-gradient-to-b from-amber-50 via-white to-teal-50 px-4 py-16"
+          aria-hidden="true"
+        >
+          <div className="max-w-md text-center">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+              <Lock size={20} />
+            </span>
+            <h1 className="mt-4 text-2xl font-bold text-slate-900">
+              {t('searchPage.title')}
+            </h1>
+            <p className="mt-2 text-sm text-slate-500">
+              {gatePending
+                ? 'Loading…'
+                : 'Please share a few details to continue.'}
+            </p>
+          </div>
+        </main>
+        <Footer />
+
+        <LeadCaptureModal
+          open={gateOpen}
+          blocking
+          source="Advanced Search"
+          title="Tell us a little about yourself"
+          subtitle="Share your details to unlock the full search — we'll keep them safe."
+          onSuccess={() => setLeadCheck('granted')}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -164,25 +251,24 @@ export default function SearchPage() {
                 onChange={(e) => update({ keyword: e.target.value })}
                 placeholder={t('searchPage.keywordPlaceholder')}
               />
-              <Select
+              <Combobox
                 label={t('searchPage.category')}
                 name="category"
                 value={filters.category}
                 onChange={(e) => update({ category: e.target.value })}
-                options={[
-                  { value: '', label: t('searchPage.allCategories') },
-                  ...toOptions(PROFESSION_TYPES),
-                ]}
+                placeholder={t('searchPage.allCategories')}
+                options={subCategories.map((s) => ({
+                  value: s.id,
+                  label: `${s.categoryName} — ${s.name}`,
+                }))}
               />
-              <Select
+              <Combobox
                 label={t('searchPage.location')}
                 name="location"
                 value={filters.location}
                 onChange={(e) => update({ location: e.target.value })}
-                options={[
-                  { value: '', label: t('searchPage.allCities') },
-                  ...toOptions(CITIES),
-                ]}
+                placeholder={t('searchPage.allCities')}
+                options={cities.map((c) => ({ value: c.name, label: c.name }))}
               />
               <Select
                 label={t('searchPage.experience')}
@@ -297,6 +383,14 @@ export default function SearchPage() {
         </div>
       </main>
       <Footer />
+
+      {/* ElevenLabs ConvAI widget — embedded only on the unlocked advanced
+          search page so it does not surface behind the lead-capture gate. */}
+      <elevenlabs-convai agent-id="agent_8401kshm0a9zfngb6jfbx0afser9"></elevenlabs-convai>
+      <Script
+        src="https://unpkg.com/@elevenlabs/convai-widget-embed"
+        strategy="afterInteractive"
+      />
     </div>
   );
 }

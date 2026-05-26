@@ -83,50 +83,10 @@ export const FOOTER_LINKS = [
   },
 ];
 
-// The 10 canonical consultation categories.
-export const CATEGORIES = [
-  'Divorce Lawyer',
-  'Family Lawyer',
-  'Criminal Lawyer',
-  'Civil Lawyer',
-  'Property Lawyer',
-  'Corporate Lawyer',
-  'Tax Consultant',
-  'GST Consultant',
-  'Income Tax Consultant',
-  'Company Registration Consultant',
-];
-
-// Profession types used on professional profiles.
-export const PROFESSION_TYPES = [
-  'Advocate',
-  'Divorce Lawyer',
-  'Family Lawyer',
-  'Criminal Lawyer',
-  'Civil Lawyer',
-  'Property Lawyer',
-  'Corporate Lawyer',
-  'Tax Consultant',
-  'GST Consultant',
-  'Income Tax Consultant',
-  'Company Registration Consultant',
-];
-
-export const SPECIALIZATIONS = [
-  'Family & Divorce',
-  'Criminal Defence',
-  'Civil Litigation',
-  'Property & Real Estate',
-  'Corporate & Commercial',
-  'Contracts & Drafting',
-  'Intellectual Property',
-  'Labour & Employment',
-  'Direct Taxation',
-  'Indirect Taxation (GST)',
-  'Income Tax Filing',
-  'Company Incorporation',
-  'Accounting & Compliance',
-];
+// Categories, sub-categories and professional taxonomy are now admin-managed
+// and served by /api/app-settings/categories. Use the `useCategories` /
+// `useSubCategoriesFlat` hooks from `@/hooks/useAppSettings` instead of a
+// hard-coded constant.
 
 export const LANGUAGES = [
   'English',
@@ -139,17 +99,9 @@ export const LANGUAGES = [
   'Gujarati',
 ];
 
-export const CITIES = [
-  'Mumbai',
-  'Delhi',
-  'Bangalore',
-  'Pune',
-  'Hyderabad',
-  'Chennai',
-  'Kolkata',
-  'Ahmedabad',
-  'Jaipur',
-];
+// Cities are admin-managed and served by /api/app-settings/cities. Use the
+// `useCities` hook from `@/hooks/useAppSettings` instead of a hard-coded
+// constant.
 
 export const SORT_OPTIONS = [
   { value: 'rating', label: 'Top rated' },

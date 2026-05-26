@@ -620,6 +620,41 @@ async function runMigrations() {
   //     name fields. Idempotent: skips notes that already have a name.
   await runCaseNoteAuthorNameBackfill();
 
+  // 16. App settings: ensure the new `subCategoryIds` + `practiceCities`
+  //     JSON columns exist on `professional_details` for older DBs (sync()
+  //     handles fresh DBs).
+  for (const col of ['subCategoryIds', 'practiceCities']) {
+    try {
+      await sequelize.query(
+        `ALTER TABLE \`professional_details\` ADD COLUMN IF NOT EXISTS \`${col}\` LONGTEXT`
+      );
+    } catch (err) {
+      if (!/doesn'?t exist|Unknown table/i.test(err.message)) {
+        console.warn(
+          `[Migrate] Could not add professional_details.${col}: ${err.message}`
+        );
+      }
+    }
+  }
+
+  // 16a. Sub-category `featured` flag — drives the homepage curation.
+  try {
+    await sequelize.query(
+      'ALTER TABLE `sub_categories` ADD COLUMN IF NOT EXISTS `featured` TINYINT(1) NOT NULL DEFAULT 0'
+    );
+  } catch (err) {
+    if (!/doesn'?t exist|Unknown table/i.test(err.message)) {
+      console.warn(
+        `[Migrate] Could not add sub_categories.featured: ${err.message}`
+      );
+    }
+  }
+
+  // 17. Seed the admin-managed taxonomy + cities tables on first boot,
+  //     then map every existing professional's `professionalType` string to
+  //     a sub-category id. Idempotent: skips rows that already exist.
+  await runAppSettingsSeed();
+
   console.log('[Migrate] Migrations finished successfully.');
 }
 
@@ -1088,6 +1123,169 @@ async function runClientUnification() {
     }
   } catch (err) {
     console.warn(`[Migrate] Client unification failed: ${err.message}`);
+  }
+}
+
+// Seed the App Settings taxonomy on first boot, then backfill every
+// existing ProfessionalDetail.subCategoryIds based on the old
+// `professionalType` string. Idempotent: existing rows are left alone.
+async function runAppSettingsSeed() {
+  try {
+    const {
+      Category,
+      SubCategory,
+      City,
+      ProfessionalDetail,
+    } = require('../models');
+
+    const slugify = (s) =>
+      String(s || '')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+    const SEED_CATEGORIES = [
+      {
+        slug: 'legal',
+        name: 'Legal',
+        sortOrder: 1,
+        subs: [
+          'Advocate',
+          'Divorce Lawyer',
+          'Family Lawyer',
+          'Criminal Lawyer',
+          'Civil Lawyer',
+          'Property Lawyer',
+          'Corporate Lawyer',
+        ],
+      },
+      {
+        slug: 'tax',
+        name: 'Tax',
+        sortOrder: 2,
+        subs: [
+          'Tax Consultant',
+          'GST Consultant',
+          'Income Tax Consultant',
+          'Company Registration Consultant',
+        ],
+      },
+    ];
+
+    const SEED_CITIES = [
+      'Mumbai',
+      'Delhi',
+      'Bangalore',
+      'Pune',
+      'Hyderabad',
+      'Chennai',
+      'Kolkata',
+      'Ahmedabad',
+      'Jaipur',
+    ];
+
+    // Categories + sub-categories.
+    let categoriesCreated = 0;
+    let subsCreated = 0;
+    for (const c of SEED_CATEGORIES) {
+      let cat = await Category.findOne({ where: { slug: c.slug } });
+      if (!cat) {
+        cat = await Category.create({
+          name: c.name,
+          slug: c.slug,
+          sortOrder: c.sortOrder,
+          active: true,
+        });
+        categoriesCreated += 1;
+      }
+      let i = 1;
+      for (const subName of c.subs) {
+        const subSlug = `${c.slug}-${slugify(subName)}`;
+        const existing = await SubCategory.findOne({
+          where: { slug: subSlug },
+        });
+        if (!existing) {
+          await SubCategory.create({
+            categoryId: cat.id,
+            name: subName,
+            slug: subSlug,
+            sortOrder: i,
+            active: true,
+          });
+          subsCreated += 1;
+        }
+        i += 1;
+      }
+    }
+
+    // Cities.
+    let citiesCreated = 0;
+    let i = 1;
+    for (const name of SEED_CITIES) {
+      const slug = slugify(name);
+      const existing = await City.findOne({ where: { slug } });
+      if (!existing) {
+        await City.create({ name, slug, sortOrder: i, active: true });
+        citiesCreated += 1;
+      }
+      i += 1;
+    }
+
+    console.log(
+      `[Migrate] App settings seed: categories +${categoriesCreated}, sub-categories +${subsCreated}, cities +${citiesCreated}.`
+    );
+
+    // Backfill ProfessionalDetail.subCategoryIds from the legacy
+    // `professionalType` string. Map by case-insensitive name match against
+    // every active sub-category row. Skip rows that already have a value.
+    const allSubs = await SubCategory.findAll({ raw: true });
+    const nameToId = new Map();
+    for (const s of allSubs) {
+      nameToId.set(String(s.name).toLowerCase().trim(), s.id);
+    }
+    // A few common aliases so older `professionalType` strings still resolve.
+    const ALIASES = {
+      lawyer: 'advocate',
+      ca: 'tax consultant',
+      'chartered accountant': 'tax consultant',
+      'business consultant': 'company registration consultant',
+      'tech consultant': 'company registration consultant',
+    };
+
+    const pros = await ProfessionalDetail.findAll({ raw: true });
+    let backfilled = 0;
+    for (const p of pros) {
+      // Parse the existing column (may be raw JSON text, an array, null, or
+      // — on fresh DBs that just gained the column — undefined).
+      let current = p.subCategoryIds;
+      if (typeof current === 'string') {
+        try {
+          current = JSON.parse(current);
+        } catch {
+          current = [];
+        }
+      }
+      if (Array.isArray(current) && current.length > 0) continue;
+
+      const rawType = String(p.professionalType || '').toLowerCase().trim();
+      if (!rawType) continue;
+      const lookup = ALIASES[rawType] || rawType;
+      const subId = nameToId.get(lookup);
+      if (!subId) continue;
+      await ProfessionalDetail.update(
+        { subCategoryIds: [subId] },
+        { where: { id: p.id } }
+      );
+      backfilled += 1;
+    }
+    if (backfilled > 0) {
+      console.log(
+        `[Migrate] App settings backfill: subCategoryIds set on +${backfilled} professional(s).`
+      );
+    }
+  } catch (err) {
+    console.warn(`[Migrate] App settings seed failed: ${err.message}`);
   }
 }
 

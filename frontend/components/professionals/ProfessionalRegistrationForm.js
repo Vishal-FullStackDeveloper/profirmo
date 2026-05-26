@@ -21,9 +21,12 @@ import {
 } from 'lucide-react';
 import Input from '@/components/common/Input';
 import Select from '@/components/common/Select';
+import Combobox from '@/components/common/Combobox';
+import MultiCombobox from '@/components/common/MultiCombobox';
 import FileUpload from '@/components/common/FileUpload';
 import PhotoUpload from '@/components/common/PhotoUpload';
 import { isEmail, isPhone, isStrongPassword } from '@/utils/validators';
+import { useCategories, useCities } from '@/hooks/useAppSettings';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -68,10 +71,13 @@ function emptyValues() {
     addressLine: '',
     bio: '',
     profilePhoto: '',
+    // Admin-managed taxonomy: array of selected SubCategory ids.
+    subCategoryIds: [],
+    // Admin-managed list: cities the professional actually practises in.
+    practiceCities: [],
     // Professional details
     yearsOfExperience: '',
     skills: '',
-    expertise: '',
     languages: '',
     education: '',
     certifications: '',
@@ -170,6 +176,12 @@ export function valuesFromProfile(data) {
   v.country = pick(address.country, pro.country);
   v.state = pick(address.state, pro.state);
   v.city = pick(address.city, pro.city);
+  v.subCategoryIds = Array.isArray(pro.subCategoryIds)
+    ? pro.subCategoryIds.filter(Boolean)
+    : [];
+  v.practiceCities = Array.isArray(pro.practiceCities)
+    ? pro.practiceCities.filter(Boolean)
+    : [];
   v.addressLine = pick(address.addressLine, address.line1, pro.addressLine);
   v.bio = pick(pro.bio, user.bio);
   v.profilePhoto = pick(user.profilePhoto, pro.profilePhoto, data.profilePhoto);
@@ -249,7 +261,6 @@ export function buildPayload(values, professionalType, mode) {
       ? Number(values.yearsOfExperience)
       : undefined,
     skills: toArray(values.skills),
-    expertise: toArray(values.expertise),
     languages: toArray(values.languages),
     education: toArray(values.education),
     certifications: toArray(values.certifications),
@@ -268,6 +279,12 @@ export function buildPayload(values, professionalType, mode) {
     state: values.state.trim(),
     city: values.city.trim(),
     addressLine: values.addressLine.trim(),
+    subCategoryIds: Array.isArray(values.subCategoryIds)
+      ? values.subCategoryIds
+      : [],
+    practiceCities: Array.isArray(values.practiceCities)
+      ? values.practiceCities.filter(Boolean)
+      : [],
   };
 
   const legal = {
@@ -294,7 +311,6 @@ export function buildPayload(values, professionalType, mode) {
 
   const tax = {
     taxRegistrationNumber: values.taxRegistrationNumber.trim(),
-    specializationAreas: toArray(values.specializationAreas),
     gstExpertise: Boolean(values.gstExpertise),
     incomeTaxExpertise: Boolean(values.incomeTaxExpertise),
     corporateTaxExpertise: Boolean(values.corporateTaxExpertise),
@@ -373,9 +389,6 @@ export function validateValues(values, professionalType, mode) {
     req('jurisdiction', 'Jurisdiction is required.');
   } else if (professionalType === PROFESSIONAL_TYPES.TAX) {
     req('taxRegistrationNumber', 'Tax registration number is required.');
-    if (toArray(values.specializationAreas).length === 0)
-      errors.specializationAreas =
-        'At least one specialization area is required.';
   }
 
   return errors;
@@ -537,6 +550,24 @@ export default function ProfessionalRegistrationForm({
   const [errors, setErrors] = useState({});
 
   const isLegal = professionalType === PROFESSIONAL_TYPES.LEGAL;
+
+  // Admin-managed taxonomy + cities power the dropdowns.
+  const { categories } = useCategories();
+  const { cities } = useCities();
+  const categoryForType = useMemo(() => {
+    if (!Array.isArray(categories)) return null;
+    const target = isLegal ? 'legal' : 'tax';
+    return categories.find((c) => String(c.slug || '').toLowerCase() === target);
+  }, [categories, isLegal]);
+
+  function toggleSubCategory(id) {
+    setValues((v) => {
+      const set = new Set(v.subCategoryIds || []);
+      if (set.has(id)) set.delete(id);
+      else set.add(id);
+      return { ...v, subCategoryIds: Array.from(set) };
+    });
+  }
   const allErrors = useMemo(
     () => ({ ...(serverErrors || {}), ...errors }),
     [serverErrors, errors]
@@ -584,8 +615,7 @@ export default function ProfessionalRegistrationForm({
       !!values.advocateLicenseNumber.trim() &&
       toArray(values.practiceAreas).length > 0 &&
       !!values.jurisdiction.trim()
-    : !!values.taxRegistrationNumber.trim() &&
-      toArray(values.specializationAreas).length > 0;
+    : !!values.taxRegistrationNumber.trim();
 
   const sections = [personalDone, true, true, typeDone];
   const completedCount = sections.filter(Boolean).length;
@@ -732,16 +762,28 @@ export default function ProfessionalRegistrationForm({
               required
               error={allErrors.state}
             />
-            <Input
+            <Combobox
               label="City"
               name="city"
               value={values.city}
               onChange={handleChange}
-              placeholder="Mumbai"
+              options={cities.map((c) => ({ value: c.name, label: c.name }))}
+              placeholder="Select city…"
               required
               error={allErrors.city}
             />
           </div>
+          <MultiCombobox
+            label="Practice cities"
+            name="practiceCities"
+            value={values.practiceCities}
+            onChange={(next) =>
+              setValues((v) => ({ ...v, practiceCities: next }))
+            }
+            options={cities.map((c) => ({ value: c.name, label: c.name }))}
+            placeholder="Select every city you take clients in…"
+            hint="These also appear when clients filter the listing by city."
+          />
           <Input
             label="Address line"
             name="addressLine"
@@ -758,6 +800,45 @@ export default function ProfessionalRegistrationForm({
             placeholder="A brief introduction about your practice."
             error={allErrors.bio}
           />
+
+          {/* Admin-managed sub-categories filtered by Legal/Tax. Pick every
+              area you practise in — drives search filters + profile tags. */}
+          {categoryForType &&
+            Array.isArray(categoryForType.subCategories) &&
+            categoryForType.subCategories.length > 0 && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  {categoryForType.name} sub-categories
+                </label>
+                <p className="mb-2 text-xs text-slate-500">
+                  Select every {categoryForType.name.toLowerCase()} area you
+                  practise in.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {categoryForType.subCategories.map((s) => {
+                    const checked = (values.subCategoryIds || []).includes(s.id);
+                    return (
+                      <label
+                        key={s.id}
+                        className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${
+                          checked
+                            ? 'border-amber-300 bg-amber-50 text-amber-800'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-amber-200'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={checked}
+                          onChange={() => toggleSubCategory(s.id)}
+                        />
+                        {s.name}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
         </div>
       </SectionCard>
 
@@ -799,15 +880,6 @@ export default function ProfessionalRegistrationForm({
             placeholder="Litigation, Drafting, Negotiation"
             hint="Comma-separated"
             error={allErrors.skills}
-          />
-          <Input
-            label="Areas of expertise"
-            name="expertise"
-            value={values.expertise}
-            onChange={handleChange}
-            placeholder="Corporate law, Mergers"
-            hint="Comma-separated"
-            error={allErrors.expertise}
           />
           <Input
             label="Languages"
@@ -1064,16 +1136,9 @@ export default function ProfessionalRegistrationForm({
               required
               error={allErrors.taxRegistrationNumber}
             />
-            <Input
-              label="Specialization areas"
-              name="specializationAreas"
-              value={values.specializationAreas}
-              onChange={handleChange}
-              placeholder="GST, Income Tax, Corporate Tax"
-              hint="Comma-separated"
-              required
-              error={allErrors.specializationAreas}
-            />
+            {/* Specialization areas are now covered by the admin-managed
+                sub-categories selected at the top of the form, so this field
+                is no longer rendered. */}
             <div>
               <p className="mb-2 text-sm font-medium text-slate-700">
                 Expertise

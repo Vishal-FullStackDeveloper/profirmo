@@ -39,6 +39,13 @@ const ProfessionalDetail = sequelize.define(
     skills: jsonField('skills', []),
     expertise: jsonField('expertise', []),
     languages: jsonField('languages', []),
+    // Admin-managed taxonomy: ids referencing rows in `sub_categories`.
+    // The parent category is inferred via sub_categories.categoryId.
+    subCategoryIds: jsonField('subCategoryIds', []),
+    // Array of city names (matching `cities.name`) where the professional
+    // actually practises. Separate from the address city — they may live in
+    // Mumbai but practise across Mumbai, Pune and Delhi.
+    practiceCities: jsonField('practiceCities', []),
     website: { type: DataTypes.STRING, allowNull: true },
     linkedin: { type: DataTypes.STRING, allowNull: true },
     certifications: jsonField('certifications', []),

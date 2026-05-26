@@ -26,6 +26,8 @@ const fileRoutes = require('./routes/fileRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const invitationRoutes = require('./routes/invitationRoutes');
 const firmJoinRoutes = require('./routes/firmJoinRoutes');
+const appSettingsRoutes = require('./routes/appSettingsRoutes');
+const leadRoutes = require('./routes/leadRoutes');
 
 const app = express();
 
@@ -125,6 +127,8 @@ app.use('/api/files', fileRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/invitations', invitationRoutes);
 app.use('/api/firm-join', firmJoinRoutes);
+app.use('/api/app-settings', appSettingsRoutes);
+app.use('/api/leads', leadRoutes);
 
 // --- Static uploads --------------------------------------------------------
 // Serve files stored on local disk at /uploads/<storedName>. Stored names
