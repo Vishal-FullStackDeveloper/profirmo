@@ -68,7 +68,7 @@ const PROFESSIONAL_NAV = [
   },
   {
     labelKey: 'dash.nav.profile',
-    href: '/dashboard/professional/profile',
+    href: '/profile/edit',
     icon: UserCircle,
   },
 ];

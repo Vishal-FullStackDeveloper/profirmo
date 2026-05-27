@@ -182,6 +182,43 @@ async function runMigrations() {
     `[Migrate] Phase-7 column check complete (${phase7Added} processed).`
   );
 
+  // 4a. 3-step signup unified fields — adds the new columns to
+  //     `professional_details` BEFORE any Sequelize-backed phase runs, so
+  //     `Professional.findAll` and friends never SELECT a column the DB
+  //     doesn't yet have. Idempotent via `ADD COLUMN IF NOT EXISTS`.
+  const PRO_DETAIL_3STEP_COLUMNS = [
+    ['primaryCategoryId', 'VARCHAR(64)'],
+    ['consultancyType', 'VARCHAR(20)'],
+    ['courtsPracticing', 'LONGTEXT'],
+    ['chamberAddress', 'TEXT'],
+    ['licenseNumber', 'VARCHAR(255)'],
+    ['barRegistrationNumber', 'VARCHAR(255)'],
+    ['taxRegistrationNumber', 'VARCHAR(255)'],
+    ['enrollmentNumber', 'VARCHAR(255)'],
+    ['advocateLicenseDoc', 'VARCHAR(512)'],
+    ['barCouncilCertDoc', 'VARCHAR(512)'],
+    ['lawDegreeDoc', 'VARCHAR(512)'],
+    ['taxRegistrationCertDoc', 'VARCHAR(512)'],
+    ['qualificationCertDoc', 'VARCHAR(512)'],
+    ['professionalLicenseDoc', 'VARCHAR(512)'],
+    ['governmentIdDoc', 'VARCHAR(512)'],
+    ['completionPercent', 'INT NOT NULL DEFAULT 0'],
+    ['signupComplete', 'TINYINT(1) NOT NULL DEFAULT 0'],
+  ];
+  for (const [col, type] of PRO_DETAIL_3STEP_COLUMNS) {
+    try {
+      await sequelize.query(
+        `ALTER TABLE \`professional_details\` ADD COLUMN IF NOT EXISTS \`${col}\` ${type}`
+      );
+    } catch (err) {
+      if (!/doesn'?t exist|Unknown table/i.test(err.message)) {
+        console.warn(
+          `[Migrate] Could not add professional_details.${col}: ${err.message}`
+        );
+      }
+    }
+  }
+
   // 5. Phase-8: add the firm-approval `status` column to the existing
   //    `law_firms` table, then backfill pre-existing firms so they do not
   //    block on review (treat firms created before Phase 8 as ACTIVE).
@@ -648,6 +685,43 @@ async function runMigrations() {
         `[Migrate] Could not add sub_categories.featured: ${err.message}`
       );
     }
+  }
+
+  // 16a-bis. `uploads.userId` is now nullable so the signup wizard can
+  // accept profile-photo / document uploads BEFORE the user has finished
+  // registering. The Sequelize-managed FK stays in place but allows NULL.
+  try {
+    await sequelize.query(
+      'ALTER TABLE `uploads` MODIFY COLUMN `userId` VARCHAR(64) NULL'
+    );
+  } catch (err) {
+    if (!/doesn'?t exist|Unknown table/i.test(err.message)) {
+      console.warn(
+        `[Migrate] Could not relax uploads.userId NOT NULL: ${err.message}`
+      );
+    }
+  }
+
+  // 16b. Backfill primaryCategoryId from the sub_categories -> categories
+  //      chain so existing rows have a usable primary category. The
+  //      ALTER TABLE that creates this column ran in phase 4a (earlier).
+  try {
+    await sequelize.query(`
+      UPDATE professional_details pd
+      JOIN (
+        SELECT pd.id AS pdId, sc.categoryId AS catId
+        FROM professional_details pd
+        JOIN sub_categories sc ON JSON_CONTAINS(pd.subCategoryIds, JSON_QUOTE(sc.id))
+        WHERE pd.primaryCategoryId IS NULL OR pd.primaryCategoryId = ''
+        GROUP BY pd.id
+      ) m ON m.pdId = pd.id
+      SET pd.primaryCategoryId = m.catId
+      WHERE pd.primaryCategoryId IS NULL OR pd.primaryCategoryId = ''
+    `);
+  } catch (err) {
+    console.warn(
+      `[Migrate] Could not backfill professional_details.primaryCategoryId: ${err.message}`
+    );
   }
 
   // 17. Seed the admin-managed taxonomy + cities tables on first boot,

@@ -5,7 +5,7 @@
 // depending on the selected professionalType. Saves via
 // PUT /api/profile/professional.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
@@ -49,18 +49,47 @@ function toCsv(arr) {
     .join(', ');
 }
 
+// Best-effort: derive a category slug ('legal' / 'tax' / '') from the
+// professionalType string when primaryCategoryId hasn't been resolved yet.
+function inferCategoryFromType(professionalType) {
+  const t = String(professionalType || '').toLowerCase();
+  if (!t) return '';
+  if (/(lawyer|advocate|legal|attorney|llb|barrister)/.test(t)) return 'legal';
+  if (/(tax|ca|chartered accountant|gst|income tax)/.test(t)) return 'tax';
+  return '';
+}
+
 function buildInitialState(detail, lawyer, tech) {
   const d = detail || {};
   const l = lawyer || {};
   const t = tech || {};
+  // Prefer the unified top-level value from ProfessionalDetail (new 3-step
+  // signup writes here), fall back to the legacy lawyer/tech sub-detail.
+  const pick = (...candidates) => {
+    for (const c of candidates) {
+      if (c !== undefined && c !== null && c !== '') return c;
+    }
+    return '';
+  };
   return {
     professionalType: d.professionalType || 'Lawyer',
+    // The new top-level primary category id (FK to `categories.id`). When
+    // missing on legacy rows we hydrate it from the categories hook below.
+    primaryCategoryId: d.primaryCategoryId || '',
     designation: d.designation || '',
     organization: d.organization || '',
     yearsOfExperience:
       d.yearsOfExperience === 0 || d.yearsOfExperience
         ? String(d.yearsOfExperience)
         : '',
+    consultationFee:
+      d.consultationFee === 0 || d.consultationFee
+        ? String(d.consultationFee)
+        : l.consultationFee
+          ? String(l.consultationFee)
+          : t.consultationFee
+            ? String(t.consultationFee)
+            : '',
     bio: d.bio || '',
     about: d.about || '',
     skills: toCsv(d.skills),
@@ -82,30 +111,37 @@ function buildInitialState(detail, lawyer, tech) {
     certificationsDocuments: Array.isArray(d.certificationsDocuments)
       ? d.certificationsDocuments.filter(Boolean)
       : [],
-    // Lawyer sub-form
-    barRegistrationNumber: l.barRegistrationNumber || '',
-    enrollmentNumber: l.enrollmentNumber || '',
-    licenseNumber: l.licenseNumber || '',
+    // --- Unified top-level identifiers / practice fields ---
+    barRegistrationNumber: pick(d.barRegistrationNumber, l.barRegistrationNumber),
+    enrollmentNumber: pick(d.enrollmentNumber, l.enrollmentNumber),
+    licenseNumber: pick(d.licenseNumber, l.licenseNumber),
+    taxRegistrationNumber: pick(d.taxRegistrationNumber),
+    chamberAddress: pick(d.chamberAddress, l.chamberAddress),
+    consultancyType: d.consultancyType || '',
+    courtsPracticing: toCsv(
+      Array.isArray(d.courtsPracticing) && d.courtsPracticing.length
+        ? d.courtsPracticing
+        : l.courtPractice
+    ),
+    // --- Unified top-level documents ---
+    advocateLicenseDoc: pick(d.advocateLicenseDoc, l.advocateLicense),
+    barCouncilCertDoc: pick(d.barCouncilCertDoc, l.barCertificate),
+    lawDegreeDoc: pick(d.lawDegreeDoc, l.lawDegreeDocument),
+    taxRegistrationCertDoc: pick(d.taxRegistrationCertDoc, t.taxConsultantCertificate),
+    qualificationCertDoc: pick(d.qualificationCertDoc),
+    professionalLicenseDoc: pick(d.professionalLicenseDoc, t.professionalLicense),
+    governmentIdDoc: pick(d.governmentIdDoc, d.identityDocument),
+    // --- Lawyer-only legacy fields kept for back-compat ---
     practiceAreas: toCsv(l.practiceAreas),
-    courtPractice: toCsv(l.courtPractice),
     jurisdiction: l.jurisdiction || '',
     lawDegree: l.lawDegree || '',
-    chamberAddress: l.chamberAddress || '',
-    lawyerConsultationFee:
-      l.consultationFee === 0 || l.consultationFee
-        ? String(l.consultationFee)
-        : '',
     availability: toCsv(l.availability),
-    // Tech sub-form
+    // --- Tech sub-form (untouched) ---
     technologies: toCsv(t.technologies),
     githubProfile: t.githubProfile || '',
     portfolioUrl: t.portfolioUrl || '',
     techCertifications: toCsv(t.certifications),
     experienceProjects: toCsv(t.experienceProjects),
-    techConsultationFee:
-      t.consultationFee === 0 || t.consultationFee
-        ? String(t.consultationFee)
-        : '',
   };
 }
 
@@ -114,12 +150,17 @@ function buildInitialState(detail, lawyer, tech) {
  * Props:
  *  - professionalDetail, lawyerDetail, techDetail: prefill data
  *  - onSaved: (refreshedProfile) => void
+ *  - view: 'all' | 'professional' | 'documents' — drives which sections
+ *          render. 'professional' hides the Documents block, 'documents'
+ *          shows only the Documents block. Default 'all' is the legacy
+ *          single-form layout.
  */
 export default function ProfessionalForm({
   professionalDetail,
   lawyerDetail,
   techDetail,
   onSaved,
+  view = 'all',
 }) {
   const [form, setForm] = useState(() =>
     buildInitialState(professionalDetail, lawyerDetail, techDetail)
@@ -168,8 +209,42 @@ export default function ProfessionalForm({
     }));
   }
 
-  const isLawyer = form.professionalType === 'Lawyer';
+  // Hydrate primaryCategoryId on first render once the categories list
+  // arrives: if the row was stored without it (legacy account) infer the
+  // slug from professionalType and look up the matching category. Runs once
+  // per categories-array reference, never overwrites an explicit value.
+  useEffect(() => {
+    if (form.primaryCategoryId || !Array.isArray(categories) || categories.length === 0) {
+      return;
+    }
+    const slug = inferCategoryFromType(form.professionalType);
+    if (!slug) return;
+    const match = categories.find(
+      (c) => String(c.slug || '').toLowerCase() === slug
+    );
+    if (match) {
+      setForm((f) => ({ ...f, primaryCategoryId: match.id }));
+    }
+  }, [categories, form.primaryCategoryId, form.professionalType]);
+
+  // Primary category drives which profession-specific fields are visible.
+  // Priority: explicit primaryCategoryId on the row -> the category slug
+  // looked up from the cached categories list -> fallback inferred from
+  // professionalType. This makes the conditional logic match the new
+  // 3-step signup wizard (which writes primaryCategoryId).
+  const categoryById = new Map(
+    (categories || []).map((c) => [c.id, String(c.slug || '').toLowerCase()])
+  );
+  const primaryCategorySlug =
+    categoryById.get(form.primaryCategoryId) ||
+    inferCategoryFromType(form.professionalType);
+  const isLegal = primaryCategorySlug === 'legal';
+  const isTax = primaryCategorySlug === 'tax';
+  // Tech is kept for legacy back-compat; the new signup wizard never
+  // selects it, so it only matters on older accounts.
   const isTech = form.professionalType === 'Tech Consultant';
+  // Legacy alias used by some downstream JSX expressions.
+  const isLawyer = isLegal;
 
   function validate() {
     const next = {};
@@ -194,6 +269,9 @@ export default function ProfessionalForm({
         yearsOfExperience: form.yearsOfExperience
           ? Number(form.yearsOfExperience)
           : 0,
+        consultationFee: form.consultationFee
+          ? Number(form.consultationFee)
+          : 0,
         bio: form.bio.trim(),
         about: form.about.trim(),
         skills: toArray(form.skills),
@@ -215,21 +293,33 @@ export default function ProfessionalForm({
         practiceCities: Array.isArray(form.practiceCities)
           ? form.practiceCities.filter(Boolean)
           : [],
+        // --- Unified top-level identifiers / practice fields ---
+        primaryCategoryId: form.primaryCategoryId || null,
+        barRegistrationNumber: form.barRegistrationNumber.trim() || null,
+        enrollmentNumber: form.enrollmentNumber.trim() || null,
+        licenseNumber: form.licenseNumber.trim() || null,
+        taxRegistrationNumber: form.taxRegistrationNumber.trim() || null,
+        chamberAddress: form.chamberAddress.trim() || null,
+        consultancyType: form.consultancyType || null,
+        courtsPracticing: toArray(form.courtsPracticing),
+        // --- Unified top-level documents ---
+        advocateLicenseDoc: form.advocateLicenseDoc || null,
+        barCouncilCertDoc: form.barCouncilCertDoc || null,
+        lawDegreeDoc: form.lawDegreeDoc || null,
+        taxRegistrationCertDoc: form.taxRegistrationCertDoc || null,
+        qualificationCertDoc: form.qualificationCertDoc || null,
+        professionalLicenseDoc: form.professionalLicenseDoc || null,
+        governmentIdDoc: form.governmentIdDoc || null,
       };
 
+      // The legacy lawyer/tech sub-objects are kept ONLY for fields that
+      // haven't been promoted to the top-level (practice areas, law degree,
+      // tech specifics). New unified fields are written above.
       if (isLawyer) {
         payload.lawyer = {
-          barRegistrationNumber: form.barRegistrationNumber.trim(),
-          enrollmentNumber: form.enrollmentNumber.trim(),
-          licenseNumber: form.licenseNumber.trim(),
           practiceAreas: toArray(form.practiceAreas),
-          courtPractice: toArray(form.courtPractice),
           jurisdiction: form.jurisdiction.trim(),
           lawDegree: form.lawDegree.trim(),
-          chamberAddress: form.chamberAddress.trim(),
-          consultationFee: form.lawyerConsultationFee
-            ? Number(form.lawyerConsultationFee)
-            : 0,
           availability: toArray(form.availability),
         };
       } else if (isTech) {
@@ -239,9 +329,6 @@ export default function ProfessionalForm({
           portfolioUrl: form.portfolioUrl.trim(),
           certifications: toArray(form.techCertifications),
           experienceProjects: toArray(form.experienceProjects),
-          consultationFee: form.techConsultationFee
-            ? Number(form.techConsultationFee)
-            : 0,
         };
       }
 
@@ -261,18 +348,59 @@ export default function ProfessionalForm({
     }
   }
 
+  // Read-only verification + completion summary surfaced from
+  // ProfessionalDetail so the professional sees their application status at
+  // a glance. Editable fields below feed into completionPercent on save.
+  const verificationStatus = (
+    (professionalDetail && professionalDetail.verificationStatus) ||
+    'pending'
+  ).toLowerCase();
+  const verificationLabel = (() => {
+    if (verificationStatus === 'verified' || verificationStatus === 'approved')
+      return { text: 'Verified', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' };
+    if (verificationStatus === 'under_review')
+      return { text: 'Under review', cls: 'bg-amber-50 text-amber-700 ring-amber-200' };
+    if (verificationStatus === 'rejected')
+      return { text: 'Rejected', cls: 'bg-red-50 text-red-700 ring-red-200' };
+    return { text: 'Pending', cls: 'bg-slate-50 text-slate-700 ring-slate-200' };
+  })();
+  const completionPercent =
+    (professionalDetail && professionalDetail.completionPercent) || 0;
+
   return (
     <Card>
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <h2 className="text-base font-semibold text-slate-900">
-            Professional details
-          </h2>
-          <p className="text-sm text-slate-500">
-            Your expertise, experience and credentials.
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">
+              Professional details
+            </h2>
+            <p className="text-sm text-slate-500">
+              Your expertise, experience and credentials.
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1.5 text-xs">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ring-1 ring-inset ${verificationLabel.cls}`}
+            >
+              {verificationLabel.text}
+            </span>
+            <div className="flex w-44 items-center gap-2">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all"
+                  style={{ width: `${completionPercent}%` }}
+                />
+              </div>
+              <span className="font-medium text-slate-600">
+                {completionPercent}%
+              </span>
+            </div>
+          </div>
         </div>
 
+        {view !== 'documents' && (
+        <>
         {/* Admin-managed taxonomy: professionals can pick multiple
             sub-categories that drive their listing + search filter tags. */}
         <MultiCombobox
@@ -284,6 +412,23 @@ export default function ProfessionalForm({
           placeholder="Select every city you take clients in…"
           hint="Clients filtering the listing by city will see you for any of these."
         />
+
+        {/* Primary category — drives which profession-specific fields show
+            up below (same Legal vs Tax conditional layout as the signup
+            wizard's Step 2). */}
+        {categories.length > 0 && (
+          <Select
+            label="Primary category"
+            name="primaryCategoryId"
+            value={form.primaryCategoryId || ''}
+            onChange={(e) => update('primaryCategoryId', e.target.value)}
+            options={[
+              { value: '', label: 'Select category…' },
+              ...categories.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+            hint="Choose Legal or Tax to reveal the profession-specific identifier and document fields."
+          />
+        )}
 
         {categories.length > 0 && (
           <div>
@@ -455,76 +600,117 @@ export default function ProfessionalForm({
           />
         </div>
 
-        {/* Lawyer sub-form */}
-        {isLawyer && (
-          <div className="border-t border-slate-200 pt-5">
-            <h3 className="text-sm font-semibold text-slate-800">
-              Lawyer details
-            </h3>
-            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input
-                label="Bar registration number"
-                name="barRegistrationNumber"
-                value={form.barRegistrationNumber}
-                onChange={(e) =>
-                  update('barRegistrationNumber', e.target.value)
-                }
-              />
-              <Input
-                label="Enrollment number"
-                name="enrollmentNumber"
-                value={form.enrollmentNumber}
-                onChange={(e) => update('enrollmentNumber', e.target.value)}
-              />
-              <Input
-                label="License number"
-                name="licenseNumber"
-                value={form.licenseNumber}
-                onChange={(e) => update('licenseNumber', e.target.value)}
-              />
-              <Input
-                label="Jurisdiction"
-                name="jurisdiction"
-                value={form.jurisdiction}
-                onChange={(e) => update('jurisdiction', e.target.value)}
-              />
-              <Input
-                label="Practice areas"
-                name="practiceAreas"
-                value={form.practiceAreas}
-                onChange={(e) => update('practiceAreas', e.target.value)}
-                hint="Comma-separated"
-              />
-              <Input
-                label="Court practice"
-                name="courtPractice"
-                value={form.courtPractice}
-                onChange={(e) => update('courtPractice', e.target.value)}
-                hint="Comma-separated"
-              />
-              <Input
-                label="Law degree"
-                name="lawDegree"
-                value={form.lawDegree}
-                onChange={(e) => update('lawDegree', e.target.value)}
-              />
-              <Input
-                label="Consultation fee"
-                name="lawyerConsultationFee"
-                type="number"
-                min="0"
-                value={form.lawyerConsultationFee}
-                onChange={(e) =>
-                  update('lawyerConsultationFee', e.target.value)
-                }
-              />
-              <Input
-                label="Chamber address"
-                name="chamberAddress"
-                value={form.chamberAddress}
-                onChange={(e) => update('chamberAddress', e.target.value)}
-                className="sm:col-span-2"
-              />
+        {/* Practice details — shared between Legal & Tax. Identifiers live
+            top-level on professional_details so the listing + admin review
+            read from one place. */}
+        <div className="border-t border-slate-200 pt-5">
+          <h3 className="text-sm font-semibold text-slate-800">
+            Practice details
+          </h3>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Consultation fee (₹ / minute)"
+              name="consultationFee"
+              type="number"
+              min="0"
+              value={form.consultationFee}
+              onChange={(e) => update('consultationFee', e.target.value)}
+            />
+            <Select
+              label="Consultancy type"
+              name="consultancyType"
+              value={form.consultancyType}
+              onChange={(e) => update('consultancyType', e.target.value)}
+              options={[
+                { value: '', label: 'Select consultancy type…' },
+                { value: 'online', label: 'Online' },
+                { value: 'in_person', label: 'In Person' },
+                { value: 'both', label: 'Both' },
+              ]}
+            />
+            {isLawyer && (
+              <>
+                <Input
+                  label="Bar registration number"
+                  name="barRegistrationNumber"
+                  value={form.barRegistrationNumber}
+                  onChange={(e) =>
+                    update('barRegistrationNumber', e.target.value)
+                  }
+                />
+                <Input
+                  label="Enrollment number"
+                  name="enrollmentNumber"
+                  value={form.enrollmentNumber}
+                  onChange={(e) => update('enrollmentNumber', e.target.value)}
+                />
+                <Input
+                  label="Advocate license number"
+                  name="licenseNumber"
+                  value={form.licenseNumber}
+                  onChange={(e) => update('licenseNumber', e.target.value)}
+                />
+                <Input
+                  label="Jurisdiction"
+                  name="jurisdiction"
+                  value={form.jurisdiction}
+                  onChange={(e) => update('jurisdiction', e.target.value)}
+                />
+                <Input
+                  label="Practice areas"
+                  name="practiceAreas"
+                  value={form.practiceAreas}
+                  onChange={(e) => update('practiceAreas', e.target.value)}
+                  hint="Comma-separated"
+                />
+                <Input
+                  label="Law degree"
+                  name="lawDegree"
+                  value={form.lawDegree}
+                  onChange={(e) => update('lawDegree', e.target.value)}
+                />
+              </>
+            )}
+            {isTax && (
+              <>
+                <Input
+                  label="Tax registration number"
+                  name="taxRegistrationNumber"
+                  value={form.taxRegistrationNumber}
+                  onChange={(e) =>
+                    update('taxRegistrationNumber', e.target.value)
+                  }
+                />
+                <Input
+                  label="Enrollment number"
+                  name="enrollmentNumber"
+                  value={form.enrollmentNumber}
+                  onChange={(e) => update('enrollmentNumber', e.target.value)}
+                />
+                <Input
+                  label="License number"
+                  name="licenseNumber"
+                  value={form.licenseNumber}
+                  onChange={(e) => update('licenseNumber', e.target.value)}
+                />
+              </>
+            )}
+            <Input
+              label="Courts practising"
+              name="courtsPracticing"
+              value={form.courtsPracticing}
+              onChange={(e) => update('courtsPracticing', e.target.value)}
+              hint="Comma-separated, e.g. High Court, District Court"
+              className="sm:col-span-2"
+            />
+            <Input
+              label="Chamber address"
+              name="chamberAddress"
+              value={form.chamberAddress}
+              onChange={(e) => update('chamberAddress', e.target.value)}
+              className="sm:col-span-2"
+            />
+            {isLawyer && (
               <Input
                 label="Availability"
                 name="availability"
@@ -533,10 +719,82 @@ export default function ProfessionalForm({
                 hint="Comma-separated, e.g. Mon, Tue, Wed"
                 className="sm:col-span-2"
               />
-            </div>
+            )}
           </div>
+        </div>
+
+        </>
         )}
 
+        {view !== 'professional' && (
+        <>
+        {/* Documents — top-level URLs uploaded via the FileUpload widget.
+            Profession-specific docs appear conditionally. */}
+        <div className="border-t border-slate-200 pt-5">
+          <h3 className="text-sm font-semibold text-slate-800">Documents</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Government ID is mandatory. Profession-specific documents are
+            required for verification — upload the highest-quality copies you
+            have.
+          </p>
+          <div className="mt-3 space-y-3">
+            <FileUpload
+              label="Government ID (Aadhaar / passport)"
+              value={form.governmentIdDoc}
+              onChange={(url) => update('governmentIdDoc', url)}
+              category="identity_document"
+            />
+            {isLawyer && (
+              <>
+                <FileUpload
+                  label="Advocate license"
+                  value={form.advocateLicenseDoc}
+                  onChange={(url) => update('advocateLicenseDoc', url)}
+                  category="certification"
+                />
+                <FileUpload
+                  label="Bar council registration certificate"
+                  value={form.barCouncilCertDoc}
+                  onChange={(url) => update('barCouncilCertDoc', url)}
+                  category="certification"
+                />
+                <FileUpload
+                  label="Law degree certificate"
+                  value={form.lawDegreeDoc}
+                  onChange={(url) => update('lawDegreeDoc', url)}
+                  category="certification"
+                />
+              </>
+            )}
+            {isTax && (
+              <>
+                <FileUpload
+                  label="Tax registration certificate"
+                  value={form.taxRegistrationCertDoc}
+                  onChange={(url) => update('taxRegistrationCertDoc', url)}
+                  category="certification"
+                />
+                <FileUpload
+                  label="Professional qualification certificate"
+                  value={form.qualificationCertDoc}
+                  onChange={(url) => update('qualificationCertDoc', url)}
+                  category="certification"
+                />
+                <FileUpload
+                  label="Professional license"
+                  value={form.professionalLicenseDoc}
+                  onChange={(url) => update('professionalLicenseDoc', url)}
+                  category="certification"
+                />
+              </>
+            )}
+          </div>
+        </div>
+        </>
+        )}
+
+        {view !== 'documents' && (
+        <>
         {/* Tech Consultant sub-form */}
         {isTech && (
           <div className="border-t border-slate-200 pt-5">
@@ -590,10 +848,16 @@ export default function ProfessionalForm({
             </div>
           </div>
         )}
+        </>
+        )}
 
+        {view !== 'professional' && (
+        <>
         {/* Documents */}
         <div className="border-t border-slate-200 pt-5">
-          <h3 className="text-sm font-semibold text-slate-800">Documents</h3>
+          <h3 className="text-sm font-semibold text-slate-800">
+            Additional documents
+          </h3>
           <p className="mt-1 text-xs text-slate-500">
             Upload your resume and supporting documents (images or PDF, up to
             10 MB each).
@@ -671,6 +935,8 @@ export default function ProfessionalForm({
             )}
           </div>
         </div>
+        </>
+        )}
 
         {feedback && (
           <div

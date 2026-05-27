@@ -333,6 +333,92 @@ export function buildPayload(values, professionalType, mode) {
     return payload;
   }
 
+  // Edit mode — single flat payload split by the consumer into
+  // PUT /api/profile (personal/address) + PUT /api/profile/professional
+  // (everything else). Documents and identifiers come out at the top level
+  // because the listing / admin / cards all read from ProfessionalDetail
+  // top-level columns now.
+  if (mode === 'edit') {
+    return {
+      // Identity
+      firstName: values.firstName.trim(),
+      lastName: values.lastName.trim(),
+      mobileNumber: values.mobileNumber.trim(),
+      profilePhoto: values.profilePhoto || '',
+      // Address
+      country: values.country.trim(),
+      state: values.state.trim(),
+      city: values.city.trim(),
+      addressLine: values.addressLine.trim(),
+      // Professional core
+      professionalType,
+      primaryCategoryId: values.primaryCategoryId || null,
+      subCategoryIds: Array.isArray(values.subCategoryIds)
+        ? values.subCategoryIds
+        : [],
+      practiceCities: Array.isArray(values.practiceCities)
+        ? values.practiceCities.filter(Boolean)
+        : [],
+      yearsOfExperience: values.yearsOfExperience
+        ? Number(values.yearsOfExperience)
+        : 0,
+      consultationFee: values.consultationFee
+        ? Number(values.consultationFee)
+        : undefined,
+      bio: values.bio.trim(),
+      skills: toArray(values.skills),
+      languages: toArray(values.languages),
+      education: toArray(values.education),
+      certifications: toArray(values.certifications),
+      website: values.website.trim(),
+      linkedin: values.linkedin.trim(),
+      availability: toArray(values.availability),
+      // Practice / identifiers (top-level on ProfessionalDetail)
+      consultancyType: isLegal
+        ? values.legalConsultationType || null
+        : values.taxConsultationType || null,
+      chamberAddress: values.chamberAddress.trim() || null,
+      courtsPracticing: toArray(values.courtPractice),
+      barRegistrationNumber: isLegal
+        ? values.barRegistrationNumber.trim() || null
+        : null,
+      enrollmentNumber: isLegal
+        ? values.enrollmentNumber.trim() || null
+        : null,
+      licenseNumber: isLegal
+        ? values.advocateLicenseNumber.trim() || null
+        : null,
+      taxRegistrationNumber: isLegal
+        ? null
+        : values.taxRegistrationNumber.trim() || null,
+      // Documents
+      governmentIdDoc: values.governmentId || null,
+      advocateLicenseDoc: isLegal ? values.advocateLicense || null : null,
+      barCouncilCertDoc: isLegal
+        ? values.barCouncilRegistration || null
+        : null,
+      lawDegreeDoc: isLegal ? values.lawDegreeDocument || null : null,
+      taxRegistrationCertDoc: !isLegal
+        ? values.taxConsultantCertificate || null
+        : null,
+      qualificationCertDoc: !isLegal
+        ? values.registrationCertificate || null
+        : null,
+      professionalLicenseDoc: !isLegal
+        ? values.professionalLicense || null
+        : null,
+      // Legacy lawyer/tax sub-objects for fields not promoted to top-level.
+      lawyer: isLegal
+        ? {
+            practiceAreas: toArray(values.practiceAreas),
+            jurisdiction: values.jurisdiction.trim(),
+            lawDegree: values.lawDegree.trim(),
+            availability: toArray(values.availability),
+          }
+        : undefined,
+    };
+  }
+
   // Registration: flat top-level professional payload.
   const payload = {
     firstName: values.firstName.trim(),
@@ -401,6 +487,11 @@ export function validateValues(values, professionalType, mode) {
 /** A collapsible section card with a step number badge. */
 function SectionCard({ index, title, description, complete, children }) {
   const [open, setOpen] = useState(true);
+  // Wizard chrome already shows step progress, so we only render the
+  // numbered badge when the parent explicitly passes a non-null `index`.
+  // Sections that pass `index={null}` (e.g. the type-specific Section 4)
+  // render with no leading number.
+  const showBadge = index !== null && index !== undefined;
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-card">
       <button
@@ -408,15 +499,17 @@ function SectionCard({ index, title, description, complete, children }) {
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-slate-50"
       >
-        <span
-          className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${
-            complete
-              ? 'bg-teal-100 text-teal-700'
-              : 'bg-amber-100 text-amber-700'
-          }`}
-        >
-          {complete ? <CheckCircle2 size={16} /> : index}
-        </span>
+        {showBadge && (
+          <span
+            className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${
+              complete
+                ? 'bg-teal-100 text-teal-700'
+                : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            {complete ? <CheckCircle2 size={16} /> : index}
+          </span>
+        )}
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-slate-900">
             {title}
@@ -542,12 +635,25 @@ export default function ProfessionalRegistrationForm({
   banner = '',
   serverErrors,
   onSubmit,
+  // Edit mode: optional async (payload, currentStep) => Promise — invoked
+  // before advancing to the next step so the visitor's data is persisted
+  // immediately instead of waiting for the final submit. If it rejects,
+  // the step is NOT advanced and `banner` should be set by the parent.
+  onStepSave,
+  // Starting step number — used by the resume flow so a professional who
+  // closed the tab after Step 1 lands directly on Step 2 instead of
+  // re-doing Personal info.
+  initialStep = 1,
 }) {
   const [values, setValues] = useState(() => ({
     ...emptyValues(),
     ...(initialValues || {}),
   }));
   const [errors, setErrors] = useState({});
+  // 3-step wizard: 1=Personal info, 2=Professional details, 3=Documents.
+  const [step, setStep] = useState(initialStep);
+  // In-flight indicator for the per-step save.
+  const [stepSaving, setStepSaving] = useState(false);
 
   const isLegal = professionalType === PROFESSIONAL_TYPES.LEGAL;
 
@@ -583,12 +689,127 @@ export default function ProfessionalRegistrationForm({
     setField(name, type === 'checkbox' ? checked : value);
   }
 
+  // Per-step validation: returns an error map for the fields the visible
+  // step controls, so Next/Back can't bypass required values.
+  function validateStep(targetStep) {
+    const allErrs = validateValues(values, professionalType, mode);
+    const STEP_FIELDS = {
+      1: [
+        'firstName',
+        'lastName',
+        'email',
+        'mobileNumber',
+        'password',
+        'confirmPassword',
+        'country',
+        'state',
+        'city',
+      ],
+      2: [
+        'barRegistrationNumber',
+        'enrollmentNumber',
+        'advocateLicenseNumber',
+        'practiceAreas',
+        'jurisdiction',
+        'taxRegistrationNumber',
+      ],
+      3: [],
+    };
+    const stepFields = STEP_FIELDS[targetStep] || [];
+    const filtered = {};
+    for (const k of stepFields) {
+      if (allErrs[k]) filtered[k] = allErrs[k];
+    }
+    return filtered;
+  }
+
+  async function goNext() {
+    const stepErrs = validateStep(step);
+    if (Object.keys(stepErrs).length > 0) {
+      setErrors((prev) => ({ ...prev, ...stepErrs }));
+      // Scroll to the first error so the inline message is visible.
+      if (typeof window !== 'undefined') {
+        const firstKey = Object.keys(stepErrs)[0];
+        const el = document.querySelector(`[name="${firstKey}"]`);
+        if (el && typeof el.scrollIntoView === 'function') {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (typeof el.focus === 'function') el.focus({ preventScroll: true });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
+      return;
+    }
+    setErrors({});
+    // Persist what we have for this step before advancing. The parent
+    // controls how to split the payload across endpoints — we just hand
+    // it the same `buildPayload` result the final submit would use.
+    if (typeof onStepSave === 'function') {
+      try {
+        setStepSaving(true);
+        const payload = buildPayload(values, professionalType, mode);
+        await onStepSave(payload, step);
+      } catch (err) {
+        // Parent should surface the message via the `banner` prop. We
+        // stay on the current step.
+        setStepSaving(false);
+        if (typeof window !== 'undefined') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        return;
+      } finally {
+        setStepSaving(false);
+      }
+    }
+    setStep((s) => Math.min(3, s + 1));
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  function goBack() {
+    setErrors({});
+    setStep((s) => Math.max(1, s - 1));
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
     const errs = validateValues(values, professionalType, mode);
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
-      // Scroll to top so the user sees the banner / first error.
+      // Jump to the first step that has an error so the user sees what's
+      // missing instead of staring at the disabled submit on step 3.
+      const STEP_FIELDS = {
+        1: [
+          'firstName',
+          'lastName',
+          'email',
+          'mobileNumber',
+          'password',
+          'confirmPassword',
+          'country',
+          'state',
+          'city',
+        ],
+        2: [
+          'barRegistrationNumber',
+          'enrollmentNumber',
+          'advocateLicenseNumber',
+          'practiceAreas',
+          'jurisdiction',
+          'taxRegistrationNumber',
+        ],
+      };
+      for (let s = 1; s <= 3; s += 1) {
+        const fields = STEP_FIELDS[s] || [];
+        if (fields.some((f) => errs[f])) {
+          setStep(s);
+          break;
+        }
+      }
       if (typeof window !== 'undefined')
         window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -597,33 +818,13 @@ export default function ProfessionalRegistrationForm({
     if (typeof onSubmit === 'function') onSubmit(payload);
   }
 
-  // Section completion flags drive the progress indicator.
-  const personalDone =
-    !!values.firstName.trim() &&
-    !!values.lastName.trim() &&
-    !!values.country.trim() &&
-    !!values.state.trim() &&
-    !!values.city.trim() &&
-    (mode !== 'register' ||
-      (isEmail(values.email) &&
-        isPhone(values.mobileNumber) &&
-        isStrongPassword(values.password) &&
-        values.password === values.confirmPassword));
-  const typeDone = isLegal
-    ? !!values.barRegistrationNumber.trim() &&
-      !!values.enrollmentNumber.trim() &&
-      !!values.advocateLicenseNumber.trim() &&
-      toArray(values.practiceAreas).length > 0 &&
-      !!values.jurisdiction.trim()
-    : !!values.taxRegistrationNumber.trim();
-
-  const sections = [personalDone, true, true, typeDone];
-  const completedCount = sections.filter(Boolean).length;
-  const progress = Math.round((completedCount / sections.length) * 100);
+  // Step-based progress: 1 = Personal info, 2 = Professional details, 3 = Documents.
+  const STEP_LABELS = ['Personal info', 'Professional details', 'Documents'];
+  const stepProgress = Math.round((step / 3) * 100);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-      {/* Progress indicator */}
+      {/* Progress indicator — wizard chrome with one step visible at a time. */}
       <div className="rounded-2xl border border-slate-200/80 bg-white px-5 py-4 shadow-card">
         <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-600">
           <span>
@@ -639,13 +840,45 @@ export default function ProfessionalRegistrationForm({
               </span>
             )}
           </span>
-          <span>{completedCount} of 4 sections ready</span>
+          <span>Step {step} of 3 · {STEP_LABELS[step - 1]}</span>
         </div>
         <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
           <div
             className="h-full rounded-full bg-gradient-to-r from-amber-500 to-teal-500 transition-all duration-300"
-            style={{ width: `${progress}%` }}
+            style={{ width: `${stepProgress}%` }}
           />
+        </div>
+        <div className="mt-3 flex items-center justify-between text-[11px]">
+          {STEP_LABELS.map((label, i) => {
+            const n = i + 1;
+            const done = step > n;
+            const active = step === n;
+            return (
+              <span
+                key={label}
+                className={`inline-flex items-center gap-1.5 ${
+                  active
+                    ? 'font-semibold text-amber-700'
+                    : done
+                    ? 'text-emerald-600'
+                    : 'text-slate-400'
+                }`}
+              >
+                <span
+                  className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                    active
+                      ? 'bg-amber-500 text-white'
+                      : done
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-slate-200 text-slate-500'
+                  }`}
+                >
+                  {done ? <CheckCircle2 size={12} /> : n}
+                </span>
+                {label}
+              </span>
+            );
+          })}
         </div>
       </div>
 
@@ -656,12 +889,13 @@ export default function ProfessionalRegistrationForm({
         </div>
       )}
 
-      {/* Section 1 — Personal */}
+      {/* Step 1 — Personal information */}
+      {step === 1 && (
       <SectionCard
         index={1}
         title="Personal information"
         description="Tell us who you are."
-        complete={personalDone}
+        complete={false}
       >
         <div className="space-y-4">
           <div>
@@ -841,8 +1075,10 @@ export default function ProfessionalRegistrationForm({
             )}
         </div>
       </SectionCard>
+      )}
 
-      {/* Section 2 — Professional details */}
+      {/* Step 2 — Professional details (includes type-specific identifiers) */}
+      {step === 2 && (
       <SectionCard
         index={2}
         title="Professional details"
@@ -937,12 +1173,16 @@ export default function ProfessionalRegistrationForm({
           />
         </div>
       </SectionCard>
+      )}
 
-      {/* Section 3 — Common documents */}
+      {/* Step 3 — Documents upload (common docs only). Profession-specific
+          docs are part of Section 4 below, which renders on both step 2
+          (identifiers) and step 3 (documents) via an inner step gate. */}
+      {step === 3 && (
       <SectionCard
         index={3}
         title="Documents"
-        description="Upload your verification documents."
+        description="Upload identification and professional documents. All uploads are optional."
         complete
       >
         <div className="space-y-4">
@@ -953,38 +1193,77 @@ export default function ProfessionalRegistrationForm({
             category="identity_document"
             hint="Aadhaar, passport or other government-issued ID."
           />
-          <FileUpload
-            label="Resume / CV"
-            value={values.resume}
-            onChange={(url) => setField('resume', url)}
-            category="resume"
-            hint="Your professional resume."
-          />
-          <FileUpload
-            label="Degree certificate"
-            value={values.degreeCertificate}
-            onChange={(url) => setField('degreeCertificate', url)}
-            category="certification"
-            hint="Your highest qualifying degree."
-          />
+          {isLegal ? (
+            <>
+              <FileUpload
+                label="Advocate license"
+                value={values.advocateLicense}
+                onChange={(url) => setField('advocateLicense', url)}
+                category="certification"
+              />
+              <FileUpload
+                label="Bar council registration certificate"
+                value={values.barCouncilRegistration}
+                onChange={(url) =>
+                  setField('barCouncilRegistration', url)
+                }
+                category="certification"
+              />
+              <FileUpload
+                label="Law degree certificate"
+                value={values.lawDegreeDocument}
+                onChange={(url) => setField('lawDegreeDocument', url)}
+                category="certification"
+              />
+            </>
+          ) : (
+            <>
+              <FileUpload
+                label="Tax registration certificate"
+                value={values.taxConsultantCertificate}
+                onChange={(url) =>
+                  setField('taxConsultantCertificate', url)
+                }
+                category="certification"
+              />
+              <FileUpload
+                label="Professional qualification certificate"
+                value={values.registrationCertificate}
+                onChange={(url) =>
+                  setField('registrationCertificate', url)
+                }
+                category="certification"
+              />
+              <FileUpload
+                label="Professional license"
+                value={values.professionalLicense}
+                onChange={(url) => setField('professionalLicense', url)}
+                category="certification"
+              />
+            </>
+          )}
         </div>
       </SectionCard>
+      )}
 
-      {/* Section 4 — Type-specific (switches dynamically) */}
+      {/* Section 4 — Type-specific practice details. Only visible on Step 2;
+          profession-specific documents have been consolidated into the
+          single Documents section on Step 3. */}
+      {step === 2 && (
       <SectionCard
-        index={4}
-        title={
-          isLegal ? 'Legal practice details' : 'Tax practice details'
-        }
+        index={null}
+        title={isLegal ? 'Legal practice details' : 'Tax practice details'}
         description={
           isLegal
-            ? 'Registration, practice areas and legal documents.'
-            : 'Registration, specializations and tax documents.'
+            ? 'Registration numbers and practice information.'
+            : 'Registration number and specializations.'
         }
-        complete={typeDone}
+        complete={false}
       >
         {isLegal ? (
           <div className="space-y-4">
+            {step === 2 && (
+            <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
                 label="Bar registration number"
@@ -1060,28 +1339,20 @@ export default function ProfessionalRegistrationForm({
               placeholder="Your chamber / office address"
               error={allErrors.chamberAddress}
             />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Select
-                label="Consultation type"
-                name="legalConsultationType"
-                value={values.legalConsultationType}
-                onChange={handleChange}
-                options={CONSULTATION_TYPE_OPTIONS}
-                placeholder="Select consultation type"
-                error={allErrors.legalConsultationType}
-              />
-              <Input
-                label="Years of practice"
-                name="yearsOfPractice"
-                type="number"
-                min="0"
-                value={values.yearsOfPractice}
-                onChange={handleChange}
-                placeholder="8"
-                error={allErrors.yearsOfPractice}
-              />
-            </div>
+            <Select
+              label="Consultation type"
+              name="legalConsultationType"
+              value={values.legalConsultationType}
+              onChange={handleChange}
+              options={CONSULTATION_TYPE_OPTIONS}
+              placeholder="Select consultation type"
+              error={allErrors.legalConsultationType}
+            />
 
+            </>
+            )}
+
+            {step === 3 && (
             <div className="border-t border-slate-100 pt-4">
               <p className="mb-3 text-sm font-semibold text-slate-800">
                 Legal documents
@@ -1124,9 +1395,12 @@ export default function ProfessionalRegistrationForm({
                 />
               </div>
             </div>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
+            {step === 2 && (
+            <>
             <Input
               label="Tax registration number"
               name="taxRegistrationNumber"
@@ -1171,6 +1445,10 @@ export default function ProfessionalRegistrationForm({
               error={allErrors.taxConsultationType}
             />
 
+            </>
+            )}
+
+            {step === 3 && (
             <div className="border-t border-slate-100 pt-4">
               <p className="mb-3 text-sm font-semibold text-slate-800">
                 Tax documents
@@ -1209,14 +1487,47 @@ export default function ProfessionalRegistrationForm({
                 />
               </div>
             </div>
+            )}
           </div>
         )}
       </SectionCard>
+      )}
 
+      {/* Wizard navigation — Back / Next / Submit. Submit only fires on step 3. */}
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+        {step > 1 ? (
+          <button
+            type="button"
+            onClick={goBack}
+            disabled={submitting}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            ← Back
+          </button>
+        ) : (
+          <span />
+        )}
+        {step < 3 ? (
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={stepSaving || submitting}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-2.5 text-sm font-semibold text-white shadow-glow-sm transition hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {stepSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              <>Save &amp; continue →</>
+            )}
+          </button>
+        ) : (
       <button
         type="submit"
         disabled={submitting}
-        className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-3 text-sm font-semibold text-white shadow-glow-sm transition hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-2.5 text-sm font-semibold text-white shadow-glow-sm transition hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? (
           <>
@@ -1227,6 +1538,8 @@ export default function ProfessionalRegistrationForm({
           submitLabel
         )}
       </button>
+        )}
+      </div>
     </form>
   );
 }

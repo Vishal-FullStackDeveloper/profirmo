@@ -22,6 +22,7 @@ const ENDPOINTS = {
   registerClient: '/api/auth/register-client',
   registerProfessional: '/api/auth/register-professional',
   registerFirm: '/api/auth/register-firm',
+  checkAvailability: '/api/auth/check-availability',
 };
 
 /** Unwrap the API envelope and return its `data` payload. */
@@ -226,6 +227,19 @@ export async function registerClient(data) {
  *   (personal + professional details, nested `legal` or `tax`, file URLs).
  * @returns {Promise<{user, emailVerificationRequired, approvalStatus}>}
  */
+/**
+ * Check whether an email and/or phone is already linked to an existing
+ * account. Used by the signup wizard before it tries to create the user
+ * so we can show "account exists, login or recover" early.
+ *
+ * @param {{email?: string, mobileNumber?: string}} payload
+ * @returns {Promise<{emailTaken,mobileTaken,takenBy}>}
+ */
+export async function checkAvailability(payload) {
+  const res = await post(ENDPOINTS.checkAvailability, payload);
+  return unwrap(res);
+}
+
 export async function registerProfessional(payload) {
   const res = await post(ENDPOINTS.registerProfessional, payload);
   return unwrap(res);
@@ -250,4 +264,5 @@ export default {
   registerClient,
   registerProfessional,
   registerFirm,
+  checkAvailability,
 };

@@ -9,7 +9,6 @@ import Link from 'next/link';
 import {
   ChevronDown,
   User,
-  Pencil,
   LayoutDashboard,
   LogOut,
   Mail,
@@ -18,7 +17,7 @@ import {
   Inbox,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
-import { formatDate } from '@/utils/formatters';
+import { formatDate, slugify } from '@/utils/formatters';
 import Avatar from '@/components/common/Avatar';
 
 // Map a backend role to a human-readable label.
@@ -45,11 +44,26 @@ function userDisplayName(user) {
 }
 
 // Core account actions — dashboard + the role-aware profile pages.
-const MENU_ACTIONS = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'View Profile', href: '/profile', icon: User },
-  { label: 'Edit Profile', href: '/profile/edit', icon: Pencil },
-];
+// "Edit Profile" was removed in favour of the dedicated Profile tab on the
+// dashboard, so the header dropdown only links to public views.
+function buildMenuActions(user) {
+  const role = user && user.role;
+  // For professionals, "View Profile" deep-links to their public listing
+  // page so the dropdown matches what visitors see. Anyone else goes to
+  // the role-aware /profile screen.
+  let viewHref = '/profile';
+  if (role === 'professional' || role === 'firm_professional') {
+    const proId = (user && (user.linkedId || user.id)) || '';
+    const slug = slugify((user && (user.fullName || user.name)) || '');
+    if (proId) {
+      viewHref = `/professionals/${proId}${slug ? `/${slug}` : ''}`;
+    }
+  }
+  return [
+    { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { label: 'View Profile', href: viewHref, icon: User },
+  ];
+}
 
 // Firm management actions — shown for professional-type roles. Harmless
 // elsewhere (the pages themselves guard access).
@@ -96,6 +110,7 @@ export default function ProfileDropdown({ className = '' }) {
     'Account';
   const firstName = user.firstName || fullName.split(/\s+/)[0];
   const showFirmActions = FIRM_ROLES.includes(user.role);
+  const menuActions = buildMenuActions(user);
 
   async function handleLogout() {
     close();
@@ -182,7 +197,7 @@ export default function ProfileDropdown({ className = '' }) {
 
           {/* Menu actions */}
           <div className="py-1.5">
-            {MENU_ACTIONS.map((action) => {
+            {menuActions.map((action) => {
               const Icon = action.icon;
               return (
                 <Link

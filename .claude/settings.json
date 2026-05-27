@@ -51,7 +51,20 @@
       "Bash(curl -sS -H \"Content-Type: application/json\" -H \"Origin: http://localhost:3000\" -c /tmp/leadck -X POST http://localhost:5001/api/leads -d '{\"fullName\":\"Widget Test\",\"email\":\"widget@example.com\",\"phone\":\"+91-9000000001\",\"source\":\"Advanced Search\"}')",
       "Bash(curl -sS -b /tmp/leadck http://localhost:3000/search)",
       "Bash(curl -sS -o /dev/null -w \"/ %{http_code}\\\\n\" http://localhost:3000/)",
-      "Bash(curl -sS -i -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' -X POST http://localhost:5001/api/auth/forgot-password -d '{\"email\":\"vishal@liamtra.com\"}')"
+      "Bash(curl -sS -i -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' -X POST http://localhost:5001/api/auth/forgot-password -d '{\"email\":\"vishal@liamtra.com\"}')",
+      "Bash(curl -sS -o /dev/null -w \"/signup %{http_code}\\\\n\" http://localhost:3000/signup)",
+      "Bash(curl -sS -o /dev/null -w \"backend %{http_code}\\\\n\" http://localhost:5001/api/health)",
+      "Bash(curl -sS -o /dev/null -w \"frontend %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -sS -o /dev/null -w \"/dashboard/professional/profile %{http_code}\\\\n\" http://localhost:3000/dashboard/professional/profile)",
+      "Bash(grep -n \"Practice cities\\\\|Categories & sub-categories\\\\|Practice details\\\\|Documents$\\\\|className=\\\\\"text-base font-semibold\" /Users/vishalchauhan/code/profirmo/frontend/components/profile/ProfessionalForm.js)",
+      "Bash(grep -n \"Tech consultant details\\\\|hint=\\\\\"https://github\\\\|</div>$\\\\|</form>\\\\|^      <button\\\\|techConsultationFee\" /Users/vishalchauhan/code/profirmo/frontend/components/profile/ProfessionalForm.js)",
+      "Bash(curl -sS -o /dev/null -w \"/profile/edit %{http_code}\\\\n\" http://localhost:3000/profile/edit)",
+      "Bash(grep -n \"{step === \\\\|Section 4 — Type-specific\\\\|Legal practice details\\\\|Tax practice details\\\\|<SectionCard$\\\\|<SectionCard\\\\b\\\\|Legal documents\\\\|Tax documents\\\\|<>\\\\|</>\" /Users/vishalchauhan/code/profirmo/frontend/components/professionals/ProfessionalRegistrationForm.js)",
+      "Bash(grep -n \"      </SectionCard>$\\\\|      </>$\\\\|      \\)}$\" /Users/vishalchauhan/code/profirmo/frontend/components/professionals/ProfessionalRegistrationForm.js)",
+      "Bash(curl -sS -o /dev/null -w \"/signup %{http_code} | /profile/edit %{http_code}\\\\n\" http://localhost:3000/signup http://localhost:3000/profile/edit)",
+      "Bash(curl -sS -o /dev/null -w \"/signup %{http_code} | /profile/edit %{http_code} | /login %{http_code}\\\\n\" http://localhost:3000/signup http://localhost:3000/profile/edit http://localhost:3000/login)",
+      "Bash(curl -sS -o /dev/null -w \"/ %{http_code} | /howitworks.mp4 %{http_code}\\\\n\" http://localhost:3000/ http://localhost:3000/howitworks.mp4)",
+      "Bash(curl -sS -i -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' -X POST http://localhost:5001/api/auth/register-professional -d '{\"firstName\":\"Test\",\"lastName\":\"Pro\",\"email\":\"__TRACKED_VAR__\",\"mobileNumber\":\"+91-9000000123\",\"password\":\"password123\",\"professionalType\":\"Legal Consultant\",\"country\":\"India\",\"state\":\"Maharashtra\",\"city\":\"Mumbai\"}')"
     ]
   }
 }

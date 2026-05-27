@@ -170,6 +170,16 @@ const auditSignup = (req, result) =>
     },
   });
 
+// POST /api/auth/check-availability
+// Public — lets the signup wizard check whether an email / phone is
+// already linked to an existing user so the visitor sees "account exists,
+// login or recover" before filling in the rest of the form.
+const checkAvailability = asyncHandler(async (req, res) => {
+  const { email, mobileNumber } = req.body || {};
+  const result = await authService.checkAvailability({ email, mobileNumber });
+  return successResponse(res, 200, 'Availability check', result);
+});
+
 // POST /api/auth/register-client
 const registerClient = asyncHandler(async (req, res) => {
   const result = await authService.registerClient(req.body);
@@ -178,8 +188,10 @@ const registerClient = asyncHandler(async (req, res) => {
 });
 
 // POST /api/auth/register-professional
-// Phase 7: dynamic professional registration (Legal / Tax Consultant). Creates
-// an unverified, pending-approval professional. No token / cookie is issued.
+// Phase 7: dynamic professional registration (Legal / Tax Consultant).
+// The service auto-issues a session so the 3-step signup wizard can keep
+// saving Step 2 and Step 3 without forcing the visitor to verify their
+// email first. The verification email is still queued.
 const registerProfessional = asyncHandler(async (req, res) => {
   const result = await professionalRegistrationService.registerProfessional(
     req.body
@@ -197,14 +209,19 @@ const registerProfessional = asyncHandler(async (req, res) => {
       approvalStatus: result.approvalStatus,
     },
   });
+  if (result.refreshToken) {
+    setRefreshCookie(res, result.refreshToken);
+  }
   return successResponse(
     res,
     201,
-    'Registration submitted. Please verify your email; your profile is pending admin approval.',
+    'Registration submitted. Continue with the next step to complete your profile.',
     {
       user: result.user,
       emailVerificationRequired: true,
       approvalStatus: result.approvalStatus,
+      accessToken: result.accessToken,
+      token: result.accessToken,
     }
   );
 });
@@ -438,6 +455,7 @@ module.exports = {
   login,
   logout,
   refresh,
+  checkAvailability,
   registerClient,
   registerProfessional,
   registerFirm,

@@ -34,6 +34,53 @@ const ADDRESS_FIELDS = [
   'postalCode',
 ];
 
+// Fields whose presence we count when scoring profile completion. Documents
+// and identifiers are profession-specific so we check the union and award
+// partial credit based on what's filled.
+const COMPLETION_FIELDS = [
+  // Core
+  'yearsOfExperience',
+  'consultationFee',
+  'bio',
+  'skills',
+  'languages',
+  'education',
+  'subCategoryIds',
+  'practiceCities',
+  'consultancyType',
+  'chamberAddress',
+  // Profession identifiers (any of the relevant ones count)
+  'licenseNumber',
+  'barRegistrationNumber',
+  'taxRegistrationNumber',
+  'enrollmentNumber',
+  // Documents (at least the government ID and one profession doc)
+  'governmentIdDoc',
+  'advocateLicenseDoc',
+  'barCouncilCertDoc',
+  'lawDegreeDoc',
+  'taxRegistrationCertDoc',
+  'qualificationCertDoc',
+];
+
+function isFilled(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim() !== '';
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'number') return Number.isFinite(value) && value !== 0;
+  return Boolean(value);
+}
+
+function computeCompletionPercent(detail) {
+  if (!detail) return 0;
+  let filled = 0;
+  for (const key of COMPLETION_FIELDS) {
+    if (isFilled(detail[key])) filled += 1;
+  }
+  const pct = Math.round((filled / COMPLETION_FIELDS.length) * 100);
+  return Math.max(0, Math.min(100, pct));
+}
+
 // professional_details columns that PUT /api/profile/professional may set.
 const PROFESSIONAL_DETAIL_FIELDS = [
   'professionalType',
@@ -65,6 +112,22 @@ const PROFESSIONAL_DETAIL_FIELDS = [
   // Array of city names where the professional practises (separate from
   // their address city). Drives the listing city filter.
   'practiceCities',
+  // --- 3-step signup unified fields ----------------------------------
+  'primaryCategoryId',
+  'consultancyType',
+  'courtsPracticing',
+  'chamberAddress',
+  'licenseNumber',
+  'barRegistrationNumber',
+  'taxRegistrationNumber',
+  'enrollmentNumber',
+  'advocateLicenseDoc',
+  'barCouncilCertDoc',
+  'lawDegreeDoc',
+  'taxRegistrationCertDoc',
+  'qualificationCertDoc',
+  'professionalLicenseDoc',
+  'governmentIdDoc',
 ];
 
 // lawyer_specific_details columns settable via the body's `lawyer` object.
@@ -233,6 +296,12 @@ const updateProfessionalProfile = async (userId, body = {}) => {
 
   // --- Upsert professional_details by userId -------------------------------
   const detailUpdates = pick(body, PROFESSIONAL_DETAIL_FIELDS);
+  // `_finalize: true` is sent by the signup wizard's Step 3 submit so the
+  // backend can flip `signupComplete` to true. Without it the user is
+  // bounced back to /signup on every page load.
+  if (body && body._finalize === true) {
+    detailUpdates.signupComplete = true;
+  }
   let professionalDetail = await ProfessionalDetail.findOne({
     where: { userId },
   });
@@ -244,6 +313,11 @@ const updateProfessionalProfile = async (userId, body = {}) => {
       ...detailUpdates,
     });
   }
+  // Recompute completion percentage after every write so the admin /
+  // dashboard widgets reflect the latest state.
+  await professionalDetail.update({
+    completionPercent: computeCompletionPercent(professionalDetail.get({ plain: true })),
+  });
 
   const professionalType =
     detailUpdates.professionalType || professionalDetail.professionalType;

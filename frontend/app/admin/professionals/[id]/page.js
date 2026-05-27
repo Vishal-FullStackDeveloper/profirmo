@@ -202,6 +202,15 @@ function statusBadge(status) {
 // on a given applicant are skipped at render time.
 const DOCUMENT_FIELDS = [
   { key: 'profilePhoto', label: 'Profile photo', source: 'professionalDetail' },
+  // 3-step signup unified documents (top-level on ProfessionalDetail).
+  { key: 'governmentIdDoc', label: 'Government ID', source: 'professionalDetail' },
+  { key: 'advocateLicenseDoc', label: 'Advocate license', source: 'professionalDetail' },
+  { key: 'barCouncilCertDoc', label: 'Bar council certificate', source: 'professionalDetail' },
+  { key: 'lawDegreeDoc', label: 'Law degree certificate', source: 'professionalDetail' },
+  { key: 'taxRegistrationCertDoc', label: 'Tax registration certificate', source: 'professionalDetail' },
+  { key: 'qualificationCertDoc', label: 'Qualification certificate', source: 'professionalDetail' },
+  { key: 'professionalLicenseDoc', label: 'Professional license', source: 'professionalDetail' },
+  // Legacy fields kept for back-compat with older applications.
   { key: 'governmentId', label: 'Government ID', source: 'professionalDetail' },
   {
     key: 'identityDocument',
@@ -670,6 +679,41 @@ export default function AdminProfessionalReviewPage() {
               </dd>
             </div>
           )}
+          <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Field
+              label="Consultancy type"
+              value={
+                pd.consultancyType === 'online'
+                  ? 'Online'
+                  : pd.consultancyType === 'in_person'
+                    ? 'In Person'
+                    : pd.consultancyType === 'both'
+                      ? 'Online · In Person'
+                      : null
+              }
+            />
+            <Field label="Chamber address" value={pd.chamberAddress} />
+            <Field
+              label="Bar registration #"
+              value={pd.barRegistrationNumber}
+            />
+            <Field
+              label="Tax registration #"
+              value={pd.taxRegistrationNumber}
+            />
+            <Field label="Enrollment #" value={pd.enrollmentNumber} />
+            <Field label="License #" value={pd.licenseNumber} />
+            <Field
+              label="Profile completion"
+              value={
+                pd.completionPercent !== undefined &&
+                pd.completionPercent !== null
+                  ? `${pd.completionPercent}%`
+                  : null
+              }
+            />
+          </dl>
+
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ChipList
               label="Sub-categories"
@@ -688,6 +732,7 @@ export default function AdminProfessionalReviewPage() {
               }
             />
             <ChipList label="Practice cities" value={pd.practiceCities} />
+            <ChipList label="Courts practising" value={pd.courtsPracticing} />
             <ChipList label="Skills" value={pd.skills} />
             <ChipList label="Languages" value={pd.languages} />
             <ChipList label="Education" value={pd.education} />

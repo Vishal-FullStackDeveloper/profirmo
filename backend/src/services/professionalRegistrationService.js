@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const {
   sequelize,
   User,
+  Session,
   Address,
   ProfessionalDetail,
   LawyerDetail,
@@ -15,6 +16,11 @@ const {
   ProfessionalApproval,
 } = require('../models');
 const { hashPassword } = require('../utils/password');
+const {
+  signAccessToken,
+  generateRefreshToken,
+  hashToken,
+} = require('../utils/tokenHelper');
 const { enqueue } = require('./queueService');
 const notificationService = require('./notificationService');
 const { sanitizeUser } = require('./authService');
@@ -59,7 +65,11 @@ const isMissing = (value) => {
 
 // --- Validation ------------------------------------------------------------
 
-// Required fields common to both professional types.
+// Required fields for the Step-1 registration. Professional details
+// (yearsOfExperience, bio, identifiers, documents) are filled in later
+// via PUT /api/profile/professional so users can complete signup
+// incrementally — if they bail out after Step 1 they can log back in and
+// finish from /profile/edit.
 const COMMON_REQUIRED = [
   'firstName',
   'lastName',
@@ -70,9 +80,6 @@ const COMMON_REQUIRED = [
   'country',
   'state',
   'city',
-  'addressLine',
-  'bio',
-  'yearsOfExperience',
 ];
 
 /**
@@ -104,34 +111,14 @@ function validateRegistration(data = {}) {
       "professionalType must be 'Legal Consultant' or 'Tax Consultant'";
   }
 
+  // Legal- and Tax-specific identifiers are optional at registration time;
+  // they are collected in Step 2 of the signup wizard and persisted via
+  // PUT /api/profile/professional. The block below is intentionally empty
+  // so users can complete signup in stages.
   if (type === LEGAL) {
-    const legal = data.legal || {};
-    if (isMissing(legal.barRegistrationNumber)) {
-      errors['legal.barRegistrationNumber'] =
-        'barRegistrationNumber is required';
-    }
-    if (isMissing(legal.enrollmentNumber)) {
-      errors['legal.enrollmentNumber'] = 'enrollmentNumber is required';
-    }
-    if (isMissing(legal.advocateLicenseNumber)) {
-      errors['legal.advocateLicenseNumber'] =
-        'advocateLicenseNumber is required';
-    }
-    if (isMissing(legal.practiceAreas)) {
-      errors['legal.practiceAreas'] = 'practiceAreas is required';
-    }
-    if (isMissing(legal.jurisdiction)) {
-      errors['legal.jurisdiction'] = 'jurisdiction is required';
-    }
+    // No additional legal validations at signup time.
   } else if (type === TAX) {
-    const tax = data.tax || {};
-    if (isMissing(tax.taxRegistrationNumber)) {
-      errors['tax.taxRegistrationNumber'] =
-        'taxRegistrationNumber is required';
-    }
-    if (isMissing(tax.specializationAreas)) {
-      errors['tax.specializationAreas'] = 'specializationAreas is required';
-    }
+    // No additional tax validations at signup time.
   }
 
   return errors;
@@ -160,6 +147,24 @@ const buildProfessionalDetailFields = (data = {}) => ({
   identityDocument: data.governmentId || null,
   profileResume: data.resume || null,
   degreeCertificate: data.degreeCertificate || null,
+  // --- 3-step signup unified fields ----------------------------------
+  primaryCategoryId: data.primaryCategoryId || null,
+  subCategoryIds: toArray(data.subCategoryIds),
+  practiceCities: toArray(data.practiceCities),
+  courtsPracticing: toArray(data.courtsPracticing),
+  consultancyType: data.consultancyType || null,
+  chamberAddress: data.chamberAddress || null,
+  licenseNumber: data.licenseNumber || null,
+  barRegistrationNumber: data.barRegistrationNumber || null,
+  taxRegistrationNumber: data.taxRegistrationNumber || null,
+  enrollmentNumber: data.enrollmentNumber || null,
+  advocateLicenseDoc: data.advocateLicenseDoc || null,
+  barCouncilCertDoc: data.barCouncilCertDoc || null,
+  lawDegreeDoc: data.lawDegreeDoc || null,
+  taxRegistrationCertDoc: data.taxRegistrationCertDoc || null,
+  qualificationCertDoc: data.qualificationCertDoc || null,
+  professionalLicenseDoc: data.professionalLicenseDoc || null,
+  governmentIdDoc: data.governmentIdDoc || data.governmentId || null,
 });
 
 // Build the LawyerDetail attributes from the `legal` section.
@@ -392,10 +397,24 @@ async function registerProfessional(data = {}) {
     action: 'registered',
   });
 
+  // 6. Auto-login after Step 1 so the 3-step wizard can keep saving Step 2
+  //    and Step 3 to /api/profile/professional without making the user verify
+  //    their email mid-flow. Email verification still happens (the email
+  //    above is queued); it just doesn't block the rest of signup.
+  const refreshToken = generateRefreshToken();
+  await Session.create({
+    userId: user.id,
+    tokenHash: hashToken(refreshToken),
+    expiresAt: new Date(Date.now() + env.refreshTokenDays * 86400000),
+  });
+  const accessToken = signAccessToken(user);
+
   return {
-    user: sanitizeUser(user, 'PENDING_APPROVAL'),
+    user: sanitizeUser(user, 'PENDING_APPROVAL', { signupComplete: false }),
     emailVerificationRequired: true,
     approvalStatus: 'PENDING_APPROVAL',
+    accessToken,
+    refreshToken,
   };
 }
 

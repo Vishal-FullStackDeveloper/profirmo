@@ -18,7 +18,7 @@ import {
   useCallback,
   useRef,
 } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import authService from '@/services/authService';
 import { setAccessToken, registerAuthCallbacks } from '@/services/api';
 
@@ -51,8 +51,21 @@ function writeCachedUser(user) {
   }
 }
 
+// Paths the incomplete-signup guard should never redirect away from. Login
+// / signup / verify / reset live here so professionals can still complete
+// auth flows while bounced; /logout is a no-op route.
+const SIGNUP_GUARD_ALLOW = [
+  '/signup',
+  '/login',
+  '/logout',
+  '/verify-email',
+  '/forgot-password',
+  '/reset-password',
+];
+
 export function AuthProvider({ children }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState(null);
   const [accessToken, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -100,6 +113,21 @@ export function AuthProvider({ children }) {
       },
     });
   }, [clearAuth]);
+
+  // Signup-completion guard: if a professional finished only part of the
+  // 3-step wizard and bounced (closing the tab, navigating away, logging
+  // back in later), force them back to /signup until they finish all
+  // three steps. Non-professionals + completed signups pass through.
+  useEffect(() => {
+    if (loading || !user) return;
+    if (user.role !== 'professional') return;
+    if (user.signupComplete) return;
+    if (!pathname) return;
+    if (SIGNUP_GUARD_ALLOW.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+      return;
+    }
+    router.replace('/signup?resume=1');
+  }, [user, loading, pathname, router]);
 
   // On mount: paint instantly from cache, then silently restore the session.
   useEffect(() => {
@@ -194,13 +222,24 @@ export function AuthProvider({ children }) {
   );
 
   // Professional registration uses the dedicated full-payload endpoint.
-  // It returns NO token — verification + admin approval are required first —
-  // so we do NOT log the user in. The response data ({ user,
-  // emailVerificationRequired, approvalStatus }) is returned so the signup
-  // page can render its pending-approval confirmation screen.
+  // The backend now issues a session immediately (so the 3-step signup
+  // wizard can keep saving Step 2/3 without forcing email verification
+  // first). If a token is returned we apply it via `applyAuth` so the
+  // wizard's later API calls are authenticated. Email verification still
+  // happens via the link in the queued email, just out-of-band.
   const registerProfessional = useCallback(
-    (payload) => authService.registerProfessional(payload),
-    []
+    async (payload) => {
+      const data = await authService.registerProfessional(payload);
+      if (data && (data.accessToken || data.token) && data.user) {
+        applyAuth({
+          user: data.user,
+          accessToken: data.accessToken || data.token,
+          token: data.accessToken || data.token,
+        });
+      }
+      return data;
+    },
+    [applyAuth]
   );
 
   // Firms can no longer sign up directly — a professional registers, then

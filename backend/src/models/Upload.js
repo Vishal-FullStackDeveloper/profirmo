@@ -27,7 +27,10 @@ const Upload = sequelize.define(
       allowNull: false,
       defaultValue: genUploadId,
     },
-    userId: { type: DataTypes.STRING(64), allowNull: false },
+    // Nullable — anonymous uploads from the signup wizard happen before
+    // the account is created. The Upload row carries userId = null until
+    // (optionally) re-linked via the profile-photo / doc URL fields.
+    userId: { type: DataTypes.STRING(64), allowNull: true },
     category: { type: DataTypes.STRING, allowNull: false },
     originalName: { type: DataTypes.STRING, allowNull: false },
     storedName: { type: DataTypes.STRING, allowNull: false },

@@ -77,6 +77,42 @@ const ProfessionalDetail = sequelize.define(
       allowNull: true,
       defaultValue: 0,
     },
+    // --- 3-step signup unification --------------------------------------
+    // Top-level mirrors of fields previously split between LawyerDetail /
+    // TaxConsultantDetail so the new signup wizard and the listing API can
+    // read every profession's data from one place.
+    primaryCategoryId: { type: DataTypes.STRING(64), allowNull: true },
+    consultancyType: { type: DataTypes.STRING(20), allowNull: true },
+    courtsPracticing: jsonField('courtsPracticing', []),
+    chamberAddress: { type: DataTypes.TEXT, allowNull: true },
+    licenseNumber: { type: DataTypes.STRING, allowNull: true },
+    barRegistrationNumber: { type: DataTypes.STRING, allowNull: true },
+    taxRegistrationNumber: { type: DataTypes.STRING, allowNull: true },
+    enrollmentNumber: { type: DataTypes.STRING, allowNull: true },
+    // Document URLs — uploaded during step 3, profession-specific.
+    advocateLicenseDoc: { type: DataTypes.STRING, allowNull: true },
+    barCouncilCertDoc: { type: DataTypes.STRING, allowNull: true },
+    lawDegreeDoc: { type: DataTypes.STRING, allowNull: true },
+    taxRegistrationCertDoc: { type: DataTypes.STRING, allowNull: true },
+    qualificationCertDoc: { type: DataTypes.STRING, allowNull: true },
+    professionalLicenseDoc: { type: DataTypes.STRING, allowNull: true },
+    governmentIdDoc: { type: DataTypes.STRING, allowNull: true },
+    // Computed by the backend on every write; 0–100 ratio of filled
+    // mandatory + recommended fields.
+    completionPercent: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    // Set to true ONLY after the professional reaches Step 3 of the
+    // signup wizard and submits. The frontend uses this flag to bounce
+    // incomplete signups back to the wizard so all three steps are
+    // actually filled in.
+    signupComplete: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
   },
   {
     tableName: 'professional_details',

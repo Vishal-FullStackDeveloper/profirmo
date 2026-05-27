@@ -1,6 +1,6 @@
 'use client';
 
-import { MapPin, BadgeCheck, Briefcase } from 'lucide-react';
+import { MapPin, BadgeCheck, Briefcase, Video, Users2 } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
@@ -35,7 +35,28 @@ export default function ProfessionalCard({ professional }) {
     consultationFee,
     availableNow,
     verified,
+    bio,
+    languages,
+    consultancyType,
   } = professional;
+
+  // Friendly label for the consultancyType enum.
+  const consultancyLabel =
+    consultancyType === 'online'
+      ? 'Online'
+      : consultancyType === 'in_person'
+        ? 'In Person'
+        : consultancyType === 'both'
+          ? 'Online · In Person'
+          : '';
+
+  // Two-line bio preview so cards stay a fixed height.
+  const bioPreview = (() => {
+    const text = String(bio || '').trim();
+    if (!text) return '';
+    if (text.length <= 140) return text;
+    return `${text.slice(0, 137)}…`;
+  })();
 
   // First two admin-managed sub-categories surface under the name. The rest
   // are summarised as "+N" so the card stays a fixed height.
@@ -103,7 +124,36 @@ export default function ProfessionalCard({ professional }) {
           <Briefcase size={14} className="text-slate-400" />
           {t('profCmp.yrsExp', { count: yearsOfExperience || 0 })}
         </span>
+        {consultancyLabel && (
+          <span className="inline-flex items-center gap-1">
+            {consultancyType === 'in_person' ? (
+              <Users2 size={14} className="text-slate-400" />
+            ) : (
+              <Video size={14} className="text-slate-400" />
+            )}
+            {consultancyLabel}
+          </span>
+        )}
       </div>
+
+      {Array.isArray(languages) && languages.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+          {languages.slice(0, 4).map((lang) => (
+            <span
+              key={lang}
+              className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600"
+            >
+              {lang}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {bioPreview && (
+        <p className="mt-3 text-xs leading-relaxed text-slate-600">
+          {bioPreview}
+        </p>
+      )}
 
       {otherPractice.length > 0 && (
         <div className="mt-2 flex flex-wrap items-start gap-1.5 text-[11px] text-slate-500">

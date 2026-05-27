@@ -93,8 +93,11 @@ const uploadFile = asyncHandler(async (req, res) => {
     );
   }
 
+  // Anonymous uploads (signup wizard, before account creation) are
+  // permitted — the row carries `userId: null` and the file lives until
+  // the registration links it via the profile-photo / doc URL fields.
   const upload = await fileService.createUpload({
-    userId: req.user.id,
+    userId: (req.user && req.user.id) || null,
     category,
     file,
   });

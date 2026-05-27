@@ -1,6 +1,15 @@
 'use client';
 
-import { MapPin, BadgeCheck, Briefcase, ShieldCheck, Building2 } from 'lucide-react';
+import {
+  MapPin,
+  BadgeCheck,
+  Briefcase,
+  ShieldCheck,
+  Building2,
+  Video,
+  Users2,
+  Gavel,
+} from 'lucide-react';
 import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
@@ -39,6 +48,15 @@ export default function ProfessionalProfileHeader({ professional }) {
     verified,
     lawyer,
     tax,
+    // New unified fields from the 3-step signup.
+    consultancyType,
+    chamberAddress,
+    courtsPracticing,
+    licenseNumber,
+    barRegistrationNumber,
+    taxRegistrationNumber,
+    enrollmentNumber,
+    verificationStatus,
   } = professional;
 
   const subs = Array.isArray(subCategories) ? subCategories : [];
@@ -48,11 +66,38 @@ export default function ProfessionalProfileHeader({ professional }) {
   const otherPractice = practice.filter(
     (c) => String(c).toLowerCase() !== String(city || '').toLowerCase()
   );
+  const courts = Array.isArray(courtsPracticing)
+    ? courtsPracticing.filter(Boolean)
+    : [];
+
+  const consultancyLabel =
+    consultancyType === 'online'
+      ? 'Online consultation'
+      : consultancyType === 'in_person'
+        ? 'In Person consultation'
+        : consultancyType === 'both'
+          ? 'Online · In Person'
+          : '';
+
+  // Verification badge text follows the lifecycle so the UI is honest about
+  // the state of the application.
+  const verificationLabel = (() => {
+    const s = String(verificationStatus || '').toLowerCase();
+    if (s === 'verified' || s === 'approved') return 'Verified';
+    if (s === 'under_review') return 'Under review';
+    if (s === 'rejected') return 'Rejected';
+    return 'Pending';
+  })();
 
   const isLegal = /lawyer|advocate/i.test(professionalType || '');
   const regLabel = isLegal ? t('profCmp.regBar') : t('profCmp.regTax');
-  // Registration number lives in the lawyer/tax sub-objects on the detail shape.
+  // Registration number: prefer the top-level fields from the new 3-step
+  // signup, fall back to the legacy lawyer/tax sub-objects.
   const registrationNumber =
+    barRegistrationNumber ||
+    taxRegistrationNumber ||
+    licenseNumber ||
+    enrollmentNumber ||
     (lawyer && (lawyer.barRegistrationNumber || lawyer.registrationNumber)) ||
     (tax && (tax.registrationNumber || tax.membershipNumber)) ||
     null;
@@ -158,12 +203,58 @@ export default function ProfessionalProfileHeader({ professional }) {
               </div>
             )}
 
+            {(chamberAddress || courts.length > 0 || consultancyLabel) && (
+              <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                {consultancyLabel && (
+                  <span className="inline-flex items-center gap-1.5">
+                    {consultancyType === 'in_person' ? (
+                      <Users2 size={13} className="text-slate-400" />
+                    ) : (
+                      <Video size={13} className="text-slate-400" />
+                    )}
+                    <span className="font-medium">{consultancyLabel}</span>
+                  </span>
+                )}
+                {chamberAddress && (
+                  <span className="inline-flex items-start gap-1.5">
+                    <Building2
+                      size={13}
+                      className="mt-0.5 shrink-0 text-slate-400"
+                    />
+                    <span>
+                      <span className="block text-[11px] uppercase tracking-wide text-slate-400">
+                        Chamber
+                      </span>
+                      {chamberAddress}
+                    </span>
+                  </span>
+                )}
+                {courts.length > 0 && (
+                  <span className="inline-flex items-start gap-1.5 sm:col-span-2">
+                    <Gavel
+                      size={13}
+                      className="mt-0.5 shrink-0 text-slate-400"
+                    />
+                    <span>
+                      <span className="block text-[11px] uppercase tracking-wide text-slate-400">
+                        Courts practising
+                      </span>
+                      {courts.join(', ')}
+                    </span>
+                  </span>
+                )}
+              </div>
+            )}
+
             {registrationNumber && (
-              <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-slate-500">
+              <p className="mt-3 inline-flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
                 <ShieldCheck size={14} className="text-emerald-500" />
                 {regLabel}{' '}
                 <span className="font-medium text-slate-700">
                   {registrationNumber}
+                </span>
+                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                  {verificationLabel}
                 </span>
               </p>
             )}

@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertCircle,
   ArrowRight,
@@ -25,7 +25,16 @@ import {
 import BrandLogo from '@/components/common/BrandLogo';
 import PhotoUpload from '@/components/common/PhotoUpload';
 import { useAuth } from '@/components/AuthProvider';
-import { resendVerification } from '@/services/authService';
+import {
+  resendVerification,
+  checkAvailability,
+} from '@/services/authService';
+import {
+  updateProfile,
+  updateProfessionalDetails,
+  getProfile,
+} from '@/services/profileService';
+import { valuesFromProfile } from '@/components/professionals/ProfessionalRegistrationForm';
 import { isEmail, isPhone, isStrongPassword } from '@/utils/validators';
 import { useCities } from '@/hooks/useAppSettings';
 import Combobox from '@/components/common/Combobox';
@@ -106,11 +115,18 @@ function Chrome({ children }) {
 
 export default function SignupPage() {
   const router = useRouter();
-  const { signup, registerProfessional, isAuthenticated, loading } = useAuth();
+  const searchParams = useSearchParams();
+  const { signup, registerProfessional, isAuthenticated, loading, user } =
+    useAuth();
 
   // step: 'role' | 'client' | 'pro-type' | 'pro-form'
   const [step, setStep] = useState('role');
   const [proType, setProType] = useState('');
+  // Resume mode: pre-filled wizard at Step 2 for a professional whose Step
+  // 1 already created the account but who bounced before finishing.
+  const [resumeInitialValues, setResumeInitialValues] = useState(null);
+  const [resumeStep, setResumeStep] = useState(1);
+  const [resumeLoading, setResumeLoading] = useState(false);
 
   // Client form state.
   const [client, setClient] = useState(CLIENT_EMPTY);
@@ -133,11 +149,67 @@ export default function SignupPage() {
   const [resendError, setResendError] = useState('');
   const [resending, setResending] = useState(false);
 
+  // Auth gate: send finished users to /dashboard, BUT keep professionals
+  // with an incomplete signup on this page so they can finish.
   useEffect(() => {
-    if (!loading && isAuthenticated) {
-      router.replace('/dashboard');
-    }
-  }, [loading, isAuthenticated, router]);
+    if (loading || !isAuthenticated) return;
+    const incompletePro =
+      user && user.role === 'professional' && user.signupComplete === false;
+    if (incompletePro) return;
+    router.replace('/dashboard');
+  }, [loading, isAuthenticated, user, router]);
+
+  // Resume flow: when an incomplete-signup professional lands here we
+  // skip the role / pro-type screens, pre-fill the wizard with their
+  // saved data, and start at Step 2.
+  //
+  // We DON'T run this if the wizard just registered the account this
+  // session — it already has the in-memory state and reloading would
+  // remount the wizard mid-flow.
+  useEffect(() => {
+    if (loading || !isAuthenticated || !user) return;
+    if (user.role !== 'professional') return;
+    if (user.signupComplete) return;
+    if (proAccountCreated) return;
+    if (resumeInitialValues || resumeLoading) return;
+    setResumeLoading(true);
+    (async () => {
+      try {
+        const profile = await getProfile();
+        const vals = valuesFromProfile(profile);
+        // Mark Step 1 as already created so handleProStepSave skips the
+        // duplicate register call.
+        setProAccountCreated(true);
+        setResumeInitialValues(vals);
+        // Derive the locked professional type from the saved row.
+        const t = String(
+          (profile &&
+            profile.professionalDetail &&
+            profile.professionalDetail.professionalType) ||
+            ''
+        ).toLowerCase();
+        if (t.includes('legal') || t.includes('lawyer') || t.includes('advocate')) {
+          setProType(PROFESSIONAL_TYPES.LEGAL);
+        } else if (t.includes('tax') || t.includes('gst') || t.includes('ca')) {
+          setProType(PROFESSIONAL_TYPES.TAX);
+        } else {
+          setProType(PROFESSIONAL_TYPES.LEGAL);
+        }
+        setResumeStep(2);
+        setStep('pro-form');
+      } catch {
+        /* if profile fetch fails, fall through to the role screen */
+      } finally {
+        setResumeLoading(false);
+      }
+    })();
+  }, [
+    loading,
+    isAuthenticated,
+    user,
+    resumeInitialValues,
+    resumeLoading,
+  ]);
 
   function handleClientChange(e) {
     const { name, value } = e.target;
@@ -180,12 +252,198 @@ export default function SignupPage() {
     }
   }
 
+  // Tracks whether Step 1 of the signup wizard has already created the
+  // account. Subsequent steps only need to upsert the existing profile.
+  const [proAccountCreated, setProAccountCreated] = useState(false);
+
+  // Flatten the wizard's register-mode payload into the shape the
+  // PUT /api/profile/professional endpoint expects (top-level identifiers
+  // + document URLs + legacy `lawyer` sub-object).
+  function flattenProPayload(payload) {
+    const isLegal = payload.professionalType === PROFESSIONAL_TYPES.LEGAL;
+    const legal = payload.legal || {};
+    const tax = payload.tax || {};
+    const out = {
+      professionalType: payload.professionalType,
+      designation: payload.designation || undefined,
+      bio: payload.bio || undefined,
+      yearsOfExperience: payload.yearsOfExperience,
+      consultationFee: payload.consultationFee,
+      skills: payload.skills,
+      languages: payload.languages,
+      education: payload.education,
+      certifications: payload.certifications,
+      website: payload.website,
+      linkedin: payload.linkedin,
+      availability: payload.availability,
+      subCategoryIds: payload.subCategoryIds || [],
+      practiceCities: payload.practiceCities || [],
+      // Promoted identifiers
+      barRegistrationNumber: isLegal
+        ? legal.barRegistrationNumber || null
+        : null,
+      enrollmentNumber: isLegal ? legal.enrollmentNumber || null : null,
+      licenseNumber: isLegal ? legal.advocateLicenseNumber || null : null,
+      taxRegistrationNumber: !isLegal ? tax.taxRegistrationNumber || null : null,
+      chamberAddress: isLegal ? legal.chamberAddress || null : null,
+      consultancyType: isLegal
+        ? legal.consultationType || null
+        : tax.consultationType || null,
+      courtsPracticing: isLegal ? legal.courtPractice || [] : [],
+      // Documents
+      governmentIdDoc: payload.governmentId || null,
+      advocateLicenseDoc: isLegal ? legal.advocateLicense || null : null,
+      barCouncilCertDoc: isLegal ? legal.barCouncilRegistration || null : null,
+      lawDegreeDoc: isLegal ? legal.lawDegreeDocument || null : null,
+      taxRegistrationCertDoc: !isLegal
+        ? tax.taxConsultantCertificate || null
+        : null,
+      qualificationCertDoc: !isLegal
+        ? tax.registrationCertificate || null
+        : null,
+      professionalLicenseDoc: !isLegal ? tax.professionalLicense || null : null,
+      // Legacy lawyer sub-fields not promoted to top-level
+      lawyer: isLegal
+        ? {
+            practiceAreas: legal.practiceAreas || [],
+            jurisdiction: legal.jurisdiction || '',
+            lawDegree: legal.lawDegree || '',
+            availability: payload.availability || [],
+          }
+        : undefined,
+    };
+    return out;
+  }
+
+  // Per-step save invoked by the wizard before advancing. Throws on
+  // failure so the wizard stays on the current step.
+  async function handleProStepSave(payload, currentStep) {
+    setProBanner('');
+    setProServerErrors({});
+    // Tracks whether this handler has already set a richer banner (e.g.
+    // the account-exists JSX with sign-in / recover links). The catch
+    // below would otherwise overwrite it with `err.message` because the
+    // closure's view of `proBanner` is the stale pre-throw state.
+    let bannerSet = false;
+    try {
+      if (currentStep === 1) {
+        // Pre-flight: warn if email or phone already belongs to a user.
+        const avail = await checkAvailability({
+          email: payload.email,
+          mobileNumber: payload.mobileNumber,
+        });
+        if (avail && avail.takenBy) {
+          const which =
+            avail.takenBy === 'both'
+              ? 'this email and phone number'
+              : avail.takenBy === 'mobile'
+                ? 'this phone number'
+                : 'this email';
+          setProBanner(
+            <span>
+              An account already exists with {which}. You can{' '}
+              <Link
+                href="/login"
+                className="font-semibold underline hover:text-red-800"
+              >
+                sign in
+              </Link>{' '}
+              or{' '}
+              <Link
+                href="/forgot-password"
+                className="font-semibold underline hover:text-red-800"
+              >
+                recover your password
+              </Link>{' '}
+              to continue.
+            </span>
+          );
+          bannerSet = true;
+          throw new Error('Account already exists');
+        }
+        // Create the account. After this, the user is authenticated and
+        // subsequent steps update the live profile.
+        // IMPORTANT: do NOT set `submittedEmail` here — that flag flips
+        // the page into the "Check your email" screen and would short-
+        // circuit the wizard before Step 2. It's only set on the final
+        // Step-3 submit.
+        if (!proAccountCreated) {
+          await registerProfessional(payload);
+          setProAccountCreated(true);
+        }
+        return;
+      }
+      if (currentStep === 2) {
+        await updateProfile({
+          firstName: payload.firstName,
+          lastName: payload.lastName,
+          mobileNumber: payload.mobileNumber,
+          profilePhoto: payload.profilePhoto,
+          address: {
+            country: payload.country,
+            state: payload.state,
+            city: payload.city,
+            addressLine: payload.addressLine,
+          },
+        });
+        const flat = flattenProPayload(payload);
+        // Strip docs from step 2; they're saved on final submit.
+        for (const k of [
+          'governmentIdDoc',
+          'advocateLicenseDoc',
+          'barCouncilCertDoc',
+          'lawDegreeDoc',
+          'taxRegistrationCertDoc',
+          'qualificationCertDoc',
+          'professionalLicenseDoc',
+        ]) {
+          delete flat[k];
+        }
+        await updateProfessionalDetails(flat);
+      }
+    } catch (err) {
+      const serverErrors = mapServerErrors(err);
+      setProServerErrors(serverErrors);
+      // Only fall back to a generic banner when the try block hasn't
+      // already set a richer one (e.g. the account-exists JSX). The
+      // closure-captured `proBanner` is stale and unreliable.
+      if (!bannerSet) {
+        setProBanner(
+          (err && err.message) || 'Could not save this step. Please try again.'
+        );
+      }
+      throw err;
+    }
+  }
+
   async function handleProSubmit(payload) {
     setProBanner('');
     setProServerErrors({});
     setProSubmitting(true);
     try {
-      await registerProfessional(payload);
+      if (!proAccountCreated) {
+        // Defensive: legacy flow where the submit fires before any
+        // step-save has run. Register first, then continue.
+        await registerProfessional(payload);
+        setProAccountCreated(true);
+      }
+      // Final step — persist the document URLs and flip the signup-complete
+      // flag so the global guard stops bouncing this professional back to
+      // the wizard.
+      const flat = flattenProPayload(payload);
+      const docsOnly = { professionalType: flat.professionalType, _finalize: true };
+      for (const k of [
+        'governmentIdDoc',
+        'advocateLicenseDoc',
+        'barCouncilCertDoc',
+        'lawDegreeDoc',
+        'taxRegistrationCertDoc',
+        'qualificationCertDoc',
+        'professionalLicenseDoc',
+      ]) {
+        if (flat[k] !== undefined) docsOnly[k] = flat[k];
+      }
+      await updateProfessionalDetails(docsOnly);
       setSubmittedEmail(payload.email || '');
       setPendingScreen(true);
       if (typeof window !== 'undefined')
@@ -848,14 +1106,17 @@ export default function SignupPage() {
         {/* `key` forces a clean form remount when the type changes so the
             legal/tax section and its state switch correctly. */}
         <ProfessionalRegistrationForm
-          key={proType}
+          key={`${proType}-${resumeInitialValues ? 'resume' : 'fresh'}`}
           mode="register"
           professionalType={proType}
+          initialValues={resumeInitialValues || undefined}
+          initialStep={resumeStep}
           submitLabel="Submit registration"
           submitting={proSubmitting}
           banner={proBanner}
           serverErrors={proServerErrors}
           onSubmit={handleProSubmit}
+          onStepSave={handleProStepSave}
         />
 
         <p className="mt-6 text-center text-sm text-slate-600">

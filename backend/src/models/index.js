@@ -265,6 +265,7 @@ ProfessionalDetail.addHook(
     'availability',
     'subCategoryIds',
     'practiceCities',
+    'courtsPracticing',
   ])
 );
 

@@ -36,6 +36,10 @@ router.post(
 router.post('/logout', authController.logout);
 router.post('/refresh', authController.refresh);
 
+// Availability check — public, used by the signup wizard before it tries
+// to register so we can show "account exists" with login / recover prompts.
+router.post('/check-availability', authController.checkAvailability);
+
 // --- Email verification (Phase 6) -----------------------------------------
 
 // Confirm an email-verification token. On success the account is activated

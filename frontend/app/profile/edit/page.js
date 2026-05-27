@@ -1,29 +1,35 @@
 'use client';
 
-// Role-based profile EDIT page.
-// Auth-guarded. Renders Header + tabbed forms + Footer. Loads
-// GET /api/profile to prefill, then renders role-appropriate forms in
-// separated Card sections / tabs. Firm management lives on the dedicated
-// /firm hub (Phase 8), so this page only links there.
+// Profile EDIT page.
+// For professionals: renders the same 3-step signup wizard
+// (ProfessionalRegistrationForm) so the edit experience is byte-for-byte
+// identical to signup. The category picked at signup is passed in as a
+// prop and not editable — once a professional registers as Legal or Tax
+// they cannot switch categories from the edit page.
+//
+// For non-professional roles (clients) the lightweight PersonalInfoForm
+// is still used since they have no professional details to edit.
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  ArrowLeft,
-  User,
-  Briefcase,
-  Building2,
-  AlertCircle,
-} from 'lucide-react';
+import { ArrowLeft, AlertCircle } from 'lucide-react';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import EmptyState from '@/components/common/EmptyState';
 import { useAuth } from '@/components/AuthProvider';
-import { getProfile } from '@/services/profileService';
+import {
+  getProfile,
+  updateProfile,
+  updateProfessionalDetails,
+} from '@/services/profileService';
 import PersonalInfoForm from '@/components/profile/PersonalInfoForm';
-import ProfessionalForm from '@/components/profile/ProfessionalForm';
+import ProfessionalRegistrationForm, {
+  PROFESSIONAL_TYPES,
+  valuesFromProfile,
+} from '@/components/professionals/ProfessionalRegistrationForm';
+import { useCategories } from '@/hooks/useAppSettings';
 
 function EditSkeleton() {
   return (
@@ -39,6 +45,27 @@ function EditSkeleton() {
   );
 }
 
+// Match the slug of the professional's primaryCategoryId (or fall back to
+// professionalType) to either Legal or Tax. The signup wizard expects one
+// of PROFESSIONAL_TYPES, which is what determines the conditional layout.
+function deriveProfessionalType(profile, categories) {
+  const detail = (profile && profile.professionalDetail) || {};
+  const primaryId = detail.primaryCategoryId;
+  if (primaryId && Array.isArray(categories)) {
+    const cat = categories.find((c) => c.id === primaryId);
+    if (cat) {
+      const slug = String(cat.slug || '').toLowerCase();
+      if (slug === 'legal') return PROFESSIONAL_TYPES.LEGAL;
+      if (slug === 'tax') return PROFESSIONAL_TYPES.TAX;
+    }
+  }
+  const t = String(detail.professionalType || '').toLowerCase();
+  if (/lawyer|advocate|legal/.test(t)) return PROFESSIONAL_TYPES.LEGAL;
+  if (/tax|ca|gst|chartered/.test(t)) return PROFESSIONAL_TYPES.TAX;
+  // Default to Legal so the wizard renders something rather than blanking.
+  return PROFESSIONAL_TYPES.LEGAL;
+}
+
 export default function ProfileEditPage() {
   const router = useRouter();
   const {
@@ -47,11 +74,14 @@ export default function ProfileEditPage() {
     isAuthenticated,
     refreshUser,
   } = useAuth();
+  const { categories } = useCategories();
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('personal');
+  const [submitting, setSubmitting] = useState(false);
+  const [banner, setBanner] = useState('');
+  const [success, setSuccess] = useState('');
 
   // Route guard.
   useEffect(() => {
@@ -79,7 +109,6 @@ export default function ProfileEditPage() {
     }
   }, [authLoading, isAuthenticated, load]);
 
-  // After a personal-info save: refresh local profile + the header user.
   const handlePersonalSaved = useCallback(
     async (refreshed) => {
       if (refreshed) setProfile(refreshed);
@@ -88,9 +117,115 @@ export default function ProfileEditPage() {
     [refreshUser]
   );
 
-  const handleProfessionalSaved = useCallback((refreshed) => {
-    if (refreshed) setProfile(refreshed);
-  }, []);
+  // Build the wizard's initial values from the live profile + the
+  // professional type derived from the locked category.
+  const initialValues = useMemo(() => valuesFromProfile(profile), [profile]);
+  const lockedProfessionalType = useMemo(
+    () => deriveProfessionalType(profile, categories),
+    [profile, categories]
+  );
+
+  // Helpers — split the wizard's flat payload into the bits each endpoint
+  // accepts. Step 1 = identity + address, Step 2 = professional core +
+  // identifiers, Step 3 (final submit) = documents.
+  const personalPart = (payload) => ({
+    firstName: payload.firstName,
+    lastName: payload.lastName,
+    mobileNumber: payload.mobileNumber,
+    profilePhoto: payload.profilePhoto,
+    address: {
+      country: payload.country,
+      state: payload.state,
+      city: payload.city,
+      addressLine: payload.addressLine,
+    },
+  });
+  const documentKeys = [
+    'governmentIdDoc',
+    'advocateLicenseDoc',
+    'barCouncilCertDoc',
+    'lawDegreeDoc',
+    'taxRegistrationCertDoc',
+    'qualificationCertDoc',
+    'professionalLicenseDoc',
+  ];
+  const professionalPart = (payload, opts = {}) => {
+    const {
+      firstName,
+      lastName,
+      mobileNumber,
+      profilePhoto,
+      country,
+      state,
+      city,
+      addressLine,
+      ...professional
+    } = payload;
+    if (opts.includeDocs === false) {
+      const stripped = { ...professional };
+      for (const k of documentKeys) delete stripped[k];
+      return stripped;
+    }
+    if (opts.docsOnly) {
+      const docs = { professionalType: professional.professionalType };
+      for (const k of documentKeys) {
+        if (professional[k] !== undefined) docs[k] = professional[k];
+      }
+      return docs;
+    }
+    return professional;
+  };
+
+  // Per-step save: invoked by the wizard's Continue button BEFORE advancing.
+  // Throws on failure so the wizard stays on the current step.
+  const handleStepSave = useCallback(
+    async (payload, currentStep) => {
+      setBanner('');
+      setSuccess('');
+      try {
+        if (currentStep === 1) {
+          await updateProfile(personalPart(payload));
+          setSuccess('Step 1 saved — personal info updated.');
+        } else if (currentStep === 2) {
+          const refreshed = await updateProfessionalDetails(
+            professionalPart(payload, { includeDocs: false })
+          );
+          if (refreshed) setProfile(refreshed);
+          setSuccess('Step 2 saved — professional details updated.');
+        }
+        await refreshUser();
+      } catch (err) {
+        const msg = err.message || 'Could not save this step.';
+        setBanner(msg);
+        // Re-throw so the wizard doesn't advance past a failed save.
+        throw err;
+      }
+    },
+    [refreshUser]
+  );
+
+  // Final submit (Step 3) — persist the document URLs and refresh.
+  const handleSubmit = useCallback(
+    async (payload) => {
+      if (submitting) return;
+      setBanner('');
+      setSuccess('');
+      setSubmitting(true);
+      try {
+        const refreshed = await updateProfessionalDetails(
+          professionalPart(payload, { docsOnly: true })
+        );
+        if (refreshed) setProfile(refreshed);
+        await refreshUser();
+        setSuccess('All set — your profile is up to date.');
+      } catch (err) {
+        setBanner(err.message || 'Could not save your documents.');
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [submitting, refreshUser]
+  );
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -108,18 +243,6 @@ export default function ProfileEditPage() {
   const role = user.role;
   const isProfessional =
     role === 'professional' || role === 'firm_professional';
-  const isFirmAdmin = role === 'firm_admin';
-  // Roles that can own / join / be invited to a firm.
-  const canUseFirm = isProfessional || isFirmAdmin;
-
-  // Build the list of tabs for this role.
-  const tabs = [{ key: 'personal', label: 'Personal', icon: User }];
-  if (isProfessional) {
-    tabs.push({ key: 'professional', label: 'Professional', icon: Briefcase });
-  }
-  if (canUseFirm) {
-    tabs.push({ key: 'firm', label: 'Firm', icon: Building2 });
-  }
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -160,72 +283,59 @@ export default function ProfileEditPage() {
               </Button>
             </div>
 
-            {/* Tabs */}
-            {tabs.length > 1 && (
-              <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-white p-1.5">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  const active = activeTab === tab.key;
-                  return (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => setActiveTab(tab.key)}
-                      className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition ${
-                        active
-                          ? 'bg-amber-600 text-white shadow-sm'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {isProfessional ? (
+              <>
+                {/* Category lock notice — professionals cannot switch
+                    primary category once they've signed up. The wizard
+                    below receives this as a prop and renders the matching
+                    Legal / Tax fields. */}
+                <Card>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-400">
+                        Primary category
+                      </p>
+                      <p className="mt-0.5 text-base font-semibold text-slate-900">
+                        {lockedProfessionalType ===
+                        PROFESSIONAL_TYPES.LEGAL
+                          ? 'Legal Consultant / Advocate'
+                          : 'Tax Consultant'}
+                      </p>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                      Locked
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    The primary category is set at signup and cannot be
+                    changed here. Contact support if you need to switch
+                    categories.
+                  </p>
+                </Card>
 
-            {/* Personal information */}
-            {activeTab === 'personal' && (
+                {success && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    {success}
+                  </div>
+                )}
+
+                <ProfessionalRegistrationForm
+                  mode="edit"
+                  professionalType={lockedProfessionalType}
+                  initialValues={initialValues}
+                  submitLabel="Save documents"
+                  submitting={submitting}
+                  banner={banner}
+                  onSubmit={handleSubmit}
+                  onStepSave={handleStepSave}
+                />
+              </>
+            ) : (
               <PersonalInfoForm
                 user={user}
                 address={profile && profile.address}
                 onSaved={handlePersonalSaved}
               />
-            )}
-
-            {/* Professional details */}
-            {activeTab === 'professional' && isProfessional && (
-              <ProfessionalForm
-                professionalDetail={profile && profile.professionalDetail}
-                lawyerDetail={profile && profile.lawyerDetail}
-                techDetail={profile && profile.techDetail}
-                onSaved={handleProfessionalSaved}
-              />
-            )}
-
-            {/* Firm — now managed on the dedicated /firm hub */}
-            {activeTab === 'firm' && canUseFirm && (
-              <Card>
-                <div className="flex flex-col items-center gap-3 py-6 text-center">
-                  <div className="grid h-12 w-12 place-items-center rounded-full bg-amber-100 text-amber-700">
-                    <Building2 className="h-6 w-6" />
-                  </div>
-                  <h2 className="text-base font-semibold text-slate-900">
-                    Firm management has moved
-                  </h2>
-                  <p className="max-w-md text-sm text-slate-500">
-                    Create your firm, edit its profile, manage members and
-                    handle invitations on the dedicated firm hub.
-                  </p>
-                  <Button
-                    href="/firm"
-                    className="bg-amber-600 hover:bg-amber-700"
-                  >
-                    Go to My Firm
-                  </Button>
-                </div>
-              </Card>
             )}
           </div>
         )}

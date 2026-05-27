@@ -200,10 +200,39 @@ const normalizeProfileProfessional = ({ user, address, detail }) => {
     expertise: toArray(detail.expertise),
     subCategoryIds: toArray(detail.subCategoryIds),
     practiceCities: toArray(detail.practiceCities),
+    courtsPracticing: toArray(detail.courtsPracticing),
+    primaryCategoryId: detail.primaryCategoryId || null,
+    consultancyType: detail.consultancyType || null,
+    chamberAddress: detail.chamberAddress || '',
+    licenseNumber: detail.licenseNumber || '',
+    barRegistrationNumber: detail.barRegistrationNumber || '',
+    taxRegistrationNumber: detail.taxRegistrationNumber || '',
+    enrollmentNumber: detail.enrollmentNumber || '',
+    // Normalize verificationStatus — listing rows are APPROVED so we
+    // surface a "verified" label by default; explicit detail.verificationStatus
+    // wins when set so the future "pending"/"under_review" flows display
+    // correctly elsewhere.
+    verificationStatus:
+      detail.verificationStatus &&
+      String(detail.verificationStatus).toLowerCase() !== 'pending'
+        ? String(detail.verificationStatus).toLowerCase()
+        : 'verified',
+    completionPercent: toNum(detail.completionPercent),
+    // Documents (URLs)
+    advocateLicenseDoc: detail.advocateLicenseDoc || '',
+    barCouncilCertDoc: detail.barCouncilCertDoc || '',
+    lawDegreeDoc: detail.lawDegreeDoc || '',
+    taxRegistrationCertDoc: detail.taxRegistrationCertDoc || '',
+    qualificationCertDoc: detail.qualificationCertDoc || '',
+    professionalLicenseDoc: detail.professionalLicenseDoc || '',
+    governmentIdDoc: detail.governmentIdDoc || '',
     languages: toArray(detail.languages),
     consultationFee: toNum(detail.consultationFee),
     rating: toNum(detail.rating),
     reviewsCount: toNum(detail.reviewsCount),
+    // Listing only surfaces APPROVED professionals, so every result is
+    // implicitly verified. `verificationStatus` is exposed separately for
+    // the verification badge on cards/detail pages.
     verified: true,
     // MariaDB stores booleans as TINYINT(1); 0/'0'/false all mean "off",
     // null/undefined means "not set" (treated as available for legacy rows).

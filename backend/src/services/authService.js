@@ -14,6 +14,7 @@ const {
   Professional,
   Firm,
   ProfessionalApproval,
+  ProfessionalDetail,
   PasswordResetOtp,
 } = require('../models');
 const {
@@ -45,7 +46,7 @@ const genUuid = () => {
 
 // Public, password-free view of a user record. An optional `approvalStatus`
 // (Phase 7) is included verbatim — `null` for non-professional users.
-const sanitizeUser = (user, approvalStatus = null) => {
+const sanitizeUser = (user, approvalStatus = null, extras = {}) => {
   if (!user) return null;
   const u = typeof user.get === 'function' ? user.get({ plain: true }) : user;
   return {
@@ -70,6 +71,15 @@ const sanitizeUser = (user, approvalStatus = null) => {
     linkedId: u.linkedId || null,
     firmId: u.firmId || null,
     approvalStatus: approvalStatus || null,
+    // Frontend uses this to bounce incomplete signups back to /signup so
+    // the 3-step wizard is always finished before the user can use the
+    // platform. Non-professionals always get `true` (n/a).
+    signupComplete:
+      extras && Object.prototype.hasOwnProperty.call(extras, 'signupComplete')
+        ? Boolean(extras.signupComplete)
+        : u.role === 'professional'
+          ? false
+          : true,
   };
 };
 
@@ -88,6 +98,27 @@ const resolveApprovalStatus = async (user) => {
 };
 
 /**
+ * Resolve a professional user's signupComplete flag from
+ * professional_details. Non-professionals are considered complete.
+ * @param {object} user
+ * @returns {Promise<boolean>}
+ */
+const resolveSignupComplete = async (user) => {
+  if (!user) return true;
+  if (user.role !== 'professional') return true;
+  try {
+    const detail = await ProfessionalDetail.findOne({
+      where: { userId: user.id },
+      attributes: ['signupComplete'],
+      raw: true,
+    });
+    return detail ? Boolean(detail.signupComplete) : false;
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Sanitize a user and attach their professional approval status (if any).
  * @param {object} user - user record
  * @returns {Promise<object|null>}
@@ -95,7 +126,23 @@ const resolveApprovalStatus = async (user) => {
 const sanitizeUserWithApproval = async (user) => {
   if (!user) return null;
   const approvalStatus = await resolveApprovalStatus(user);
-  return sanitizeUser(user, approvalStatus);
+  // Resolve the live `signupComplete` flag for professionals from the
+  // detail row so a partially-onboarded user gets bounced back to the
+  // wizard. Non-professionals don't have a detail row — treat as complete.
+  let signupComplete = true;
+  if (user.role === 'professional') {
+    try {
+      const detail = await ProfessionalDetail.findOne({
+        where: { userId: user.id },
+        attributes: ['signupComplete'],
+        raw: true,
+      });
+      signupComplete = detail ? Boolean(detail.signupComplete) : false;
+    } catch {
+      signupComplete = false;
+    }
+  }
+  return sanitizeUser(user, approvalStatus, { signupComplete });
 };
 
 /**
@@ -568,7 +615,9 @@ const login = async (email, password, meta = {}) => {
   return {
     accessToken: signAccessToken(user),
     refreshToken,
-    user: sanitizeUser(user, approvalStatus),
+    user: sanitizeUser(user, approvalStatus, {
+      signupComplete: await resolveSignupComplete(user),
+    }),
   };
 };
 
@@ -632,7 +681,9 @@ const refresh = async (refreshToken, meta = {}) => {
   return {
     accessToken: signAccessToken(user),
     refreshToken: newRefreshToken,
-    user: sanitizeUser(user),
+    user: sanitizeUser(user, await resolveApprovalStatus(user), {
+      signupComplete: await resolveSignupComplete(user),
+    }),
   };
 };
 
@@ -691,7 +742,9 @@ const verifyEmail = async (rawToken, meta = {}) => {
       await user.save({ transaction });
       return {
         noSession: true,
-        user: sanitizeUser(user, approvalStatus),
+        user: sanitizeUser(user, approvalStatus, {
+        signupComplete: await resolveSignupComplete(user),
+      }),
         emailVerified: true,
         approvalStatus,
       };
@@ -717,7 +770,9 @@ const verifyEmail = async (rawToken, meta = {}) => {
     return {
       accessToken: signAccessToken(user),
       refreshToken,
-      user: sanitizeUser(user, approvalStatus),
+      user: sanitizeUser(user, approvalStatus, {
+        signupComplete: await resolveSignupComplete(user),
+      }),
     };
   });
 
@@ -1234,6 +1289,39 @@ const resetPassword = async (body = {}, opts = {}) => {
   });
 };
 
+/**
+ * Tell whether the supplied email and/or mobile number already belong to a
+ * user account. Used by the signup wizard before it tries to create the
+ * account so we can show "this account already exists" instead of a 409
+ * after the user has filled in all of Step 1.
+ *
+ * @param {{email?: string, mobileNumber?: string}} input
+ * @returns {Promise<{
+ *   emailTaken: boolean,
+ *   mobileTaken: boolean,
+ *   takenBy: 'email' | 'mobile' | 'both' | null,
+ * }>}
+ */
+async function checkAvailability({ email, mobileNumber } = {}) {
+  let emailTaken = false;
+  let mobileTaken = false;
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanMobile = (mobileNumber || '').trim();
+  if (cleanEmail) {
+    const u = await User.findOne({ where: { email: cleanEmail } });
+    emailTaken = Boolean(u);
+  }
+  if (cleanMobile) {
+    const u = await User.findOne({ where: { mobileNumber: cleanMobile } });
+    mobileTaken = Boolean(u);
+  }
+  let takenBy = null;
+  if (emailTaken && mobileTaken) takenBy = 'both';
+  else if (emailTaken) takenBy = 'email';
+  else if (mobileTaken) takenBy = 'mobile';
+  return { emailTaken, mobileTaken, takenBy };
+}
+
 module.exports = {
   sanitizeUser,
   sanitizeUserWithApproval,
@@ -1258,4 +1346,5 @@ module.exports = {
   enqueueClientInvitationEmail,
   getClaimInfo,
   claimClientAccount,
+  checkAvailability,
 };
