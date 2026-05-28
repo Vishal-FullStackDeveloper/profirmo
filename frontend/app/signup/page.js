@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
   ArrowRight,
@@ -115,7 +115,6 @@ function Chrome({ children }) {
 
 export default function SignupPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { signup, registerProfessional, isAuthenticated, loading, user } =
     useAuth();
 
