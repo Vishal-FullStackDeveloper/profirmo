@@ -122,11 +122,25 @@ app.get('/api/health', async (req, res) => {
   } catch (err) {
     database = 'disconnected';
   }
+  // Surface enough config state to diagnose a misconfigured production
+  // deploy without having to ssh and grep .env. Secrets are NEVER echoed
+  // back — only "set" / "missing" booleans + the public key id prefix
+  // (which the frontend bundle already exposes anyway).
+  const razorpay = {
+    keyIdSet: Boolean(env.razorpay.keyId),
+    keySecretSet: Boolean(env.razorpay.keySecret),
+    webhookSecretSet: Boolean(env.razorpay.webhookSecret),
+    keyIdPrefix: env.razorpay.keyId
+      ? `${String(env.razorpay.keyId).slice(0, 8)}…`
+      : null,
+  };
+  razorpay.ready = razorpay.keyIdSet && razorpay.keySecretSet;
   return successResponse(res, 200, 'Backend API is running successfully', {
     timestamp: new Date().toISOString(),
     environment: env.nodeEnv,
     uptime: process.uptime(),
     database,
+    razorpay,
   });
 });
 
