@@ -43,18 +43,43 @@ export async function listTags() {
 
 /**
  * Server-side fetch (called from Next's `generateMetadata` / RSC).
- * Uses plain fetch + the env base URL so it works without browser cookies.
+ *
+ * The browser version of getApiBaseUrl picks the prod backend by sniffing
+ * `window.location.hostname` — that branch is unreachable on the server,
+ * so we layer the lookup explicitly:
+ *   1. NEXT_PUBLIC_API_URL (build-time bake)
+ *   2. API_BASE_URL (server-only env, useful for previews)
+ *   3. In production: the known prod backend host
+ *   4. Otherwise: localhost dev backend
+ *
+ * Any fetch failure (DNS, ECONNREFUSED, timeout, non-2xx) returns null so
+ * the Server Component renders the 404 page instead of throwing — which is
+ * what produced the `Application error` digest in production.
  */
+function ssrApiBase() {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (process.env.API_BASE_URL) return process.env.API_BASE_URL;
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://profirmo.onrender.com';
+  }
+  return 'http://localhost:5000';
+}
+
 export async function ssrGetPost(slug) {
-  const base = process.env.NEXT_PUBLIC_API_URL || getApiBaseUrl();
-  const res = await fetch(
-    `${base}/api/blog/posts/${encodeURIComponent(slug)}`,
-    { cache: 'no-store' }
-  );
-  if (!res.ok) return null;
-  const body = await res.json().catch(() => null);
-  if (!body || !body.success) return null;
-  return body.data;
+  const base = ssrApiBase();
+  try {
+    const res = await fetch(
+      `${base}/api/blog/posts/${encodeURIComponent(slug)}`,
+      { cache: 'no-store' }
+    );
+    if (!res.ok) return null;
+    const body = await res.json().catch(() => null);
+    if (!body || !body.success) return null;
+    return body.data;
+  } catch (err) {
+    console.error('[ssrGetPost] fetch failed for', slug, '-', err.message);
+    return null;
+  }
 }
 
 // --- Admin CRUD ----------------------------------------------------------
