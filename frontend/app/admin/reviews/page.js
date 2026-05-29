@@ -47,6 +47,28 @@ const RATING_OPTIONS = [
   { value: '1', label: '1★ & up' },
 ];
 
+// Review kinds are normalised on the backend. Surfacing them lets the admin
+// split out professional-profile reviews (the only ones that drive public
+// ratings) from booking-anchored reviews (consultation / client).
+const KIND_OPTIONS = [
+  { value: '', label: 'All kinds' },
+  { value: 'professional', label: 'Reviews of professional' },
+  { value: 'consultation', label: 'Reviews on consultation' },
+  { value: 'client', label: 'Reviews on client (legacy)' },
+];
+
+const KIND_VARIANT = {
+  professional: 'blue',
+  consultation: 'amber',
+  client: 'gray',
+};
+
+const KIND_LABEL = {
+  professional: 'Of professional',
+  consultation: 'On consultation',
+  client: 'On client',
+};
+
 const RATING_SELECT_OPTIONS = [
   { value: '5', label: '5 stars' },
   { value: '4', label: '4 stars' },
@@ -88,6 +110,7 @@ export default function AdminReviewsPage() {
   // Filter state.
   const [status, setStatus] = useState('');
   const [minRating, setMinRating] = useState('');
+  const [kind, setKind] = useState('');
   const [page, setPage] = useState(1);
 
   // Edit modal.
@@ -119,6 +142,7 @@ export default function AdminReviewsPage() {
         limit: PAGE_SIZE,
         status: status || undefined,
         minRating: minRating || undefined,
+        kind: kind || undefined,
       });
       setRows(Array.isArray(data) ? data : []);
       setMeta(m || null);
@@ -127,7 +151,7 @@ export default function AdminReviewsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, status, minRating]);
+  }, [page, status, minRating, kind]);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && isAdmin) {
@@ -145,6 +169,11 @@ export default function AdminReviewsPage() {
   function changeMinRating(e) {
     setPage(1);
     setMinRating(e.target.value);
+  }
+
+  function changeKind(e) {
+    setPage(1);
+    setKind(e.target.value);
   }
 
   // ----- Edit action -------------------------------------------------------
@@ -232,14 +261,20 @@ export default function AdminReviewsPage() {
       <div className="space-y-6">
         {/* Filter bar */}
         <Card>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Select
+              label="Kind"
+              name="review-kind"
+              value={kind}
+              onChange={changeKind}
+              options={KIND_OPTIONS}
+            />
             <Select
               label="Status"
               name="review-status"
               value={status}
               onChange={changeStatus}
               options={STATUS_OPTIONS}
-              className="lg:w-56"
             />
             <Select
               label="Minimum rating"
@@ -247,7 +282,6 @@ export default function AdminReviewsPage() {
               value={minRating}
               onChange={changeMinRating}
               options={RATING_OPTIONS}
-              className="lg:w-52"
             />
           </div>
         </Card>
@@ -298,86 +332,129 @@ export default function AdminReviewsPage() {
           />
         ) : (
           <>
-            {/* Desktop table */}
-            <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white md:block">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Professional</th>
-                    <th className="px-4 py-3 font-semibold">Reviewer</th>
-                    <th className="px-4 py-3 font-semibold">Rating</th>
-                    <th className="px-4 py-3 font-semibold">Comment</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Date</th>
-                    <th className="px-4 py-3 font-semibold text-right">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {rows.map((row) => {
-                    const badge = statusBadge(row.status);
-                    return (
-                      <tr key={row.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3">
-                          <p className="truncate font-medium text-slate-800">
-                            {row.professionalName ||
-                              row.professionalId ||
-                              '—'}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {row.clientName || '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <RatingStars rating={row.rating} size="sm" />
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          <p className="max-w-xs truncate">
-                            {row.comment || '—'}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant={badge.variant}>{badge.label}</Badge>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {formatDate(row.date || row.createdAt)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openEdit(row)}
-                            >
-                              <Pencil size={15} />
-                              Edit
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="danger"
-                              onClick={() => openDelete(row)}
-                            >
-                              <Trash2 size={15} />
-                              Delete
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            {/* Desktop table — wrapped in overflow-x-auto so it stays
+                readable on mid-width screens between mobile-cards and
+                full-width desktop. */}
+            <div className="hidden rounded-xl border border-slate-200 bg-white md:block">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[860px] text-left text-sm">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Type</th>
+                      <th className="px-4 py-3 font-semibold">Professional</th>
+                      <th className="px-4 py-3 font-semibold">Reviewer</th>
+                      <th className="px-4 py-3 font-semibold">Rating</th>
+                      <th className="px-4 py-3 font-semibold">Comment</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 font-semibold">Date</th>
+                      <th className="px-4 py-3 font-semibold text-right">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {rows.map((row) => {
+                      const badge = statusBadge(row.status);
+                      const reviewKind = String(
+                        row.kind || 'professional'
+                      ).toLowerCase();
+                      return (
+                        <tr key={row.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col items-start gap-1">
+                              <Badge
+                                variant={KIND_VARIANT[reviewKind] || 'gray'}
+                              >
+                                {KIND_LABEL[reviewKind] || reviewKind}
+                              </Badge>
+                              {row.bookingId && (
+                                <span
+                                  title={`Booking ${row.bookingId}`}
+                                  className="font-mono text-[10px] text-slate-500"
+                                >
+                                  bk · {String(row.bookingId).slice(-8)}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="truncate font-medium text-slate-800">
+                              {row.professionalName ||
+                                row.professionalId ||
+                                '—'}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {row.clientName || '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <RatingStars rating={row.rating} size="sm" />
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            <p className="max-w-xs truncate">
+                              {row.comment || '—'}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant={badge.variant}>{badge.label}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {formatDate(row.date || row.createdAt)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openEdit(row)}
+                                title="Edit"
+                                aria-label="Edit"
+                              >
+                                <Pencil size={15} />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="danger"
+                                onClick={() => openDelete(row)}
+                                title="Delete"
+                                aria-label="Delete"
+                              >
+                                <Trash2 size={15} />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Mobile cards */}
             <div className="space-y-3 md:hidden">
               {rows.map((row) => {
                 const badge = statusBadge(row.status);
+                const reviewKind = String(
+                  row.kind || 'professional'
+                ).toLowerCase();
                 return (
                   <Card key={row.id}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
+                        <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                          <Badge variant={KIND_VARIANT[reviewKind] || 'gray'}>
+                            {KIND_LABEL[reviewKind] || reviewKind}
+                          </Badge>
+                          {row.bookingId && (
+                            <span
+                              title={`Booking ${row.bookingId}`}
+                              className="font-mono text-[10px] text-slate-500"
+                            >
+                              bk · {String(row.bookingId).slice(-8)}
+                            </span>
+                          )}
+                        </div>
                         <p className="truncate font-medium text-slate-800">
                           {row.professionalName || row.professionalId || '—'}
                         </p>
@@ -398,24 +475,24 @@ export default function AdminReviewsPage() {
                     <p className="mt-2 text-xs text-slate-400">
                       {formatDate(row.date || row.createdAt)}
                     </p>
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-3 flex justify-end gap-2">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => openEdit(row)}
-                        className="flex-1"
+                        title="Edit"
+                        aria-label="Edit"
                       >
                         <Pencil size={15} />
-                        Edit
                       </Button>
                       <Button
                         size="sm"
                         variant="danger"
                         onClick={() => openDelete(row)}
-                        className="flex-1"
+                        title="Delete"
+                        aria-label="Delete"
                       >
                         <Trash2 size={15} />
-                        Delete
                       </Button>
                     </div>
                   </Card>

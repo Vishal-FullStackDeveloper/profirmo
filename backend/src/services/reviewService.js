@@ -592,6 +592,10 @@ const listAll = async ({ filters = {}, page, limit } = {}) => {
   if (filters.minRating !== undefined && filters.minRating !== '') {
     where.rating = { [Op.gte]: Number(filters.minRating) || 0 };
   }
+  // Optional filter by review kind so admin can split "reviews of the
+  // professional" from "reviews on a specific booking" (consultation /
+  // client). NULL is silently ignored (= no filter).
+  if (filters.kind) where.kind = filters.kind;
 
   const { rows, count } = await Review.findAndCountAll({
     where,

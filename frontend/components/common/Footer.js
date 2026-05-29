@@ -16,6 +16,7 @@ const TOP_INDIA_CITIES = [
   'Ahmedabad',
   'Jaipur',
   'Lucknow',
+  'Gautam Budh Nagar',
 ];
 
 const SOCIALS = [

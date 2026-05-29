@@ -5,6 +5,8 @@ const leads = require('../controllers/leadController');
 const adminPayments = require('../controllers/adminPaymentsController');
 const payoutController = require('../controllers/payoutController');
 const adminSettings = require('../controllers/adminSettingsController');
+const blog = require('../controllers/blogController');
+const { uploadSingle, handleUploadErrors } = require('../middleware/uploadMiddleware');
 const { authenticate } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 
@@ -155,5 +157,31 @@ router.get('/payouts/:id', payoutController.adminGet);
 router.post('/payouts/:id/approve', payoutController.adminApprove);
 router.post('/payouts/:id/reject', payoutController.adminReject);
 router.post('/payouts/:id/paid', payoutController.adminMarkPaid);
+
+// --- Blog management -----------------------------------------------------
+// Posts
+router.get('/blog/posts', blog.adminListPosts);
+router.post('/blog/posts', blog.adminCreatePost);
+router.get('/blog/posts/:id', blog.adminGetPost);
+router.patch('/blog/posts/:id', blog.adminUpdatePost);
+router.delete('/blog/posts/:id', blog.adminDeletePost);
+// Categories
+router.get('/blog/categories', blog.adminListCategories);
+router.post('/blog/categories', blog.adminCreateCategory);
+router.patch('/blog/categories/:id', blog.adminUpdateCategory);
+router.delete('/blog/categories/:id', blog.adminDeleteCategory);
+// Tags
+router.get('/blog/tags', blog.adminListTags);
+router.post('/blog/tags', blog.adminCreateTag);
+router.patch('/blog/tags/:id', blog.adminUpdateTag);
+router.delete('/blog/tags/:id', blog.adminDeleteTag);
+// Featured-image upload — writes to frontend/public/blog-images so Next.js
+// serves the file as a first-class static asset (same origin as the page).
+router.post(
+  '/blog/images',
+  uploadSingle,
+  handleUploadErrors,
+  blog.adminUploadImage
+);
 
 module.exports = router;

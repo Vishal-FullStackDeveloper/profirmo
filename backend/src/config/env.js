@@ -94,4 +94,17 @@ module.exports = {
   },
   // Platform commission in basis points (1 bp = 0.01%). 1000 = 10% cut.
   platformFeeBps: Number(process.env.PLATFORM_FEE_BPS) || 1000,
+
+  // --- Blog ---------------------------------------------------------------
+  // Featured blog images are written to the frontend's `public/` folder so
+  // Next.js serves them as first-class static assets (better Lighthouse +
+  // OG scrape success than the backend's /uploads/). Defaults to a sibling
+  // path; override BLOG_IMAGE_DIR in production when the two services
+  // aren't colocated on disk.
+  blogImageDir:
+    process.env.BLOG_IMAGE_DIR ||
+    require('path').resolve(__dirname, '../../../frontend/public/blog-images'),
+  // Public URL prefix the frontend uses to fetch those images. Files
+  // written to <blogImageDir>/foo.jpg are served at <blogImageUrlPrefix>/foo.jpg.
+  blogImageUrlPrefix: process.env.BLOG_IMAGE_URL_PREFIX || '/blog-images',
 };

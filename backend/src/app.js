@@ -31,6 +31,7 @@ const leadRoutes = require('./routes/leadRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const walletRoutes = require('./routes/walletRoutes');
 const payoutRoutes = require('./routes/payoutRoutes');
+const blogRoutes = require('./routes/blogRoutes');
 const paymentController = require('./controllers/paymentController');
 
 const app = express();
@@ -168,6 +169,7 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/payouts', payoutRoutes);
+app.use('/api/blog', blogRoutes);
 
 // --- Static uploads --------------------------------------------------------
 // Serve files stored on local disk at /uploads/<storedName>. Stored names

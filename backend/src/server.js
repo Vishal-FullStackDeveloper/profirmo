@@ -82,6 +82,13 @@ const SYNC_ORDER = [
   db.PayoutRequest,
   db.BookingNote,
   db.AdminSetting,
+  // --- Blog -----------------------------------------------------------
+  // Categories + tags are referenced via JSON columns on BlogPost (soft
+  // links, no FK constraints), so the strict parent-first ordering only
+  // matters for consistency.
+  db.BlogCategory,
+  db.BlogTag,
+  db.BlogPost,
 ];
 
 // Boot the Profirmo HTTP server.

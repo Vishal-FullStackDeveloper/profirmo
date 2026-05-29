@@ -82,6 +82,11 @@ const BookingNote = require('./BookingNote');
 // --- Admin-managed platform settings (markup %, etc.) ---------------------
 const AdminSetting = require('./AdminSetting');
 
+// --- Blog / news content --------------------------------------------------
+const BlogCategory = require('./BlogCategory');
+const BlogTag = require('./BlogTag');
+const BlogPost = require('./BlogPost');
+
 // Optional relationship — clearing the parent nulls the foreign key.
 const fkSetNull = (foreignKey) => ({
   foreignKey,
@@ -348,6 +353,7 @@ CaseNote.addHook('afterFind', jsonParser(['attachments']));
 Payment.addHook('afterFind', jsonParser(['rawOrder', 'rawPayment']));
 WalletTransaction.addHook('afterFind', jsonParser(['metadata']));
 BookingNote.addHook('afterFind', jsonParser(['attachments']));
+BlogPost.addHook('afterFind', jsonParser(['tagIds']));
 
 module.exports = {
   sequelize,
@@ -395,4 +401,7 @@ module.exports = {
   PayoutRequest,
   BookingNote,
   AdminSetting,
+  BlogCategory,
+  BlogTag,
+  BlogPost,
 };

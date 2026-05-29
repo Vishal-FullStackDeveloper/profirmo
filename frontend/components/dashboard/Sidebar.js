@@ -27,6 +27,8 @@ import {
   Wallet,
   ArrowDownToLine,
   CreditCard,
+  Newspaper,
+  Hash,
 } from 'lucide-react';
 import BrandLogo from '@/components/common/BrandLogo';
 import { useLanguage } from '@/components/LanguageProvider';
@@ -255,6 +257,29 @@ const NAV_BY_ROLE = {
       labelKey: 'dash.nav.auditLogs',
       href: '/admin/audit-logs',
       icon: ScrollText,
+    },
+    // Blog / journal — admin-managed. The three children mirror the
+    // backend's posts / categories / tags split.
+    {
+      labelKey: 'dash.nav.blog',
+      icon: Newspaper,
+      children: [
+        {
+          labelKey: 'dash.nav.blogPosts',
+          href: '/admin/blog',
+          icon: Newspaper,
+        },
+        {
+          labelKey: 'dash.nav.blogCategories',
+          href: '/admin/blog/categories',
+          icon: ListTree,
+        },
+        {
+          labelKey: 'dash.nav.blogTags',
+          href: '/admin/blog/tags',
+          icon: Hash,
+        },
+      ],
     },
     // App settings: admin-managed taxonomy + city list that drive every
     // dropdown across the platform.

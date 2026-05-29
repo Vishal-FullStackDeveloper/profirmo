@@ -297,9 +297,15 @@ export async function deleteLawFirm(id) {
  * @param {{ page?, limit?, status?, minRating? }} [params]
  * @returns {Promise<{ data: Array, meta: Object }>}
  */
-export async function listReviews({ page, limit, status, minRating } = {}) {
+export async function listReviews({
+  page,
+  limit,
+  status,
+  minRating,
+  kind,
+} = {}) {
   const res = await get('/api/admin/reviews', {
-    params: { page, limit, status, minRating },
+    params: { page, limit, status, minRating, kind },
   });
   return {
     data: (res && res.data) || [],

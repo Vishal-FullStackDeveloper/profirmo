@@ -423,13 +423,14 @@ const deleteLawFirm = asyncHandler(async (req, res) => {
 
 // --- Reviews & review appeals ---------------------------------------------
 
-// GET /api/admin/reviews?page=&limit=&status=&minRating=&professionalId=
+// GET /api/admin/reviews?page=&limit=&status=&minRating=&professionalId=&kind=
 const listReviews = asyncHandler(async (req, res) => {
   const { items, ...meta } = await reviewService.listAll({
     filters: {
       status: req.query.status,
       minRating: req.query.minRating,
       professionalId: req.query.professionalId,
+      kind: req.query.kind,
     },
     page: req.query.page,
     limit: req.query.limit,

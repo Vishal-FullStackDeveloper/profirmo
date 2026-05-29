@@ -8,6 +8,7 @@ export const translations = {
     // --- Header / navigation ---
     'nav.professionals': 'Professionals',
     'nav.firms': 'Firms',
+    'nav.blog': 'Blog',
     'nav.howItWorks': 'How it works',
     'nav.pricing': 'Pricing',
     'nav.contact': 'Contact',
@@ -69,6 +70,8 @@ export const translations = {
     'city.Kolkata': 'Kolkata',
     'city.Ahmedabad': 'Ahmedabad',
     'city.Jaipur': 'Jaipur',
+    'city.Lucknow': 'Lucknow',
+    'city.Gautam Budh Nagar': 'Gautam Budh Nagar',
 
     // --- Hero section ---
     'hero.eyebrow': 'AI-powered consultation matching',
@@ -300,6 +303,7 @@ export const translations = {
     // --- Header / navigation ---
     'nav.professionals': 'प्रोफेशनल',
     'nav.firms': 'फर्म',
+    'nav.blog': 'ब्लॉग',
     'nav.howItWorks': 'यह कैसे काम करता है',
     'nav.pricing': 'मूल्य निर्धारण',
     'nav.contact': 'संपर्क',
@@ -361,6 +365,8 @@ export const translations = {
     'city.Kolkata': 'कोलकाता',
     'city.Ahmedabad': 'अहमदाबाद',
     'city.Jaipur': 'जयपुर',
+    'city.Lucknow': 'लखनऊ',
+    'city.Gautam Budh Nagar': 'गौतम बुद्ध नगर',
 
     // --- Hero section ---
     'hero.eyebrow': 'एआई-आधारित परामर्श मिलान',

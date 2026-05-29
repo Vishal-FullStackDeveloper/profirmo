@@ -14,6 +14,7 @@ import NotificationBell from '@/components/common/NotificationBell';
 const NAV_KEYS = {
   '/professionals': 'nav.professionals',
   '/firms': 'nav.firms',
+  '/blog': 'nav.blog',
   '/how-it-works': 'nav.howItWorks',
   '/pricing': 'nav.pricing',
   '/contact': 'nav.contact',
