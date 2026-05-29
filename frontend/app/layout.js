@@ -9,7 +9,15 @@ const inter = Inter({
   display: 'swap',
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+// Layered fallback — see notes in app/blog/[slug]/page.js. Without this,
+// relative URLs in any page's metadata get resolved against `localhost:3000`
+// when the build env didn't set NEXT_PUBLIC_SITE_URL.
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  (process.env.NODE_ENV === 'production'
+    ? 'https://profirmo.com'
+    : 'http://localhost:3000');
 
 const TITLE = 'Pro Firmo — AI-Powered Legal & Tax Consultation';
 const DESCRIPTION =

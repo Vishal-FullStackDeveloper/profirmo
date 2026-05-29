@@ -12,12 +12,17 @@ import Footer from '@/components/common/Footer';
 import ShareButtons from '@/components/blog/ShareButtons';
 import { ssrGetPost } from '@/services/blogService';
 
+// Used to build absolute URLs for OG / Twitter / canonical tags. The SSR
+// path has no `window.location` to read from, so we layer the lookup:
+//   1. NEXT_PUBLIC_SITE_URL  (build-time bake — recommended)
+//   2. NEXT_PUBLIC_APP_URL   (older env name, kept for back-compat)
+//   3. In production: the known public host so scrapers never see localhost
+//   4. Otherwise: local dev
 function siteUrl() {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    'http://localhost:3000'
-  );
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  if (process.env.NODE_ENV === 'production') return 'https://profirmo.com';
+  return 'http://localhost:3000';
 }
 
 function absoluteUrl(maybePath) {
