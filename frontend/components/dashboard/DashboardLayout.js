@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Wallet } from 'lucide-react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import BrandLogo from '@/components/common/BrandLogo';
 import ProfileDropdown from '@/components/common/ProfileDropdown';
 import NotificationBell from '@/components/common/NotificationBell';
 import { useLanguage } from '@/components/LanguageProvider';
 import { useAuth } from '@/hooks/useAuth';
+import { ROLES } from '@/utils/constants';
 
 /**
  * DashboardLayout — app shell with sticky sidebar, top bar and content area.
@@ -18,8 +20,14 @@ import { useAuth } from '@/hooks/useAuth';
 export default function DashboardLayout({ children, role, title, subtitle }) {
   const router = useRouter();
   const { t } = useLanguage();
-  const { loading, isAuthenticated } = useAuth();
+  const { loading, isAuthenticated, user } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Wallet quick-link is only relevant to professionals (both standalone +
+  // firm-attached). Other roles keep the existing two-item header.
+  const showWalletShortcut =
+    user &&
+    (user.role === ROLES.PROFESSIONAL ||
+      user.role === ROLES.FIRM_PROFESSIONAL);
 
   // Route guard — once auth has resolved, bounce guests to the login page.
   useEffect(() => {
@@ -118,6 +126,16 @@ export default function DashboardLayout({ children, role, title, subtitle }) {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
+              {showWalletShortcut && (
+                <Link
+                  href="/dashboard/professional/wallet"
+                  title="Wallet"
+                  aria-label="Wallet"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-amber-300 hover:text-amber-700"
+                >
+                  <Wallet className="h-4 w-4" />
+                </Link>
+              )}
               <NotificationBell />
               <ProfileDropdown />
             </div>

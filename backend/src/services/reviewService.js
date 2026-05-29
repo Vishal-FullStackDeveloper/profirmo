@@ -123,66 +123,180 @@ const resolveProfessionalNames = async (ids) => {
  * may review each professional only once.
  * @param {{ user:Object, professionalId:string, rating:number, comment:string }}
  */
-const create = async ({ user, professionalId, rating, comment }) => {
+const create = async ({
+  user,
+  professionalId,
+  rating,
+  comment,
+  kind: rawKind,
+  bookingId,
+  reviewedUserId,
+}) => {
   if (!user || !user.id) {
     throw {
       statusCode: 401,
       message: 'You must be signed in to write a review.',
     };
   }
-  if (!professionalId) {
-    throw { statusCode: 422, message: 'professionalId is required' };
+  const kind = String(rawKind || 'professional').toLowerCase();
+  if (!['professional', 'consultation', 'client'].includes(kind)) {
+    throw {
+      statusCode: 422,
+      message: "kind must be 'professional', 'consultation' or 'client'.",
+    };
   }
   const safeRating = validateRating(rating);
 
-  // A professional cannot review their own profile.
-  if (user.linkedId && user.linkedId === professionalId) {
-    throw { statusCode: 403, message: 'You cannot review your own profile.' };
+  // 5-day review window for booking-anchored reviews. Past that point the
+  // booking is considered "closed" and nobody (client or pro) can add a
+  // review — escrow has either released by then anyway.
+  if (bookingId) {
+    const { Booking } = require('../models');
+    const bookingRow = await Booking.findByPk(bookingId, { raw: true });
+    if (bookingRow && bookingRow.completedAt) {
+      const windowMs = 5 * 24 * 60 * 60 * 1000;
+      const age = Date.now() - new Date(bookingRow.completedAt).getTime();
+      if (age > windowMs) {
+        throw {
+          statusCode: 403,
+          message:
+            'The 5-day review window for this booking has closed.',
+        };
+      }
+    }
   }
 
-  // One review per user per professional.
-  const existing = await Review.findOne({
-    where: { userId: user.id, professionalId },
-  });
+  // Per-kind validation + uniqueness check.
+  let dupeWhere = null;
+  let resolvedProfessionalId = professionalId || null;
+  let resolvedReviewedUserId = reviewedUserId || null;
+
+  if (kind === 'professional') {
+    if (!resolvedProfessionalId) {
+      throw { statusCode: 422, message: 'professionalId is required' };
+    }
+    if (user.linkedId && user.linkedId === resolvedProfessionalId) {
+      throw {
+        statusCode: 403,
+        message: 'You cannot review your own profile.',
+      };
+    }
+    dupeWhere = {
+      userId: user.id,
+      professionalId: resolvedProfessionalId,
+      kind,
+    };
+  } else if (kind === 'consultation') {
+    if (!bookingId) {
+      throw {
+        statusCode: 422,
+        message: 'bookingId is required for a consultation review.',
+      };
+    }
+    dupeWhere = { userId: user.id, bookingId, kind };
+  } else {
+    // kind === 'client' — pro reviewing a client. Booking anchored.
+    if (!bookingId) {
+      throw {
+        statusCode: 422,
+        message: 'bookingId is required for a client review.',
+      };
+    }
+    if (!resolvedReviewedUserId) {
+      throw {
+        statusCode: 422,
+        message: 'reviewedUserId is required for a client review.',
+      };
+    }
+    if (resolvedReviewedUserId === user.id) {
+      throw { statusCode: 403, message: 'You cannot review yourself.' };
+    }
+    dupeWhere = { userId: user.id, bookingId, kind };
+  }
+
+  const existing = await Review.findOne({ where: dupeWhere });
   if (existing) {
     throw {
       statusCode: 409,
-      message: 'You have already reviewed this professional.',
+      message: 'You have already submitted this review.',
     };
   }
 
   // The JWT only carries `id / role / linkedId / firmId`, so we look up the
-  // full User row to pull the reviewer's display name. Falls back to 'Client'
-  // only when the row is somehow missing or fully empty.
+  // full User row to pull the reviewer's display name.
   const reviewerUser = await User.findByPk(user.id, { raw: true });
   const reviewerName =
     displayName(reviewerUser) || displayName(user) || 'Client';
 
-  // Reviews are always against a professional; a firm has no review record
-  // of its own (firm reviews = the collective reviews of its professionals).
-  // The client column is `users.id` directly.
   const review = await Review.create({
     userId: user.id,
     clientId: user.role === 'client' ? user.id : null,
     clientName: reviewerName,
-    professionalId,
+    professionalId: resolvedProfessionalId,
     rating: safeRating,
     comment: String(comment || '').trim(),
     date: today(),
     status: PUBLISHED,
+    kind,
+    bookingId: bookingId || null,
+    reviewedUserId: resolvedReviewedUserId,
   });
 
-  // Notify the reviewed professional.
-  const reviewedUserId = await resolveProfessionalUserId(professionalId);
-  if (reviewedUserId && reviewedUserId !== user.id) {
+  // Notifications: pro→client and client→pro reviews land in the recipient's
+  // inbox; the consultation review is silent (it's about the booking, not a
+  // specific user, so there's nobody to "ping").
+  if (kind === 'professional') {
+    const reviewedUserId = await resolveProfessionalUserId(resolvedProfessionalId);
+    if (reviewedUserId && reviewedUserId !== user.id) {
+      await notify({
+        userId: reviewedUserId,
+        type: 'review_received',
+        title: 'New client review',
+        message: `${reviewerName} left you a ${safeRating}-star review.`,
+        link: '/dashboard/professional/reviews',
+        metadata: { reviewId: review.id, rating: safeRating },
+      });
+    }
+  } else if (kind === 'client' && resolvedReviewedUserId) {
     await notify({
-      userId: reviewedUserId,
+      userId: resolvedReviewedUserId,
       type: 'review_received',
-      title: 'New client review',
+      title: 'Professional left you a review',
       message: `${reviewerName} left you a ${safeRating}-star review.`,
-      link: '/dashboard/professional/reviews',
-      metadata: { reviewId: review.id, rating: safeRating },
+      link: '/dashboard/client/bookings',
+      metadata: { reviewId: review.id, rating: safeRating, bookingId },
     });
+  }
+
+  // Escrow release rule: funds release when BOTH parties have submitted a
+  // consultation review for the same booking. (The 5-day fallback lives in
+  // bookingDetailService and walletService — this is the "happy path".)
+  // Anything other than a consultation review never moves the escrow.
+  if (kind === 'consultation' && bookingId) {
+    try {
+      const { Op } = require('sequelize');
+      const consultationCount = await Review.count({
+        where: { bookingId, kind: 'consultation' },
+      });
+      if (consultationCount >= 2) {
+        const { EscrowEntry } = require('../models');
+        const escrow = await EscrowEntry.findOne({
+          where: {
+            bookingId,
+            status: { [Op.in]: ['awaiting_review', 'escrowed'] },
+          },
+        });
+        if (escrow) {
+          const walletService = require('./walletService');
+          await walletService.onReviewSubmitted({
+            bookingId,
+            reviewId: review.id,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn(`[reviewService] escrow release hook failed: ${err.message}`);
+    }
   }
 
   return review.get({ plain: true });
@@ -190,25 +304,96 @@ const create = async ({ user, professionalId, rating, comment }) => {
 
 // --- Public: read reviews --------------------------------------------------
 
-/** Published reviews for a professional, newest first. */
+/**
+ * Published reviews for a professional, newest first. Only kind='professional'
+ * rows surface here — consultation + client reviews are anchored to specific
+ * bookings and shouldn't leak into the public profile.
+ */
 const getByProfessional = async (professionalId) =>
   Review.findAll({
-    where: { professionalId, status: PUBLISHED },
+    where: { professionalId, status: PUBLISHED, kind: 'professional' },
     order: [['createdAt', 'DESC']],
     raw: true,
   });
 
 /**
  * Published reviews for a firm — the collective reviews of every professional
- * working under that firm (firms have no reviews of their own).
+ * working under that firm. Each row is enriched with the reviewed
+ * professional's display name + photo so the firm owner can tell who was
+ * reviewed, and the latest appeal state so already-appealed rows can show
+ * a badge instead of an Appeal button.
  */
 const getByFirm = async (firmId) => {
   const profIds = await firmService.getFirmProfessionalIds(firmId);
   if (profIds.length === 0) return [];
-  return Review.findAll({
-    where: { professionalId: { [Op.in]: profIds }, status: PUBLISHED },
+  const reviews = await Review.findAll({
+    where: {
+      professionalId: { [Op.in]: profIds },
+      status: PUBLISHED,
+      kind: 'professional',
+    },
     order: [['createdAt', 'DESC']],
     raw: true,
+  });
+  if (reviews.length === 0) return [];
+
+  // Resolve each reviewedProfessionalId → User { name, profilePhoto }. Some
+  // rows reference legacy `prof-N` ids (linkedId), others reference the new
+  // ProfessionalDetail.id; we honour both.
+  const ids = [...new Set(reviews.map((r) => r.professionalId).filter(Boolean))];
+  const [details, linkedUsers] = await Promise.all([
+    ProfessionalDetail.findAll({
+      where: { id: { [Op.in]: ids } },
+      attributes: ['id', 'userId'],
+      raw: true,
+    }),
+    User.findAll({
+      where: { linkedId: { [Op.in]: ids } },
+      attributes: ['id', 'linkedId', 'fullName', 'firstName', 'lastName', 'name', 'profilePhoto'],
+      raw: true,
+    }),
+  ]);
+  const detailUserIds = details.map((d) => d.userId).filter(Boolean);
+  const detailUsers = detailUserIds.length
+    ? await User.findAll({
+        where: { id: { [Op.in]: detailUserIds } },
+        attributes: ['id', 'fullName', 'firstName', 'lastName', 'name', 'profilePhoto'],
+        raw: true,
+      })
+    : [];
+  const detailUserById = new Map(detailUsers.map((u) => [u.id, u]));
+  const userByLinked = new Map(linkedUsers.map((u) => [u.linkedId, u]));
+  const proById = new Map();
+  for (const d of details) {
+    const u = detailUserById.get(d.userId);
+    if (u) proById.set(d.id, u);
+  }
+  for (const [linkedId, u] of userByLinked) proById.set(linkedId, u);
+
+  // Latest appeal per review so the UI can show "Appealed" status.
+  const appeals = await ReviewAppeal.findAll({
+    where: { reviewId: { [Op.in]: reviews.map((r) => r.id) } },
+    order: [['createdAt', 'DESC']],
+    raw: true,
+  });
+  const appealByReview = new Map();
+  for (const a of appeals) {
+    if (!appealByReview.has(a.reviewId)) appealByReview.set(a.reviewId, a);
+  }
+
+  return reviews.map((r) => {
+    const u = proById.get(r.professionalId);
+    return {
+      ...r,
+      reviewedProfessionalName: u
+        ? u.fullName ||
+          [u.firstName, u.lastName].filter(Boolean).join(' ').trim() ||
+          u.name ||
+          ''
+        : '',
+      reviewedProfessionalPhoto: (u && u.profilePhoto) || null,
+      appeal: appealByReview.get(r.id) || null,
+    };
   });
 };
 
@@ -222,8 +407,10 @@ const getMineForProfessional = async (user) => {
   const professionalId = user && (user.linkedId || user.firmId);
   if (!professionalId) return [];
 
+  // Professional dashboard only lists kind='professional' reviews — the
+  // consultation + client reviews live on the booking detail page.
   const reviews = await Review.findAll({
-    where: { professionalId },
+    where: { professionalId, kind: 'professional' },
     order: [['createdAt', 'DESC']],
     raw: true,
   });

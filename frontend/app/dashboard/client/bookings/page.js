@@ -1,12 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CalendarClock, RefreshCw, AlertTriangle, Eye, Video } from 'lucide-react';
+import {
+  CalendarClock,
+  RefreshCw,
+  AlertTriangle,
+  Eye,
+} from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import Badge from '@/components/common/Badge';
+import Avatar from '@/components/common/Avatar';
 import EmptyState from '@/components/common/EmptyState';
+import ConnectChips from '@/components/booking/ConnectChips';
 import bookingService from '@/services/bookingService';
 import { ROLES } from '@/utils/constants';
 import { formatDate, formatTime, formatCurrency } from '@/utils/formatters';
@@ -119,14 +126,32 @@ export default function ClientBookingsPage() {
                   <th className="px-4 py-3 font-semibold">Duration</th>
                   <th className="px-4 py-3 font-semibold">Cost</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Connect</th>
                   <th className="px-4 py-3 font-semibold text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {bookings.map((b) => (
                   <tr key={b.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 text-slate-600">
-                      {b.professionalId || '—'}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          src={b.professional && b.professional.profilePhoto}
+                          name={(b.professional && b.professional.name) || ''}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-800">
+                            {(b.professional && b.professional.name) || '—'}
+                          </p>
+                          {b.professional &&
+                            b.professional.professionalType && (
+                              <p className="truncate text-xs text-slate-500">
+                                {b.professional.professionalType}
+                              </p>
+                            )}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-slate-600 capitalize">
                       {b.type || '—'}
@@ -153,28 +178,28 @@ export default function ClientBookingsPage() {
                         {b.status || 'pending'}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-2">
-                        {b.consultationId &&
-                          b.status !== 'cancelled' &&
-                          b.callStatus !== 'ended' && (
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              href={`/consultation/${b.consultationId}`}
-                            >
-                              <Video size={15} />
-                              Join call
-                            </Button>
-                          )}
-                        <Button
+                    <td className="px-4 py-3">
+                      {b.status !== 'pending' && b.professional ? (
+                        <ConnectChips
+                          phone={b.professional.phone}
+                          email={b.professional.email}
+                          waMessage={`Hi ${b.professional.name}, this is about my Profirmo booking.`}
+                          emailSubject={`Profirmo booking ${b.id.slice(-8)}`}
                           size="sm"
-                          variant="outline"
-                          href={`/professionals/${b.professionalId}`}
-                        >
-                          <Eye size={15} />
-                        </Button>
-                      </div>
+                        />
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        href={`/dashboard/client/bookings/${b.id}`}
+                      >
+                        <Eye size={15} />
+                        Details
+                      </Button>
                     </td>
                   </tr>
                 ))}

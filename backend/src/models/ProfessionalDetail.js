@@ -69,6 +69,10 @@ const ProfessionalDetail = sequelize.define(
     // consultations. NULL is treated as "available" so legacy rows remain
     // bookable until the professional explicitly toggles off.
     availableNow: { type: DataTypes.BOOLEAN, allowNull: true },
+    // Professional-controlled flag. When false, the public marketplace +
+    // detail page hide the "Book consultation" CTA. NULL is treated as
+    // "accepting" so existing rows + new signups default to bookable.
+    acceptsOnlineBooking: { type: DataTypes.BOOLEAN, allowNull: true },
     degreeCertificate: { type: DataTypes.STRING, allowNull: true },
     // --- Listing additive columns ----------------------------------------
     rating: { type: DataTypes.DECIMAL(3, 2), allowNull: true, defaultValue: 0 },

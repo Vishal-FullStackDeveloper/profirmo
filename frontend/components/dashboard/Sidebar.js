@@ -24,6 +24,9 @@ import {
   MapPin,
   Inbox,
   TrendingUp,
+  Wallet,
+  ArrowDownToLine,
+  CreditCard,
 } from 'lucide-react';
 import BrandLogo from '@/components/common/BrandLogo';
 import { useLanguage } from '@/components/LanguageProvider';
@@ -52,9 +55,37 @@ const PROFESSIONAL_NAV = [
     icon: CalendarClock,
   },
   {
+    labelKey: 'dash.nav.onlineBookings',
+    href: '/dashboard/professional/availability',
+    icon: CalendarClock,
+  },
+  {
     labelKey: 'dash.nav.myReviews',
     href: '/dashboard/professional/reviews',
     icon: Star,
+  },
+  // Wallet / Payments / Payouts share a single collapsible parent so the
+  // sidebar doesn't grow three entries deep for each money-related view.
+  {
+    labelKey: 'dash.nav.walletGroup',
+    icon: Wallet,
+    children: [
+      {
+        labelKey: 'dash.nav.wallet',
+        href: '/dashboard/professional/wallet',
+        icon: Wallet,
+      },
+      {
+        labelKey: 'dash.nav.payments',
+        href: '/dashboard/professional/payments',
+        icon: CreditCard,
+      },
+      {
+        labelKey: 'dash.nav.payouts',
+        href: '/dashboard/professional/payouts',
+        icon: ArrowDownToLine,
+      },
+    ],
   },
   {
     labelKey: 'dash.nav.myFirm',
@@ -89,6 +120,11 @@ const NAV_BY_ROLE = {
       labelKey: 'dash.nav.myBookings',
       href: '/dashboard/client/bookings',
       icon: CalendarClock,
+    },
+    {
+      labelKey: 'dash.nav.payments',
+      href: '/dashboard/client/payments',
+      icon: CreditCard,
     },
     {
       labelKey: 'dash.nav.findProfessionals',
@@ -204,6 +240,17 @@ const NAV_BY_ROLE = {
       href: '/admin/review-appeals',
       icon: Flag,
     },
+    // Payments + payouts — Razorpay reconciliation and the payout queue.
+    {
+      labelKey: 'dash.nav.payments',
+      href: '/admin/payments',
+      icon: CreditCard,
+    },
+    {
+      labelKey: 'dash.nav.payouts',
+      href: '/admin/payouts',
+      icon: ArrowDownToLine,
+    },
     {
       labelKey: 'dash.nav.auditLogs',
       href: '/admin/audit-logs',
@@ -215,6 +262,11 @@ const NAV_BY_ROLE = {
       labelKey: 'dash.nav.appSettings',
       icon: Settings,
       children: [
+        {
+          labelKey: 'dash.nav.platformSettings',
+          href: '/admin/settings',
+          icon: Settings,
+        },
         {
           labelKey: 'dash.nav.categories',
           href: '/admin/categories',

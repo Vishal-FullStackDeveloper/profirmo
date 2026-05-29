@@ -2,6 +2,9 @@ const express = require('express');
 const adminController = require('../controllers/adminController');
 const appSettings = require('../controllers/appSettingsController');
 const leads = require('../controllers/leadController');
+const adminPayments = require('../controllers/adminPaymentsController');
+const payoutController = require('../controllers/payoutController');
+const adminSettings = require('../controllers/adminSettingsController');
 const { authenticate } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 
@@ -137,5 +140,20 @@ router.get(
 );
 router.post('/opportunities/:id/notes', leads.adminAddOpportunityNote);
 router.post('/opportunities/:id/convert', leads.adminConvertOpportunity);
+
+// --- Payments (Razorpay + escrow) ----------------------------------------
+router.get('/payments', adminPayments.list);
+router.post('/payments/:id/refund', adminPayments.refund);
+
+// --- Platform settings (markup %, etc.) ---------------------------------
+router.get('/settings', adminSettings.list);
+router.patch('/settings/:key', adminSettings.update);
+
+// --- Payouts -------------------------------------------------------------
+router.get('/payouts', payoutController.adminList);
+router.get('/payouts/:id', payoutController.adminGet);
+router.post('/payouts/:id/approve', payoutController.adminApprove);
+router.post('/payouts/:id/reject', payoutController.adminReject);
+router.post('/payouts/:id/paid', payoutController.adminMarkPaid);
 
 module.exports = router;

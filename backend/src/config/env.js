@@ -82,4 +82,16 @@ module.exports = {
   // How long an email-verification token stays valid, in hours.
   emailVerificationExpiryHours:
     Number(process.env.EMAIL_VERIFICATION_EXPIRY_HOURS) || 48,
+
+  // --- Razorpay -----------------------------------------------------------
+  // Server-side credentials for Razorpay Standard Checkout. The KEY_ID is
+  // also exposed to the frontend via NEXT_PUBLIC_RAZORPAY_KEY_ID; the
+  // SECRET must never leave the backend.
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID || '',
+    keySecret: process.env.RAZORPAY_KEY_SECRET || '',
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
+  },
+  // Platform commission in basis points (1 bp = 0.01%). 1000 = 10% cut.
+  platformFeeBps: Number(process.env.PLATFORM_FEE_BPS) || 1000,
 };

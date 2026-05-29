@@ -556,7 +556,9 @@ export default function CaseDetail({ caseId }) {
             <div className="mb-3 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <MessageSquare size={16} className="text-blue-600" />
-                <h3 className="text-sm font-semibold text-slate-900">Notes</h3>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Notes / Messages
+                </h3>
                 {notes.length > 0 && (
                   <span className="text-xs text-slate-400">({notes.length})</span>
                 )}
@@ -576,7 +578,7 @@ export default function CaseDetail({ caseId }) {
                 rows={3}
                 value={noteBody}
                 onChange={(e) => setNoteBody(e.target.value)}
-                placeholder="Add a note for this case…"
+                placeholder="Add a note / message for this case…"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               />
               {/* Attachments uploader — any stakeholder can attach docs/pics. */}
@@ -1114,6 +1116,12 @@ export default function CaseDetail({ caseId }) {
             : data.clientId
               ? [data.clientId]
               : [],
+          // Snapshot of the case's clients keyed by id. Used by the modal
+          // as a fallback so chips render with the right name even when a
+          // client isn't part of the pro's loaded clients list (e.g. a
+          // booking-converted case where no ProfessionalClient link
+          // existed at convert time).
+          clientsSnapshot: Array.isArray(data.clients) ? data.clients : [],
           title: data.title,
           category: data.category,
           description: data.description,

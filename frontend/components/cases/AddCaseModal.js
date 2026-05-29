@@ -131,13 +131,27 @@ export default function AddCaseModal({
 
   const clientById = useMemo(() => {
     const map = new Map();
+    // 1) Snapshot from defaults — used when editing a case whose client
+    //    isn't part of the pro's regular client list (e.g. booking
+    //    converted before the client was properly linked).
+    if (Array.isArray(defaults && defaults.clientsSnapshot)) {
+      for (const c of defaults.clientsSnapshot) {
+        if (c && c.id) map.set(c.id, c);
+      }
+    }
+    // 2) Loaded list — wins over the snapshot (newer data).
     for (const c of clients) map.set(c.id, c);
     return map;
-  }, [clients]);
+  }, [clients, defaults]);
 
-  const selectedClients = form.clientIds
-    .map((id) => clientById.get(id))
-    .filter(Boolean);
+  // Always render a chip per selected id. If the client somehow isn't in
+  // the snapshot OR the loaded list, fall back to a labelled placeholder
+  // so the chip is at least removable and the count stays correct.
+  const selectedClients = form.clientIds.map((id) => {
+    const match = clientById.get(id);
+    if (match) return match;
+    return { id, name: `Client ${String(id).slice(-8)}`, email: '', phone: '' };
+  });
 
   const filteredClients = useMemo(() => {
     const q = clientQuery.trim().toLowerCase();

@@ -59,6 +59,11 @@ const Case = sequelize.define(
     // professional assigned. assignedByUserId records who made the assignment.
     assignedByUserId: { type: DataTypes.STRING(64), allowNull: true },
     assignedAt: { type: DataTypes.DATE, allowNull: true },
+    // Anchors a case back to the booking that produced it. NULL for cases
+    // created manually (firm or admin). Enforced as "one live case per
+    // booking" by the convertBookingToCase controller — deleting the case
+    // clears the row, so the next conversion is free to create another.
+    bookingId: { type: DataTypes.STRING(64), allowNull: true },
   },
   {
     tableName: 'cases',
@@ -69,6 +74,9 @@ const Case = sequelize.define(
       { fields: ['firmId'] },
       { fields: ['status'] },
       { fields: ['category'] },
+      // One live case per booking — see convertBookingToCase. Not unique at
+      // the DB level (NULL is allowed for cases created without a booking).
+      { fields: ['bookingId'] },
     ],
   }
 );

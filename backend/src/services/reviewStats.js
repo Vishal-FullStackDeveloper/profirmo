@@ -2,13 +2,18 @@
 // from the `reviews` table, so listings and profiles always reflect the
 // exact reviews stored in the database (never stale seed counters).
 //
-// Only PUBLISHED reviews count: a review hidden while under appeal does not
-// affect any public rating until an admin resolves the appeal.
+// Filters applied here:
+//   1. status = PUBLISHED         — reviews hidden during appeal don't move
+//                                   the public rating until an admin resolves.
+//   2. kind   = 'professional'    — consultation + client reviews are anchored
+//                                   to specific bookings and must NEVER inflate
+//                                   the public professional / firm rating.
 
 const { fn, col, Op } = require('sequelize');
 const { Review } = require('../models');
 
 const PUBLISHED = 'PUBLISHED';
+const PROFESSIONAL_KIND = 'professional';
 const round1 = (n) => Math.round(n * 10) / 10;
 
 /**
@@ -22,7 +27,11 @@ const getProfessionalStats = async (ids) => {
   if (unique.length === 0) return map;
 
   const rows = await Review.findAll({
-    where: { professionalId: { [Op.in]: unique }, status: PUBLISHED },
+    where: {
+      professionalId: { [Op.in]: unique },
+      status: PUBLISHED,
+      kind: PROFESSIONAL_KIND,
+    },
     attributes: [
       'professionalId',
       [fn('COUNT', col('id')), 'count'],
@@ -60,7 +69,11 @@ const getFirmStatsForGroups = async (groupMap) => {
   if (allProfIds.length === 0) return result;
 
   const rows = await Review.findAll({
-    where: { professionalId: { [Op.in]: allProfIds }, status: PUBLISHED },
+    where: {
+      professionalId: { [Op.in]: allProfIds },
+      status: PUBLISHED,
+      kind: PROFESSIONAL_KIND,
+    },
     attributes: ['professionalId', 'rating'],
     raw: true,
   });

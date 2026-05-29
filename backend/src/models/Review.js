@@ -42,6 +42,19 @@ const Review = sequelize.define(
       allowNull: false,
       defaultValue: 'PUBLISHED',
     },
+    // Review type. Legacy rows are 'professional' (client → professional).
+    // 'consultation' is the client → booking experience.
+    // 'client' is the professional → client (post-engagement feedback).
+    kind: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'professional',
+    },
+    // Optional pointer to the booking the review is anchored to. NULL for
+    // legacy 'professional' reviews left from the public profile page.
+    bookingId: { type: DataTypes.STRING(64), allowNull: true },
+    // For kind='client', the users.id of the client being reviewed.
+    reviewedUserId: { type: DataTypes.STRING(64), allowNull: true },
   },
   {
     tableName: 'reviews',
@@ -51,6 +64,9 @@ const Review = sequelize.define(
       { fields: ['clientId'] },
       { fields: ['professionalId'] },
       { fields: ['status'] },
+      { fields: ['kind'] },
+      { fields: ['bookingId'] },
+      { fields: ['reviewedUserId'] },
     ],
   }
 );

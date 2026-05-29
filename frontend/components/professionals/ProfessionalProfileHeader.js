@@ -48,6 +48,7 @@ export default function ProfessionalProfileHeader({ professional }) {
     consultationFee,
     availableNow,
     verified,
+    acceptsOnlineBooking,
     lawyer,
     tax,
     // New unified fields from the 3-step signup.
@@ -275,17 +276,25 @@ export default function ProfessionalProfileHeader({ professional }) {
           <p className="mt-1 text-2xl font-bold text-slate-900">
             {formatCurrency(consultationFee)}
           </p>
-          <Button
-            href={`/booking/${id}`}
-            variant="primary"
-            size="md"
-            className="mt-4 w-full"
-          >
-            {t('profCmp.bookConsultation')}
-          </Button>
-          <p className="mt-2 text-xs text-slate-400">
-            {t('profCmp.payOnlyMinutes')}
-          </p>
+          {acceptsOnlineBooking !== false ? (
+            <>
+              <Button
+                href={`/booking/${id}`}
+                variant="primary"
+                size="md"
+                className="mt-4 w-full"
+              >
+                {t('profCmp.bookConsultation')}
+              </Button>
+              <p className="mt-2 text-xs text-slate-400">
+                {t('profCmp.payOnlyMinutes')}
+              </p>
+            </>
+          ) : (
+            <p className="mt-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+              {t('profCmp.bookingsClosed')}
+            </p>
+          )}
         </div>
       </div>
     </Card>

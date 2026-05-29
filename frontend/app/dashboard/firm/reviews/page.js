@@ -1,22 +1,43 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import FirmReviews from '@/components/firms/FirmReviews';
 import EmptyState from '@/components/common/EmptyState';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
-import { useAuth } from '@/hooks/useAuth';
 import { ROLES } from '@/utils/constants';
 import reviewService from '@/services/reviewService';
+import { getLawFirmReviews } from '@/services/profileService';
 
 export default function FirmReviewsPage() {
-  const { user } = useAuth();
-  const firmId = user ? user.linkedId || user.firmId : undefined;
+  // Resolve the firm server-side. Firm-owner pro users have linkedId =
+  // ProfessionalDetail.id and firmId = null on their JWT, so the
+  // frontend can't derive the firm id from `user`. The API resolves it
+  // from req.user.id via the firm context.
+  const [firmId, setFirmId] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Force a remount of <FirmReviews> after a successful appeal to refresh.
-  const [reloadKey, setReloadKey] = useState(0);
+  const loadFirmReviews = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await getLawFirmReviews();
+      setFirmId(result && result.firmId ? result.firmId : null);
+      setReviews(Array.isArray(result && result.items) ? result.items : []);
+    } catch {
+      setFirmId(null);
+      setReviews([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFirmReviews();
+  }, [loadFirmReviews]);
+
   const [target, setTarget] = useState(null);
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -48,7 +69,7 @@ export default function FirmReviewsPage() {
       await reviewService.appealOnBehalf(target.id, trimmed);
       setTarget(null);
       setReason('');
-      setReloadKey((k) => k + 1);
+      await loadFirmReviews();
     } catch (err) {
       setError(
         err.message ||
@@ -65,10 +86,11 @@ export default function FirmReviewsPage() {
       title="Reviews"
       subtitle="What clients say about your firm's professionals"
     >
-      {firmId ? (
+      {loading || firmId ? (
         <FirmReviews
-          key={reloadKey}
           firmId={firmId}
+          reviews={reviews}
+          loading={loading}
           onAppeal={openAppeal}
         />
       ) : (

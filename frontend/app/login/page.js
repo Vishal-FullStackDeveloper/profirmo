@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertCircle,
   ArrowRight,
@@ -18,8 +18,20 @@ import { useAuth } from '@/components/AuthProvider';
 import { resendVerification } from '@/services/authService';
 import { validateForm, loginRules } from '@/utils/validators';
 
-export default function LoginPage() {
+// Only same-origin paths are honoured as a post-login redirect target — the
+// `next` query param could otherwise be used to redirect users to a phishing
+// site. We require a leading "/" and reject "//" (protocol-relative URLs).
+function safeNext(raw) {
+  if (typeof raw !== 'string') return null;
+  if (!raw.startsWith('/')) return null;
+  if (raw.startsWith('//')) return null;
+  return raw;
+}
+
+function LoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = safeNext(searchParams.get('next')) || '/dashboard';
   const { login, isAuthenticated, loading } = useAuth();
   const [values, setValues] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
@@ -34,12 +46,13 @@ export default function LoginPage() {
   const [resendError, setResendError] = useState('');
   const [resending, setResending] = useState(false);
 
-  // Already signed in — go straight to the dashboard.
+  // Already signed in — go straight to the post-login destination
+  // (preserves `?next=` so deep links keep working).
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      router.replace('/dashboard');
+      router.replace(nextPath);
     }
-  }, [loading, isAuthenticated, router]);
+  }, [loading, isAuthenticated, router, nextPath]);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -84,7 +97,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(values.email.trim(), values.password);
-      router.push('/dashboard');
+      router.push(nextPath);
     } catch (err) {
       if (isPendingApprovalError(err)) {
         setPendingApproval(true);
@@ -321,5 +334,14 @@ export default function LoginPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+// useSearchParams() requires a Suspense boundary in app-router pages.
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginInner />
+    </Suspense>
   );
 }

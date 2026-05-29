@@ -3,12 +3,23 @@ const asyncHandler = require('../utils/asyncHandler');
 const { successResponse } = require('../utils/responseHandler');
 
 // POST /api/reviews  (authenticated — any signed-in user)
+//
+// Body accepts the full review spec — `kind` selects between the three
+// review types (`professional` | `consultation` | `client`), with the
+// matching anchor field required per kind. The previous version only
+// forwarded { professionalId, rating, comment }, so EVERY request fell
+// through to the default `kind='professional'` branch — which is why
+// the pro hit "You cannot review your own profile" when leaving a
+// consultation review on their own booking.
 const createReview = asyncHandler(async (req, res) => {
   const review = await reviewService.create({
     user: req.user,
     professionalId: req.body.professionalId,
     rating: req.body.rating,
     comment: req.body.comment,
+    kind: req.body.kind,
+    bookingId: req.body.bookingId,
+    reviewedUserId: req.body.reviewedUserId,
   });
   return successResponse(res, 201, 'Review submitted', review);
 });

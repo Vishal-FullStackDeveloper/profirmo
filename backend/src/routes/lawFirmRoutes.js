@@ -13,6 +13,8 @@ router.use(authenticate);
 router.get('/mine', lawFirmController.getMyFirm);
 router.get('/mine/members', lawFirmController.getMembers);
 router.get('/mine/clients', lawFirmController.getFirmClients);
+router.get('/mine/payments', lawFirmController.getFirmPayments);
+router.get('/mine/reviews', lawFirmController.getFirmReviews);
 router.get('/mine/leads', lawFirmController.getMyFirmLeads);
 router.post(
   '/mine/leads/:leadId/add-client',

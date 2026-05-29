@@ -39,6 +39,9 @@ const Booking = sequelize.define(
       allowNull: false,
       defaultValue: 'pending',
     },
+    // Anchor for the 5-day review + escrow-release window. Set when the
+    // booking is flipped to 'completed' by the professional.
+    completedAt: { type: DataTypes.DATE, allowNull: true },
   },
   {
     tableName: 'bookings',

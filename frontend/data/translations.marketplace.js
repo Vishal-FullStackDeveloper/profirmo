@@ -94,6 +94,8 @@ export const translations = {
     'profCmp.yrsExp': '{count} yrs exp',
     'profCmp.yearsExperience': '{count} years experience',
     'profCmp.consultationRate': 'Consultation fee / min',
+    'profCmp.bookingsClosed':
+      'This professional is not accepting online bookings right now.',
     'profCmp.availableNow': 'Available now',
     'profCmp.offline': 'Offline',
     'profCmp.viewProfile': 'View profile',
@@ -140,6 +142,12 @@ export const translations = {
     'profCmp.yourRating': 'Your rating',
     'profCmp.yourReview': 'Your review',
     'profCmp.reviewPlaceholder': 'Share your experience with this professional…',
+    'profCmp.consultationReviewLabel': 'Your review of this consultation',
+    'profCmp.consultationReviewPlaceholder':
+      'How was the consultation? Was it useful, on time, well prepared?',
+    'profCmp.clientReviewLabel': 'Your review of this client',
+    'profCmp.clientReviewPlaceholder':
+      'Share your experience working with this client…',
     'profCmp.submitReview': 'Submit review',
     'profCmp.submitting': 'Submitting…',
     'profCmp.cancel': 'Cancel',
@@ -259,6 +267,8 @@ export const translations = {
     'profCmp.yrsExp': '{count} वर्ष अनुभव',
     'profCmp.yearsExperience': '{count} वर्ष का अनुभव',
     'profCmp.consultationRate': 'परामर्श शुल्क / मिनट',
+    'profCmp.bookingsClosed':
+      'यह प्रोफेशनल अभी ऑनलाइन बुकिंग स्वीकार नहीं कर रहा है।',
     'profCmp.availableNow': 'अभी उपलब्ध',
     'profCmp.offline': 'ऑफ़लाइन',
     'profCmp.viewProfile': 'प्रोफ़ाइल देखें',
@@ -305,6 +315,12 @@ export const translations = {
     'profCmp.yourRating': 'आपकी रेटिंग',
     'profCmp.yourReview': 'आपका रिव्यू',
     'profCmp.reviewPlaceholder': 'इस प्रोफेशनल के साथ अपना अनुभव साझा करें…',
+    'profCmp.consultationReviewLabel': 'इस कंसल्टेशन का आपका रिव्यू',
+    'profCmp.consultationReviewPlaceholder':
+      'कंसल्टेशन कैसा रहा? क्या यह उपयोगी, समय पर और अच्छी तैयारी के साथ था?',
+    'profCmp.clientReviewLabel': 'इस क्लाइंट का आपका रिव्यू',
+    'profCmp.clientReviewPlaceholder':
+      'इस क्लाइंट के साथ काम करने का अपना अनुभव साझा करें…',
     'profCmp.submitReview': 'रिव्यू सबमिट करें',
     'profCmp.submitting': 'सबमिट हो रहा है…',
     'profCmp.cancel': 'रद्द करें',

@@ -13,8 +13,6 @@ import {
   LogOut,
   Mail,
   CalendarDays,
-  Building2,
-  Inbox,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { formatDate, slugify } from '@/utils/formatters';
@@ -65,15 +63,9 @@ function buildMenuActions(user) {
   ];
 }
 
-// Firm management actions — shown for professional-type roles. Harmless
-// elsewhere (the pages themselves guard access).
-const FIRM_ACTIONS = [
-  { label: 'My Firm', href: '/firm', icon: Building2 },
-  { label: 'Firm Invitations', href: '/invitations', icon: Inbox },
-];
-
-// Roles that can own, join or be invited to a firm.
-const FIRM_ROLES = ['professional', 'firm'];
+// Firm management actions used to live here; they were removed because the
+// firm dashboard sidebar already exposes My Firm / Invitations as full
+// menu items. Keeping them in the profile pop-over duplicated navigation.
 
 export default function ProfileDropdown({ className = '' }) {
   const { user, logout } = useAuth();
@@ -109,7 +101,9 @@ export default function ProfileDropdown({ className = '' }) {
     [user.firstName, user.lastName].filter(Boolean).join(' ') ||
     'Account';
   const firstName = user.firstName || fullName.split(/\s+/)[0];
-  const showFirmActions = FIRM_ROLES.includes(user.role);
+  // Kept as a stub so the surrounding JSX still has the variable in scope.
+  // The dropdown no longer shows firm-related quick links.
+  const showFirmActions = false;
   const menuActions = buildMenuActions(user);
 
   async function handleLogout() {
@@ -212,27 +206,6 @@ export default function ProfileDropdown({ className = '' }) {
                 </Link>
               );
             })}
-
-            {showFirmActions && (
-              <>
-                <div className="my-1.5 h-px bg-slate-200/80" />
-                {FIRM_ACTIONS.map((action) => {
-                  const Icon = action.icon;
-                  return (
-                    <Link
-                      key={action.label}
-                      href={action.href}
-                      role="menuitem"
-                      onClick={close}
-                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-teal-50 hover:text-teal-700"
-                    >
-                      <Icon className="h-4 w-4 text-slate-400" />
-                      {action.label}
-                    </Link>
-                  );
-                })}
-              </>
-            )}
 
             <div className="my-1.5 h-px bg-slate-200/80" />
 

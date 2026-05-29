@@ -40,6 +40,12 @@ export const translations = {
     'bookingPage.duration': 'Duration',
     'bookingPage.durationMinutes': '{count} minutes',
     'bookingPage.amountPaid': 'Amount paid',
+    'bookingPage.signInToContinueTitle': 'Sign in to continue',
+    'bookingPage.signInToContinueDesc':
+      "We'll bring you back to this booking after sign-in.",
+    'bookingPage.signInCta': 'Sign in to pay',
+    'bookingPage.signInNoAccount': "Don't have an account?",
+    'bookingPage.signUpCta': 'Sign up',
 
     // bookCmp.*
     'bookCmp.today': 'Today',
@@ -64,6 +70,12 @@ export const translations = {
     'bookCmp.amountDue': 'Amount due',
     'bookCmp.processing': 'Processing…',
     'bookCmp.pay': 'Pay {amount}',
+    'bookCmp.payWithRazorpay': 'Pay {amount} with Razorpay',
+    'bookCmp.razorpaySecure':
+      '256-bit SSL secured by Razorpay — UPI, cards, netbanking and wallets.',
+    'bookCmp.razorpayHeldInEscrow':
+      'Funds are held in escrow until your consultation is complete.',
+    'bookCmp.razorpayPoweredBy': 'Powered by Razorpay',
     'bookCmp.paymentPlaceholder':
       'Payment gateway integration placeholder — no real charge is made.',
 
@@ -157,6 +169,12 @@ export const translations = {
     'bookingPage.duration': 'अवधि',
     'bookingPage.durationMinutes': '{count} मिनट',
     'bookingPage.amountPaid': 'भुगतान की गई राशि',
+    'bookingPage.signInToContinueTitle': 'जारी रखने के लिए साइन इन करें',
+    'bookingPage.signInToContinueDesc':
+      'साइन इन के बाद हम आपको इसी बुकिंग पर वापस लाएंगे।',
+    'bookingPage.signInCta': 'भुगतान के लिए साइन इन करें',
+    'bookingPage.signInNoAccount': 'खाता नहीं है?',
+    'bookingPage.signUpCta': 'साइन अप करें',
 
     // bookCmp.*
     'bookCmp.today': 'आज',
@@ -181,6 +199,12 @@ export const translations = {
     'bookCmp.amountDue': 'देय राशि',
     'bookCmp.processing': 'प्रोसेस हो रहा है…',
     'bookCmp.pay': '{amount} का भुगतान करें',
+    'bookCmp.payWithRazorpay': 'Razorpay से {amount} का भुगतान करें',
+    'bookCmp.razorpaySecure':
+      'Razorpay द्वारा 256-बिट SSL सुरक्षित — UPI, कार्ड, नेटबैंकिंग और वॉलेट।',
+    'bookCmp.razorpayHeldInEscrow':
+      'आपकी कंसल्टेशन पूरी होने तक राशि एस्क्रो में रखी जाती है।',
+    'bookCmp.razorpayPoweredBy': 'Razorpay द्वारा संचालित',
     'bookCmp.paymentPlaceholder':
       'भुगतान गेटवे एकीकरण प्लेसहोल्डर — कोई वास्तविक शुल्क नहीं लिया जाता।',
 

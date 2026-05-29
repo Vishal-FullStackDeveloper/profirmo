@@ -200,7 +200,8 @@ const listMineAsClient = async (user) => {
     order: [['createdAt', 'DESC']],
     raw: true,
   });
-  return attachConsultations(rows);
+  const decorated = await attachConsultations(rows);
+  return attachProfessionalSnapshot(decorated);
 };
 
 /**
@@ -223,8 +224,111 @@ const listMineAsProfessional = async (user) => {
     order: [['createdAt', 'DESC']],
     raw: true,
   });
-  return attachConsultations(rows);
+  const decorated = await attachConsultations(rows);
+  return attachClientSnapshot(decorated);
 };
+
+/**
+ * Decorate each booking with a `professional` snapshot (name + contact +
+ * photo) so the client listing can render names instead of raw ids and the
+ * connect chips have something to link to.
+ */
+async function attachProfessionalSnapshot(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows;
+  const proIds = [...new Set(rows.map((r) => r.professionalId).filter(Boolean))];
+  if (proIds.length === 0) return rows;
+
+  // 1. New-model: look up ProfessionalDetail directly.
+  const details = await ProfessionalDetail.findAll({
+    where: { id: { [Op.in]: proIds } },
+    raw: true,
+  });
+  const detailById = new Map(details.map((d) => [d.id, d]));
+  const detailUserIds = details.map((d) => d.userId).filter(Boolean);
+
+  // 2. Legacy: a User row with linkedId pointing at the professional id.
+  const linkedUsers = await User.findAll({
+    where: { linkedId: { [Op.in]: proIds } },
+    raw: true,
+  });
+  const userByLinked = new Map(
+    linkedUsers.map((u) => [u.linkedId, u])
+  );
+
+  const allUserIds = [
+    ...new Set([
+      ...detailUserIds,
+      ...linkedUsers.map((u) => u.id),
+    ]),
+  ];
+  const users = allUserIds.length
+    ? await User.findAll({
+        where: { id: { [Op.in]: allUserIds } },
+        raw: true,
+      })
+    : [];
+  const userById = new Map(users.map((u) => [u.id, u]));
+
+  const buildSnap = (proId) => {
+    if (!proId) return null;
+    const detail = detailById.get(proId);
+    const user = detail
+      ? userById.get(detail.userId)
+      : userByLinked.get(proId);
+    if (!user && !detail) return null;
+    return {
+      id: proId,
+      name:
+        (user && (user.fullName || [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.name)) ||
+        'Professional',
+      email: user ? user.email || null : null,
+      phone: user ? user.mobileNumber || null : null,
+      profilePhoto: user ? user.profilePhoto || null : null,
+      designation: detail ? detail.designation || null : null,
+      professionalType: detail ? detail.professionalType || null : null,
+    };
+  };
+
+  return rows.map((r) => ({
+    ...r,
+    professional: buildSnap(r.professionalId),
+  }));
+}
+
+/**
+ * Decorate each booking with a `client` snapshot (name + contact + photo)
+ * so the professional listing renders human-readable names and the connect
+ * chips work both ways.
+ */
+async function attachClientSnapshot(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows;
+  const ids = [...new Set(rows.map((r) => r.clientId).filter(Boolean))];
+  if (ids.length === 0) return rows;
+  const users = await User.findAll({
+    where: { id: { [Op.in]: ids } },
+    raw: true,
+  });
+  const byId = new Map(users.map((u) => [u.id, u]));
+  return rows.map((r) => {
+    const u = r.clientId ? byId.get(r.clientId) : null;
+    return {
+      ...r,
+      client: u
+        ? {
+            id: u.id,
+            name:
+              u.fullName ||
+              [u.firstName, u.lastName].filter(Boolean).join(' ').trim() ||
+              u.name ||
+              'Client',
+            email: u.email || null,
+            phone: u.mobileNumber || null,
+            profilePhoto: u.profilePhoto || null,
+          }
+        : null,
+    };
+  });
+}
 
 /** Update a booking's status. Returns null when the booking is not found. */
 const updateStatus = async (id, status) => {
@@ -236,7 +340,26 @@ const updateStatus = async (id, status) => {
   }
   const booking = await Booking.findByPk(id);
   if (!booking) return null;
-  await booking.update({ status });
+  // Stamp completedAt the first time we transition into 'completed' so the
+  // 5-day review + auto-release window has a stable anchor. Re-marking an
+  // already-completed booking keeps the original timestamp.
+  const patch = { status };
+  if (status === 'completed' && !booking.completedAt) {
+    patch.completedAt = new Date();
+  }
+  await booking.update(patch);
+  // When a consultation is marked completed, flip the escrow entry so it
+  // moves from "escrowed" to "awaiting_review". The escrow then releases
+  // once the client posts their review (see reviewService) — or, after the
+  // 5-day window, automatically via bookingDetailService.
+  if (status === 'completed') {
+    try {
+      const walletService = require('./walletService');
+      await walletService.onBookingCompleted(id);
+    } catch (err) {
+      console.warn(`[bookingService] escrow lifecycle hook failed: ${err.message}`);
+    }
+  }
   return booking.get({ plain: true });
 };
 

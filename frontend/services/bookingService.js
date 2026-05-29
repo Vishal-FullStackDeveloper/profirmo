@@ -57,6 +57,36 @@ export function getByProfessional(professionalId) {
   return get(`${BASE}/professional/${professionalId}`);
 }
 
+/** Booking detail payload: booking + professional + notes + review. */
+export async function getDetail(id) {
+  const res = await get(`${BASE}/${id}/detail`);
+  return unwrap(res);
+}
+
+/**
+ * Append a note/message to the booking. Accepts either:
+ *   addNote(id, "free text")
+ * or
+ *   addNote(id, { body, attachments })
+ */
+export async function addNote(id, payload) {
+  const body =
+    typeof payload === 'string'
+      ? { body: payload, attachments: [] }
+      : {
+          body: (payload && payload.body) || '',
+          attachments: (payload && payload.attachments) || [],
+        };
+  const res = await post(`${BASE}/${id}/notes`, body);
+  return unwrap(res);
+}
+
+/** Pro-only: convert the booking into a case carrying the notes over. */
+export async function convertToCase(id, payload = {}) {
+  const res = await post(`${BASE}/${id}/convert-to-case`, payload);
+  return unwrap(res);
+}
+
 export default {
   getAll,
   getById,
@@ -66,4 +96,7 @@ export default {
   updateStatus,
   getByClient,
   getByProfessional,
+  getDetail,
+  addNote,
+  convertToCase,
 };

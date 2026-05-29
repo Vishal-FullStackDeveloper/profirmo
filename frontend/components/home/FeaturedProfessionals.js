@@ -168,25 +168,42 @@ export default function FeaturedProfessionals() {
                       {t('profCmp.noReviewYet')}
                     </span>
                   )}
-                  <span className="text-sm font-semibold text-slate-900">
+                  <span className="text-right text-sm font-semibold text-slate-900">
                     {formatCurrency(pro.consultationFee)}
+                    <span className="ml-1 text-xs font-normal text-slate-500">
+                      / min
+                    </span>
                   </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <Link
-                    href={`/professionals/${pro.id}`}
-                    className="rounded-xl border border-slate-200 px-3 py-2.5 text-center text-sm font-semibold text-slate-700 transition hover:border-teal-300 hover:text-teal-700"
-                  >
-                    {t('featuredProfessionals.viewProfile')}
-                  </Link>
-                  <Link
-                    href={`/professionals/${pro.id}`}
-                    className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-glow-sm transition hover:shadow-glow"
-                  >
-                    {t('featuredProfessionals.book')}
-                  </Link>
-                </div>
+                {/* The Book CTA is hidden when the professional has paused
+                    online bookings — the View profile link stretches to
+                    full width in that case. */}
+                {pro.acceptsOnlineBooking !== false ? (
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <Link
+                      href={`/professionals/${pro.id}`}
+                      className="rounded-xl border border-slate-200 px-3 py-2.5 text-center text-sm font-semibold text-slate-700 transition hover:border-teal-300 hover:text-teal-700"
+                    >
+                      {t('featuredProfessionals.viewProfile')}
+                    </Link>
+                    <Link
+                      href={`/booking/${pro.id}`}
+                      className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-glow-sm transition hover:shadow-glow"
+                    >
+                      {t('featuredProfessionals.book')}
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="mt-4">
+                    <Link
+                      href={`/professionals/${pro.id}`}
+                      className="block w-full rounded-xl border border-slate-200 px-3 py-2.5 text-center text-sm font-semibold text-slate-700 transition hover:border-teal-300 hover:text-teal-700"
+                    >
+                      {t('featuredProfessionals.viewProfile')}
+                    </Link>
+                  </div>
+                )}
               </div>
             ))}
           </div>

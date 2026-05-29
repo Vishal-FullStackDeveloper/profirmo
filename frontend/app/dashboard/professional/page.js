@@ -5,6 +5,7 @@ import { Briefcase, CheckCircle2, Users, Star } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import StatsCard from '@/components/dashboard/StatsCard';
 import AvailabilityManager from '@/components/dashboard/AvailabilityManager';
+import OnlineBookingToggle from '@/components/dashboard/OnlineBookingToggle';
 import Card from '@/components/common/Card';
 import { useLanguage } from '@/components/LanguageProvider';
 import { useAuth } from '@/hooks/useAuth';
@@ -130,6 +131,9 @@ export default function ProfessionalDashboardPage() {
             />
           </div>
         </Card>
+
+        {/* Pause / resume online bookings */}
+        <OnlineBookingToggle compact />
 
         {/* Availability */}
         <AvailabilityManager

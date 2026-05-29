@@ -105,6 +105,9 @@ const PROFESSIONAL_DETAIL_FIELDS = [
   // them via GET /api/professionals/:id without a second query.
   'availability',
   'availableNow',
+  // Professional's on/off switch for accepting new bookings. When false the
+  // marketplace + detail page hide the Book CTA. NULL counts as "on".
+  'acceptsOnlineBooking',
   'consultationFee',
   // Admin-managed taxonomy: array of SubCategory.id values. The parent
   // Category is inferred from sub_categories.categoryId.

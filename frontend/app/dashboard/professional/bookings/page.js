@@ -7,13 +7,15 @@ import {
   AlertTriangle,
   Check,
   X,
-  Video,
+  Eye,
 } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import Badge from '@/components/common/Badge';
+import Avatar from '@/components/common/Avatar';
 import EmptyState from '@/components/common/EmptyState';
+import ConnectChips from '@/components/booking/ConnectChips';
 import bookingService from '@/services/bookingService';
 import { ROLES } from '@/utils/constants';
 import { formatDate, formatTime, formatCurrency } from '@/utils/formatters';
@@ -134,14 +136,31 @@ export default function ProfessionalBookingsPage() {
                   <th className="px-4 py-3 font-semibold">Duration</th>
                   <th className="px-4 py-3 font-semibold">Est. cost</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Connect</th>
                   <th className="px-4 py-3 font-semibold text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {bookings.map((b) => (
                   <tr key={b.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 text-slate-600">
-                      {b.clientId || '—'}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          src={b.client && b.client.profilePhoto}
+                          name={(b.client && b.client.name) || ''}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-800">
+                            {(b.client && b.client.name) || '—'}
+                          </p>
+                          {b.client && b.client.email && (
+                            <p className="truncate text-xs text-slate-500">
+                              {b.client.email}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-slate-600 capitalize">
                       {b.type || '—'}
@@ -168,6 +187,19 @@ export default function ProfessionalBookingsPage() {
                         {b.status || 'pending'}
                       </Badge>
                     </td>
+                    <td className="px-4 py-3">
+                      {b.client ? (
+                        <ConnectChips
+                          phone={b.client.phone}
+                          email={b.client.email}
+                          waMessage={`Hi ${b.client.name}, this is about your Profirmo booking.`}
+                          emailSubject={`Profirmo booking ${b.id.slice(-8)}`}
+                          size="sm"
+                        />
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
                         {b.status === 'pending' && (
@@ -177,45 +209,44 @@ export default function ProfessionalBookingsPage() {
                               variant="primary"
                               disabled={updatingId === b.id}
                               onClick={() => handleStatus(b.id, 'confirmed')}
+                              title="Confirm"
+                              aria-label="Confirm"
                             >
                               <Check size={15} />
-                              Confirm
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
                               disabled={updatingId === b.id}
                               onClick={() => handleStatus(b.id, 'cancelled')}
+                              title="Decline"
+                              aria-label="Decline"
                             >
                               <X size={15} />
-                              Decline
                             </Button>
                           </>
                         )}
-                        {b.consultationId &&
-                          b.status !== 'cancelled' &&
-                          b.callStatus !== 'ended' &&
-                          b.status !== 'pending' && (
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              href={`/consultation/${b.consultationId}`}
-                            >
-                              <Video size={15} />
-                              Join call
-                            </Button>
-                          )}
                         {b.status === 'confirmed' && (
                           <Button
                             size="sm"
                             variant="outline"
                             disabled={updatingId === b.id}
                             onClick={() => handleStatus(b.id, 'completed')}
+                            title="Mark complete"
+                            aria-label="Mark complete"
                           >
                             <Check size={15} />
-                            Mark complete
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          href={`/dashboard/professional/bookings/${b.id}`}
+                          title="Details"
+                          aria-label="Details"
+                        >
+                          <Eye size={15} />
+                        </Button>
                       </div>
                     </td>
                   </tr>

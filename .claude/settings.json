@@ -71,7 +71,8 @@
       "Bash(curl -s http://localhost:4000/api/app-settings/locations)",
       "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" http://localhost:4000/api/app-settings/locations)",
       "Bash(lsof -iTCP -sTCP:LISTEN -P -n)",
-      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" http://localhost:5001/api/health)"
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" http://localhost:5001/api/health)",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" http://localhost:5001/api/app-settings/locations -o /dev/null)"
     ]
   }
 }

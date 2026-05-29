@@ -40,7 +40,10 @@ export default function ProfessionalCard({ professional }) {
     bio,
     languages,
     consultancyType,
+    acceptsOnlineBooking,
   } = professional;
+  // Default true: a missing/legacy flag still shows the Book CTA.
+  const bookingAllowed = acceptsOnlineBooking !== false;
 
   // Friendly label for the consultancyType enum.
   const consultancyLabel =
@@ -204,18 +207,20 @@ export default function ProfessionalCard({ professional }) {
           }`}
           variant="outline"
           size="sm"
-          className="flex-1"
+          className={bookingAllowed ? 'flex-1' : 'w-full'}
         >
           {t('profCmp.viewProfile')}
         </Button>
-        <Button
-          href={`/booking/${id}`}
-          variant="primary"
-          size="sm"
-          className="flex-1"
-        >
-          {t('profCmp.bookNow')}
-        </Button>
+        {bookingAllowed && (
+          <Button
+            href={`/booking/${id}`}
+            variant="primary"
+            size="sm"
+            className="flex-1"
+          >
+            {t('profCmp.bookNow')}
+          </Button>
+        )}
       </div>
     </Card>
   );

@@ -24,6 +24,9 @@ const CATEGORIES = [
   'firm_registration',
   'business_license',
   'tax_document',
+  // Attachments dropped on booking notes + case notes by either side.
+  'booking_note',
+  'case_note',
   'other',
 ];
 

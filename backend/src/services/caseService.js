@@ -350,6 +350,10 @@ const create = async (data = {}, actor = null) => {
         ? actor.id
         : data.assignedByUserId || null,
     assignedAt: primaryProfessionalId ? new Date() : null,
+    // Optional back-link to the booking that produced this case. Set by
+    // the convert-to-case flow so a second conversion attempt can be
+    // deduped + redirected to the existing case.
+    bookingId: data.bookingId || null,
   });
 
   if (Array.isArray(data.files) && data.files.length > 0) {

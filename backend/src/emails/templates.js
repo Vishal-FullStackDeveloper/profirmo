@@ -888,6 +888,54 @@ const TEMPLATES = {
 
     return { subject, html, text };
   },
+
+  /**
+   * Payment receipt sent to the client after a successful Razorpay payment.
+   * vars: { amount, bookingId, paymentId }
+   */
+  paymentReceipt(vars = {}) {
+    const amount = vars.amount || '0.00';
+    const bookingId = vars.bookingId || '—';
+    const paymentId = vars.paymentId || '—';
+    const subject = 'Payment received — your booking is confirmed';
+    const html = layout(
+      subject,
+      `
+      <h1 style="margin:0 0 16px;font-size:20px;color:#111827;">Thank you for your payment</h1>
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.6;">
+        We have received your payment of
+        <strong>₹${esc(amount)}</strong>. Your consultation booking
+        is now confirmed.
+      </p>
+      <h2 style="margin:24px 0 8px;font-size:14px;color:#111827;">Receipt</h2>
+      <table cellpadding="0" cellspacing="0" style="margin:0 0 16px;font-size:14px;">
+        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;">Amount paid</td><td style="padding:4px 0;">₹${esc(amount)}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;">Booking ID</td><td style="padding:4px 0;font-family:monospace;font-size:12px;">${esc(bookingId)}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;">Payment ID</td><td style="padding:4px 0;font-family:monospace;font-size:12px;">${esc(paymentId)}</td></tr>
+      </table>
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#6b7280;">
+        Your payment is held in escrow until the consultation is completed
+        and you have submitted a review — this protects both you and the
+        professional.
+      </p>
+      <p style="margin:0;font-size:14px;line-height:1.6;">
+        The Profirmo Team
+      </p>`
+    );
+    const text = [
+      'Payment received — booking confirmed.',
+      '',
+      `Amount paid: ₹${amount}`,
+      `Booking ID: ${bookingId}`,
+      `Payment ID: ${paymentId}`,
+      '',
+      'Funds are held in escrow until the consultation is completed and',
+      'you submit a review.',
+      '',
+      'The Profirmo Team',
+    ].join('\n');
+    return { subject, html, text };
+  },
 };
 
 /**

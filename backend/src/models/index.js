@@ -70,6 +70,18 @@ const Lead = require('./Lead');
 const Opportunity = require('./Opportunity');
 const LeadActivity = require('./LeadActivity');
 
+// --- Payment domain: Razorpay + escrow + wallet + payouts -----------------
+const Payment = require('./Payment');
+const EscrowEntry = require('./EscrowEntry');
+const WalletTransaction = require('./WalletTransaction');
+const PayoutRequest = require('./PayoutRequest');
+
+// --- Booking notes (client + pro free-text on each booking) ---------------
+const BookingNote = require('./BookingNote');
+
+// --- Admin-managed platform settings (markup %, etc.) ---------------------
+const AdminSetting = require('./AdminSetting');
+
 // Optional relationship — clearing the parent nulls the foreign key.
 const fkSetNull = (foreignKey) => ({
   foreignKey,
@@ -226,6 +238,34 @@ FirmInvitation.belongsTo(LawFirm, fkCascade('firmId'));
 LawFirm.hasMany(FirmJoinRequest, fkCascade('firmId'));
 FirmJoinRequest.belongsTo(LawFirm, fkCascade('firmId'));
 
+// --- Payment domain --------------------------------------------------------
+// Bookings → Payments (one-to-many: a booking can have a retried payment).
+Booking.hasMany(Payment, fkSetNull('bookingId'));
+Payment.belongsTo(Booking, fkSetNull('bookingId'));
+
+// Payer → Payments (client). Cascade the payments off if the user is wiped.
+User.hasMany(Payment, fkCascade('userId'));
+Payment.belongsTo(User, fkCascade('userId'));
+
+// One escrow row per Payment.
+Payment.hasOne(EscrowEntry, fkCascade('paymentId'));
+EscrowEntry.belongsTo(Payment, fkCascade('paymentId'));
+
+// Wallet entries reference the professional whose wallet they belong to.
+// Use CASCADE so a deleted pro doesn't leave orphan ledger rows.
+User.hasMany(WalletTransaction, fkCascade('walletUserId'));
+WalletTransaction.belongsTo(User, fkCascade('walletUserId'));
+
+// Payout requests belong to the requesting professional.
+User.hasMany(PayoutRequest, fkCascade('professionalUserId'));
+PayoutRequest.belongsTo(User, fkCascade('professionalUserId'));
+
+// Booking notes cascade off the parent booking + author.
+Booking.hasMany(BookingNote, fkCascade('bookingId'));
+BookingNote.belongsTo(Booking, fkCascade('bookingId'));
+User.hasMany(BookingNote, fkCascade('authorUserId'));
+BookingNote.belongsTo(User, fkCascade('authorUserId'));
+
 // --- JSON normalization ----------------------------------------------------
 // MariaDB exposes JSON columns as LONGTEXT, so the driver returns them as raw
 // strings; `raw: true` queries also bypass model getters. This afterFind hook
@@ -305,6 +345,9 @@ LawFirm.addHook(
 Case.addHook('afterFind', jsonParser(['clientIds', 'professionalIds']));
 CaseUpdate.addHook('afterFind', jsonParser(['attachments']));
 CaseNote.addHook('afterFind', jsonParser(['attachments']));
+Payment.addHook('afterFind', jsonParser(['rawOrder', 'rawPayment']));
+WalletTransaction.addHook('afterFind', jsonParser(['metadata']));
+BookingNote.addHook('afterFind', jsonParser(['attachments']));
 
 module.exports = {
   sequelize,
@@ -346,4 +389,10 @@ module.exports = {
   Lead,
   Opportunity,
   LeadActivity,
+  Payment,
+  EscrowEntry,
+  WalletTransaction,
+  PayoutRequest,
+  BookingNote,
+  AdminSetting,
 };

@@ -676,12 +676,135 @@ const getFirmClients = async (userId) => {
   };
 };
 
+/**
+ * Reviews of every member-professional in the calling user's firm. Used by
+ * /dashboard/firm/reviews so the page can resolve the firm server-side
+ * instead of relying on the JWT's firmId (which is null for firm-owner
+ * pros — see the user table layout: linkedId points to ProfessionalDetail,
+ * not the firm, so the frontend can't reliably derive the firm id).
+ */
+const getFirmReviews = async (userId) => {
+  const ctx = await resolveFirmContext(userId);
+  if (!ctx.lawFirm) return { firmId: null, items: [] };
+  const reviewService = require('./reviewService');
+  const items = await reviewService.getByFirm(ctx.lawFirm.id);
+  return { firmId: ctx.lawFirm.id, items };
+};
+
+/**
+ * List every payment received by the firm's member-professionals. Used by
+ * /dashboard/firm to show the firm's collective revenue.
+ *
+ * Decorated with the receiving professional's name + the payer's name, so
+ * the firm owner sees who paid whom without N+1 lookups in the UI.
+ */
+const getFirmPayments = async (userId) => {
+  const ctx = await resolveFirmContext(userId);
+  if (!ctx.lawFirm) return { firmId: null, items: [], memberCount: 0 };
+  const { Payment } = require('../models');
+
+  const members = await FirmMember.findAll({
+    where: { firmId: ctx.lawFirm.id, status: 'active' },
+    attributes: ['professionalId'],
+    raw: true,
+  });
+  if (members.length === 0) {
+    return { firmId: ctx.lawFirm.id, items: [], memberCount: 0 };
+  }
+  // Resolve each member's user id — payments are keyed by professionalUserId
+  // (the user, not the public listing id).
+  const detailIds = [
+    ...new Set(members.map((m) => m.professionalId).filter(Boolean)),
+  ];
+  const details = await ProfessionalDetail.findAll({
+    where: { id: { [Op.in]: detailIds } },
+    attributes: ['id', 'userId'],
+    raw: true,
+  });
+  const memberUserIds = [
+    ...new Set(details.map((d) => d.userId).filter(Boolean)),
+  ];
+  if (memberUserIds.length === 0) {
+    return {
+      firmId: ctx.lawFirm.id,
+      items: [],
+      memberCount: members.length,
+    };
+  }
+
+  const payments = await Payment.findAll({
+    where: { professionalUserId: { [Op.in]: memberUserIds } },
+    order: [['createdAt', 'DESC']],
+    limit: 200,
+    raw: true,
+  });
+  if (payments.length === 0) {
+    return {
+      firmId: ctx.lawFirm.id,
+      items: [],
+      memberCount: members.length,
+    };
+  }
+
+  // Bulk-resolve professional + client display names so the table renders
+  // without another roundtrip per row.
+  const userIds = [
+    ...new Set(
+      [
+        ...payments.map((p) => p.professionalUserId),
+        ...payments.map((p) => p.userId),
+      ].filter(Boolean)
+    ),
+  ];
+  const users = await User.findAll({
+    where: { id: { [Op.in]: userIds } },
+    attributes: ['id', 'fullName', 'firstName', 'lastName', 'email'],
+    raw: true,
+  });
+  const byUserId = new Map(users.map((u) => [u.id, u]));
+  const display = (u) =>
+    u
+      ? u.fullName ||
+        [u.firstName, u.lastName].filter(Boolean).join(' ').trim() ||
+        u.email ||
+        ''
+      : '';
+
+  const items = payments.map((p) => ({
+    ...p,
+    professionalName: display(byUserId.get(p.professionalUserId)),
+    payerName: display(byUserId.get(p.userId)),
+  }));
+
+  // Aggregate totals so the page header can show at a glance.
+  const totals = items.reduce(
+    (acc, p) => {
+      if (p.status === 'paid' || p.status === 'refunded') {
+        acc.gross += Number(p.amount) || 0;
+        acc.markup += Number(p.platformFee) || 0;
+        acc.net += Number(p.netAmount) || 0;
+      }
+      return acc;
+    },
+    { gross: 0, markup: 0, net: 0 }
+  );
+
+  return {
+    firmId: ctx.lawFirm.id,
+    items,
+    memberCount: members.length,
+    totals,
+  };
+};
+
 module.exports = {
   getMyFirm,
   createFirm,
   updateFirm,
   getMembers,
   getFirmClients,
+  getFirmReviews,
+  getFirmPayments,
   changeMemberRole,
   removeMember,
   searchProfessionals,

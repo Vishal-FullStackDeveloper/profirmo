@@ -74,6 +74,24 @@ export async function getLawFirmClients() {
 }
 
 /**
+ * Aggregated payments received by every member professional in the firm.
+ * @returns {Promise<{firmId, items, memberCount, totals}>}
+ */
+export async function getLawFirmPayments() {
+  const res = await get('/api/law-firm/mine/payments');
+  return unwrap(res);
+}
+
+/**
+ * Collective reviews of every member-professional in the caller's firm.
+ * @returns {Promise<{firmId, items}>}
+ */
+export async function getLawFirmReviews() {
+  const res = await get('/api/law-firm/mine/reviews');
+  return unwrap(res);
+}
+
+/**
  * Create a new law firm (firm_admin).
  * @returns {Promise<Object>}
  */

@@ -10,11 +10,19 @@ import reviewService from '@/services/reviewService';
  * ReviewForm — a 1–5 star picker + comment box for writing a review.
  *
  * Props:
- *  - professionalId: the professional being reviewed
+ *  - professionalId, bookingId, reviewedUserId — wired to reviewService.create
+ *  - kind: 'professional' | 'consultation' | 'client' (default 'professional')
  *  - onSubmitted: () => void — called after a successful submission
  *  - onCancel: () => void — optional, shows a Cancel button when provided
  */
-export default function ReviewForm({ professionalId, onSubmitted, onCancel }) {
+export default function ReviewForm({
+  professionalId,
+  bookingId,
+  reviewedUserId,
+  kind = 'professional',
+  onSubmitted,
+  onCancel,
+}) {
   const { t } = useLanguage();
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
@@ -33,6 +41,9 @@ export default function ReviewForm({ professionalId, onSubmitted, onCancel }) {
     try {
       await reviewService.create({
         professionalId,
+        bookingId,
+        reviewedUserId,
+        kind,
         rating,
         comment: comment.trim(),
       });
@@ -47,6 +58,28 @@ export default function ReviewForm({ professionalId, onSubmitted, onCancel }) {
   }
 
   const shown = hover || rating;
+
+  // Copy is kind-aware so the placeholder + label match whichever review
+  // the user is leaving (consultation experience vs. professional vs. the
+  // legacy client review).
+  const flowCopy = (() => {
+    if (kind === 'consultation') {
+      return {
+        label: t('profCmp.consultationReviewLabel'),
+        placeholder: t('profCmp.consultationReviewPlaceholder'),
+      };
+    }
+    if (kind === 'client') {
+      return {
+        label: t('profCmp.clientReviewLabel'),
+        placeholder: t('profCmp.clientReviewPlaceholder'),
+      };
+    }
+    return {
+      label: t('profCmp.yourReview'),
+      placeholder: t('profCmp.reviewPlaceholder'),
+    };
+  })();
 
   return (
     <form
@@ -80,14 +113,14 @@ export default function ReviewForm({ professionalId, onSubmitted, onCancel }) {
         htmlFor="review-comment"
         className="mt-4 block text-sm font-medium text-slate-700"
       >
-        {t('profCmp.yourReview')}
+        {flowCopy.label}
       </label>
       <textarea
         id="review-comment"
         rows={3}
         value={comment}
         onChange={(e) => setComment(e.target.value)}
-        placeholder={t('profCmp.reviewPlaceholder')}
+        placeholder={flowCopy.placeholder}
         className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 transition-colors focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
       />
 

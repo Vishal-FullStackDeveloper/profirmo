@@ -36,6 +36,19 @@ const getFirmClients = asyncHandler(async (req, res) => {
   return successResponse(res, 200, 'Firm clients fetched', result);
 });
 
+// GET /api/law-firm/mine/payments — payments received by every firm member.
+const getFirmPayments = asyncHandler(async (req, res) => {
+  const result = await lawFirmService.getFirmPayments(req.user.id);
+  return successResponse(res, 200, 'Firm payments fetched', result);
+});
+
+// GET /api/law-firm/mine/reviews — collective reviews of every firm member,
+// each decorated with the reviewed pro's name + latest appeal state.
+const getFirmReviews = asyncHandler(async (req, res) => {
+  const result = await lawFirmService.getFirmReviews(req.user.id);
+  return successResponse(res, 200, 'Firm reviews fetched', result);
+});
+
 // GET /api/law-firm/mine/leads — inquiries submitted via the firm-profile
 // "Contact firm" modal. Returns an empty list when the caller has no firm.
 const getMyFirmLeads = asyncHandler(async (req, res) => {
@@ -162,6 +175,8 @@ module.exports = {
   updateFirm,
   getMembers,
   getFirmClients,
+  getFirmPayments,
+  getFirmReviews,
   getMyFirmLeads,
   addLeadAsClient,
   addMember,

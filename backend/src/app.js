@@ -28,6 +28,10 @@ const invitationRoutes = require('./routes/invitationRoutes');
 const firmJoinRoutes = require('./routes/firmJoinRoutes');
 const appSettingsRoutes = require('./routes/appSettingsRoutes');
 const leadRoutes = require('./routes/leadRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
+const walletRoutes = require('./routes/walletRoutes');
+const payoutRoutes = require('./routes/payoutRoutes');
+const paymentController = require('./controllers/paymentController');
 
 const app = express();
 
@@ -70,6 +74,24 @@ app.use(
 
 // 3. cookie-parser — needed to read the httpOnly refresh-token cookie.
 app.use(cookieParser());
+
+// 4a. Razorpay webhook — must run BEFORE the global JSON parser so we can
+//     access the raw body bytes for HMAC verification. The handler parses
+//     the JSON itself after the signature has been validated.
+app.post(
+  '/api/payments/webhook',
+  express.raw({ type: 'application/json' }),
+  (req, res, next) => {
+    try {
+      req.rawBody = req.body && req.body.toString ? req.body.toString('utf8') : '';
+      req.body = req.rawBody ? JSON.parse(req.rawBody) : {};
+    } catch {
+      req.body = {};
+    }
+    next();
+  },
+  paymentController.webhook
+);
 
 // 4. body parsing.
 app.use(express.json());
@@ -129,6 +151,9 @@ app.use('/api/invitations', invitationRoutes);
 app.use('/api/firm-join', firmJoinRoutes);
 app.use('/api/app-settings', appSettingsRoutes);
 app.use('/api/leads', leadRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/payouts', payoutRoutes);
 
 // --- Static uploads --------------------------------------------------------
 // Serve files stored on local disk at /uploads/<storedName>. Stored names

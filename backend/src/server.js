@@ -73,6 +73,15 @@ const SYNC_ORDER = [
   db.Lead,
   db.Opportunity,
   db.LeadActivity,
+  // --- Payment domain -------------------------------------------------
+  // Payment references bookings + users. EscrowEntry references Payment.
+  // WalletTransaction and PayoutRequest reference users (already above).
+  db.Payment,
+  db.EscrowEntry,
+  db.WalletTransaction,
+  db.PayoutRequest,
+  db.BookingNote,
+  db.AdminSetting,
 ];
 
 // Boot the Profirmo HTTP server.

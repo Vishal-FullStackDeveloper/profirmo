@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
 import {
   Zap,
   CalendarClock,
@@ -11,6 +12,7 @@ import {
   CheckCircle2,
   UserX,
   AlertCircle,
+  LogIn,
 } from 'lucide-react';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
@@ -23,10 +25,11 @@ import EmptyState from '@/components/common/EmptyState';
 import BookingCalendar from '@/components/booking/BookingCalendar';
 import TimeSlotSelector from '@/components/booking/TimeSlotSelector';
 import ConsultationSummary from '@/components/booking/ConsultationSummary';
-import PaymentPlaceholder from '@/components/booking/PaymentPlaceholder';
+import RazorpayPaymentCard from '@/components/booking/RazorpayPaymentCard';
 import { useLanguage } from '@/components/LanguageProvider';
 import professionalService from '@/services/professionalService';
 import bookingService from '@/services/bookingService';
+import { payForBooking } from '@/services/paymentService';
 import { useAuth } from '@/components/AuthProvider';
 import { BOOKING_TYPES } from '@/utils/constants';
 import { formatCurrency, formatDate, formatTime } from '@/utils/formatters';
@@ -35,6 +38,7 @@ const DURATIONS = [15, 30, 45, 60];
 
 export default function BookingPage() {
   const { t } = useLanguage();
+  const router = useRouter();
   const { professionalId } = useParams();
   const { user, isAuthenticated } = useAuth();
 
@@ -121,6 +125,7 @@ export default function BookingPage() {
     setProcessing(true);
     setBookingError('');
     try {
+      // Step 1: create the pending booking server-side.
       const booking = await bookingService.createBooking({
         professionalId,
         date: isInstant ? null : selectedDate,
@@ -129,9 +134,41 @@ export default function BookingPage() {
         type: isInstant ? BOOKING_TYPES.INSTANT : BOOKING_TYPES.SCHEDULED,
       });
       setCreatedBooking(booking);
-      setConfirmed(true);
+
+      // Step 2: open Razorpay Standard Checkout for this booking. The
+      // backend verifies the signature, flips the booking to "confirmed"
+      // and writes the escrow entry inside one transaction.
+      const payeeName =
+        (professional &&
+          (professional.name || professional.fullName)) ||
+        'Profirmo professional';
+      const result = await payForBooking({
+        bookingId: booking.id,
+        prefill: {
+          name:
+            (user && (user.fullName || user.name)) ||
+            [user && user.firstName, user && user.lastName]
+              .filter(Boolean)
+              .join(' '),
+          email: user && user.email,
+          phone: user && user.mobileNumber,
+        },
+        notes: `Consultation with ${payeeName}`,
+      });
+
+      if (result && result.cancelled) {
+        // The booking exists in `pending` state; client can retry from the
+        // bookings dashboard. Surface a clear message instead of throwing.
+        setBookingError(
+          'Payment was cancelled. Your booking is saved as pending — you can retry from My bookings.'
+        );
+      } else {
+        // Send the client straight to the bookings list — that's where they
+        // can connect with the pro, add notes and leave a review.
+        router.push('/dashboard/client/bookings');
+      }
     } catch (err) {
-      setBookingError(err.message || 'Failed to create booking.');
+      setBookingError(err.message || 'Payment failed. Please try again.');
     } finally {
       setProcessing(false);
     }
@@ -427,11 +464,60 @@ export default function BookingPage() {
                   </p>
                 )}
 
-                <PaymentPlaceholder
-                  amount={estimatedCost}
-                  onPay={handlePay}
-                  processing={processing || !canConfirm}
-                />
+                {isAuthenticated ? (
+                  <RazorpayPaymentCard
+                    amount={estimatedCost}
+                    onPay={handlePay}
+                    processing={processing}
+                    disabled={!canConfirm}
+                  />
+                ) : (
+                  <Card>
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                        <LogIn size={18} />
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-800">
+                          {t('bookingPage.signInToContinueTitle')}
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          {t('bookingPage.signInToContinueDesc')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+                      <span className="text-sm font-medium text-slate-600">
+                        {t('bookCmp.amountDue')}
+                      </span>
+                      <span className="text-lg font-bold text-slate-900">
+                        {formatCurrency(estimatedCost)}
+                      </span>
+                    </div>
+                    <Button
+                      href={`/login?next=${encodeURIComponent(
+                        `/booking/${professionalId}`
+                      )}`}
+                      variant="primary"
+                      size="lg"
+                      className="mt-4 w-full"
+                    >
+                      <LogIn size={16} />
+                      {t('bookingPage.signInCta')}
+                    </Button>
+                    <p className="mt-3 text-center text-xs text-slate-500">
+                      {t('bookingPage.signInNoAccount')}{' '}
+                      <Link
+                        href={`/signup?next=${encodeURIComponent(
+                          `/booking/${professionalId}`
+                        )}`}
+                        className="font-semibold text-amber-700 hover:text-amber-800"
+                      >
+                        {t('bookingPage.signUpCta')}
+                      </Link>
+                    </p>
+                  </Card>
+                )}
               </div>
             </div>
           </div>

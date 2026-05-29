@@ -36,4 +36,13 @@ router.patch(
   bookingController.updateBookingStatus
 );
 
+// Booking detail page (client + pro shared) + notes + case conversion.
+router.get('/:id/detail', bookingController.getBookingDetail);
+// Notes can be body-only, attachments-only, or both. Service validates.
+router.post('/:id/notes', bookingController.addBookingNote);
+router.post(
+  '/:id/convert-to-case',
+  bookingController.convertBookingToCase
+);
+
 module.exports = router;

@@ -384,6 +384,95 @@ async function runMigrations() {
     }
   }
 
+  // 7j. Case.bookingId — anchors a case back to the booking that produced
+  // it so we can enforce "one live case per booking" in the convert-to-case
+  // flow. NULL when the case was created manually (firm or admin).
+  try {
+    await sequelize.query(
+      'ALTER TABLE `cases` ADD COLUMN IF NOT EXISTS `bookingId` VARCHAR(64) NULL'
+    );
+  } catch (err) {
+    if (!/doesn'?t exist|Unknown table/i.test(err.message)) {
+      console.warn(
+        `[Migrate] Could not add cases.bookingId: ${err.message}`
+      );
+    }
+  }
+
+  // 7i. ProfessionalDetail.acceptsOnlineBooking + Booking.completedAt.
+  // Both are NULL-safe: NULL on acceptsOnlineBooking means "accepting"
+  // (existing pros stay bookable); completedAt is set when a booking flips
+  // to status='completed' so the 5-day review window can be evaluated.
+  try {
+    await sequelize.query(
+      'ALTER TABLE `professional_details` ADD COLUMN IF NOT EXISTS `acceptsOnlineBooking` BOOLEAN NULL'
+    );
+  } catch (err) {
+    if (!/doesn'?t exist|Unknown table/i.test(err.message)) {
+      console.warn(
+        `[Migrate] Could not add professional_details.acceptsOnlineBooking: ${err.message}`
+      );
+    }
+  }
+  try {
+    await sequelize.query(
+      'ALTER TABLE `bookings` ADD COLUMN IF NOT EXISTS `completedAt` DATETIME NULL'
+    );
+    // Backfill: any booking that's already 'completed' but missing a
+    // completedAt stamp gets one — the 5-day review window anchors against
+    // this column, so a missing value would keep escrow locked forever.
+    // We use the row's updatedAt as the best approximation of when it was
+    // marked completed.
+    const [r] = await sequelize.query(
+      "UPDATE `bookings` SET `completedAt` = `updatedAt` WHERE `status` = 'completed' AND `completedAt` IS NULL"
+    );
+    if (r && r.affectedRows > 0) {
+      console.log(
+        `[Migrate] Backfilled bookings.completedAt for ${r.affectedRows} row(s).`
+      );
+    }
+  } catch (err) {
+    if (!/doesn'?t exist|Unknown table/i.test(err.message)) {
+      console.warn(
+        `[Migrate] Could not add bookings.completedAt: ${err.message}`
+      );
+    }
+  }
+
+  // 7h. Review extensions: kind / bookingId / reviewedUserId. Lets the same
+  // table hold three review types — client→professional, client→consultation
+  // and professional→client — without churning existing rows.
+  for (const [col, type] of [
+    ['kind', "VARCHAR(20) NOT NULL DEFAULT 'professional'"],
+    ['bookingId', 'VARCHAR(64) NULL'],
+    ['reviewedUserId', 'VARCHAR(64) NULL'],
+  ]) {
+    try {
+      await sequelize.query(
+        `ALTER TABLE \`reviews\` ADD COLUMN IF NOT EXISTS \`${col}\` ${type}`
+      );
+    } catch (err) {
+      if (!/doesn'?t exist|Unknown table/i.test(err.message)) {
+        console.warn(`[Migrate] Could not add reviews.${col}: ${err.message}`);
+      }
+    }
+  }
+
+  // 7g. BookingNote `attachments` JSON column. The booking detail view lets
+  // either side attach files alongside a note; legacy rows get the column
+  // with NULL so JSON parsing falls back to an empty array.
+  try {
+    await sequelize.query(
+      'ALTER TABLE `booking_notes` ADD COLUMN IF NOT EXISTS `attachments` LONGTEXT NULL'
+    );
+  } catch (err) {
+    if (!/doesn'?t exist|Unknown table/i.test(err.message)) {
+      console.warn(
+        `[Migrate] Could not add booking_notes.attachments: ${err.message}`
+      );
+    }
+  }
+
   // 7f. Lead `firmId` + `message` columns. The firm-profile "Contact firm"
   // modal needs both — message for the inquiry text, firmId so each firm
   // sees only the leads addressed to them.

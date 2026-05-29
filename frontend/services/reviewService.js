@@ -29,8 +29,22 @@ export async function getByFirm(firmId) {
  * Create a review for a professional. Requires an authenticated user.
  * @param {{ professionalId:string, rating:number, comment?:string }} data
  */
-export async function create({ professionalId, rating, comment }) {
-  const res = await post(BASE, { professionalId, rating, comment });
+export async function create({
+  professionalId,
+  rating,
+  comment,
+  kind,
+  bookingId,
+  reviewedUserId,
+}) {
+  const res = await post(BASE, {
+    professionalId,
+    rating,
+    comment,
+    kind,
+    bookingId,
+    reviewedUserId,
+  });
   return unwrap(res);
 }
 

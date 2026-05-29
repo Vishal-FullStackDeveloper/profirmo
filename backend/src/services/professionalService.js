@@ -166,6 +166,14 @@ const normalizeLegacyProfessional = (p, overlay = null) => {
     reviewsCount: toNum(p.reviewsCount),
     verified: Boolean(p.verified),
     availableNow: Boolean(p.availableNow),
+    // Legacy rows can override via the new-model detail; default to true.
+    acceptsOnlineBooking:
+      detail &&
+      (detail.acceptsOnlineBooking === false ||
+        detail.acceptsOnlineBooking === 0 ||
+        detail.acceptsOnlineBooking === '0')
+        ? false
+        : true,
   };
 };
 
@@ -241,6 +249,13 @@ const normalizeProfileProfessional = ({ user, address, detail }) => {
       detail.availableNow === false ||
       detail.availableNow === 0 ||
       detail.availableNow === '0'
+        ? false
+        : true,
+    // NULL acceptsOnlineBooking → bookable. Explicit false hides the CTA.
+    acceptsOnlineBooking:
+      detail.acceptsOnlineBooking === false ||
+      detail.acceptsOnlineBooking === 0 ||
+      detail.acceptsOnlineBooking === '0'
         ? false
         : true,
   };
@@ -695,10 +710,14 @@ const updateRate = async (id, perMinuteRate) => {
   return professional.get({ plain: true });
 };
 
-/** Published reviews tied to a professional, newest first (empty when none). */
+/**
+ * Published reviews tied to a professional, newest first (empty when none).
+ * Filter `kind: 'professional'` so consultation + client reviews — both
+ * anchored to specific bookings — never leak into the public profile.
+ */
 const getReviews = async (id) =>
   Review.findAll({
-    where: { professionalId: id, status: 'PUBLISHED' },
+    where: { professionalId: id, status: 'PUBLISHED', kind: 'professional' },
     order: [['createdAt', 'DESC']],
     raw: true,
   });
